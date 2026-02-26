@@ -1,0 +1,116 @@
+═════════════════════════════════════════════════════════════════════════════════
+  WHAT TO TELL ANY LLM WORKING ON THIS PROJECT
+═════════════════════════════════════════════════════════════════════════════════
+
+COPY & PASTE THIS:
+
+---
+
+"You're working on a Reddit/Daily Star news aggregation dashboard.
+
+BEFORE MAKING ANY CHANGES:
+
+1. Read READ_ME_FIRST_FOR_LLM.md (the comprehensive starter guide)
+   - It covers architecture, data flow, read tracking, configuration
+   - It has step-by-step instructions for 10+ common tasks
+   - It has a troubleshooting flowchart for debugging
+
+2. The code is heavily optimized for LLM consumption:
+   - Every function has complete docstrings with examples
+   - Every function has type hints on arguments/returns
+   - Complex logic has inline 'WHY' explanations
+   - Section markers (=====) divide code into ~50-line chunks
+   - Error handling is documented
+
+3. Key files:
+   - config.py: ALL settings go here (subreddits, RSS feeds, keywords)
+   - scrape_dailystar.py: News scraping with keyword matching
+   - dashboard.py: 3-tab UI with read tracking
+
+4. When you need info:
+   - Architecture? Read CLAUDE.md
+   - Design decisions? Read IMPLEMENTATION_NOTES.md
+   - Quick reference? Read .llm-guide-index
+   - Specific question? Use Ctrl+F in READ_ME_FIRST_FOR_LLM.md
+
+5. When making changes:
+   - Edit only what's mentioned in the documentation
+   - Keep changes minimal
+   - Test with: python3 -m py_compile <file.py>
+   - Run scrapers before dashboard if you change data loading
+
+6. Your task: [DESCRIBE WHAT YOU WANT DONE]
+
+Read the documentation first, then proceed."
+
+---
+
+═════════════════════════════════════════════════════════════════════════════════
+
+KEY DOCUMENTS (in order of importance):
+
+1. READ_ME_FIRST_FOR_LLM.md        ← Most important
+   Everything an LLM needs to know
+
+2. config.py (with comments)       ← For changing settings
+   All configuration in one place
+
+3. scrape_dailystar.py (docstrings) ← For understanding news scraping
+   Complete documentation
+
+4. dashboard.py (docstrings)        ← For understanding UI
+   Complete documentation
+
+5. CLAUDE.md                        ← For architecture questions
+   System design
+
+6. IMPLEMENTATION_NOTES.md          ← For "why?" questions
+   Design decisions
+
+7. .llm-guide-index                 ← For quick lookups
+   Question → Answer mapping
+
+═════════════════════════════════════════════════════════════════════════════════
+
+IF THE LLM ASKS:
+
+Q: "What should I do first?"
+A: "Read READ_ME_FIRST_FOR_LLM.md and find your task in the Common Tasks section"
+
+Q: "How do I add a new subreddit?"
+A: "Read READ_ME_FIRST_FOR_LLM.md → Common Tasks → 'Add a new subreddit'"
+
+Q: "How does read tracking work?"
+A: "Read READ_ME_FIRST_FOR_LLM.md → Read Tracking System section"
+
+Q: "What files should I edit?"
+A: "Look at CLAUDE.md → Critical Files table"
+
+Q: "I got an error. What should I do?"
+A: "Read READ_ME_FIRST_FOR_LLM.md → Troubleshooting section"
+
+Q: "Can I understand the architecture?"
+A: "Yes, read CLAUDE.md and READ_ME_FIRST_FOR_LLM.md → Architecture section"
+
+═════════════════════════════════════════════════════════════════════════════════
+
+EXPECTED TIME FOR LLM TO GET PRODUCTIVE:
+
+- Reading master guide (READ_ME_FIRST_FOR_LLM.md): 5-10 minutes
+- Understanding your specific task: 2-5 minutes
+- Making the change: 5-15 minutes
+- Testing: 2-5 minutes
+- Total: 15-35 minutes for most tasks
+
+═════════════════════════════════════════════════════════════════════════════════
+
+THIS PROJECT IS READY FOR:
+✓ Autonomous LLM agents
+✓ Multi-turn conversations
+✓ Feature additions
+✓ Bug fixes
+✓ Performance improvements
+✓ Code refactoring
+✓ Documentation expansion
+
+═════════════════════════════════════════════════════════════════════════════════

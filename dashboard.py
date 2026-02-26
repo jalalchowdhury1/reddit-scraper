@@ -1,0 +1,764 @@
+"""
+Reddit Daily Dashboard + Daily Star News Browser
+=================================================
+
+WHAT IT DOES:
+1. Displays Reddit top posts (monthly + yearly) in tab 1 & 2
+2. Displays Daily Star news articles (keyword-matched) in tab 3
+3. Lets users mark posts/articles as "read"
+4. Read status persists across sessions (saved to JSON)
+5. Beautiful Tokyo Night theme with category badges
+
+KEY FEATURES:
+- 3 tabs: Monthly Top, Yearly Top, Daily Star News
+- Unified read tracking (Reddit + News in same JSON file)
+- Subreddit/category filters
+- Sort by score/comments (Reddit) or date (News)
+- Pagination (50 items per tab)
+- Read posts hidden by default (toggle in sidebar)
+- Gracefully handles missing data (shows helpful messages)
+
+USAGE:
+    streamlit run dashboard.py
+
+DEPENDENCIES:
+    - streamlit >= 1.28.0 (UI framework)
+    - pandas >= 2.1.0 (data processing)
+    - config.py (subreddit and category config)
+
+READ TRACKING SYSTEM:
+    File: data/read_posts.json
+    Keys for Reddit posts: bare ID (e.g., "1r2vnhs")
+    Keys for News articles: "dsr_" prefix (e.g., "dsr_464356fa75d5")
+    → No collision possible between systems
+
+IMPORTANT FOR LLMs:
+- Do NOT manually edit data/read_posts.json (use dashboard UI instead)
+- If dashboard shows "No data": Run scrape_top.py and/or scrape_dailystar.py
+- To debug: Check sidebar "Show read posts" to see all items
+- CSS styling: style.css must be in same directory as this file
+"""
+import streamlit as st
+import pandas as pd
+from pathlib import Path
+import glob
+import json
+import os
+import tempfile
+import logging
+from typing import Tuple
+
+import config
+
+# ============================================================================
+# LOGGING SETUP
+# ============================================================================
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
+logger = logging.getLogger(__name__)
+
+# ============================================================================
+# READ TRACKING CONFIGURATION
+# ============================================================================
+# File that stores which posts/articles user has marked as read
+READ_POSTS_FILE = Path("data/read_posts.json")
+
+# ============================================================================
+# READ TRACKING FUNCTIONS
+# ============================================================================
+
+
+def load_read_posts() -> set:
+    """
+    Load read post IDs from persistent JSON storage.
+
+    Returns:
+        set: IDs of read posts/articles. May contain:
+            - Reddit post IDs: bare numeric IDs (e.g., "1r2vnhs")
+            - News article IDs: with "dsr_" prefix (e.g., "dsr_464356fa75d5")
+
+    Behavior:
+        - If file doesn't exist: returns empty set
+        - If file corrupted: logs error, returns empty set
+        - Strips legacy "_month"/"_year" suffixes (old format auto-migration)
+
+    WHY THIS MATTERS:
+        - User marking post as read in Monthly tab also hides it in Yearly
+        - Post stays hidden even after browser refresh
+        - Across multiple browser sessions
+    """
+    if not READ_POSTS_FILE.exists():
+        return set()
+    try:
+        with open(READ_POSTS_FILE, "r") as f:
+            data = json.load(f)
+        # Support both old format (list of "id_month" strings) and new (bare IDs)
+        cleaned = set()
+        for item in data:
+            # Strip legacy suffixes like "_month" / "_year"
+            base_id = str(item).rsplit("_month", 1)[0].rsplit("_year", 1)[0]
+            cleaned.add(base_id)
+        return cleaned
+    except (json.JSONDecodeError, TypeError, IOError) as e:
+        logger.error(f"Failed to load read_posts.json: {e}")
+        return set()
+
+
+def save_read_posts(read_set: set) -> None:
+    """
+    Atomically save read post/article IDs to JSON.
+
+    Args:
+        read_set (set): IDs to save
+
+    Safety Features:
+        - Write to temp file first, then atomic rename
+        - Prevents corruption if process crashes mid-write
+        - Cleans up temp file on error
+        - Logs errors instead of crashing
+
+    ATOMIC WRITE PATTERN:
+        1. Create temp file
+        2. Write entire set to temp file
+        3. Atomic rename temp → real file
+        → Either all data written or nothing (no partial writes)
+    """
+    READ_POSTS_FILE.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        # Write to temp file first, then atomically replace
+        fd, tmp_path = tempfile.mkstemp(
+            dir=str(READ_POSTS_FILE.parent), suffix=".tmp"
+        )
+        with os.fdopen(fd, "w") as f:
+            json.dump(sorted(read_set), f, indent=2)
+        os.replace(tmp_path, str(READ_POSTS_FILE))
+    except IOError as e:
+        logger.error(f"Failed to save read_posts.json: {e}")
+        # Clean up temp file on failure
+        if os.path.exists(tmp_path):
+            os.unlink(tmp_path)
+
+
+# ============================================================================
+# STYLING
+# ============================================================================
+
+
+def local_css(file_name: str) -> None:
+    """
+    Inject CSS from file into Streamlit page.
+
+    Args:
+        file_name (str): Path to CSS file (relative to current directory)
+
+    Note:
+        - style.css must exist in same directory as this file
+        - Contains Tokyo Night color scheme
+        - Includes badge styles for Reddit subreddits and News categories
+    """
+    path = Path(file_name)
+    if path.exists():
+        st.markdown(f"<style>{path.read_text()}</style>", unsafe_allow_html=True)
+
+
+# ============================================================================
+# STREAMLIT PAGE SETUP
+# ============================================================================
+if "read_posts" not in st.session_state:
+    st.session_state.read_posts = load_read_posts()
+
+st.set_page_config(
+    page_title="Reddit Daily",
+    page_icon="https://www.redditstatic.com/desktop2x/img/favicon/android-icon-192x192.png",
+    layout="wide",
+    initial_sidebar_state="expanded",
+)
+local_css("style.css")
+
+# ============================================================================
+# DATA LOADING — REDDIT POSTS
+# ============================================================================
+
+
+def load_posts() -> pd.DataFrame:
+    """
+    Load all scraped Reddit posts from CSV files.
+
+    Returns:
+        pd.DataFrame: Combined posts with columns:
+            - id, title, author, score, num_comments, etc. (see CSV_FORMAT.md)
+            - subreddit (added from folder name)
+            - time_filter (added: "month" or "year")
+
+    Data Layout:
+        data/r_dataisbeautiful/posts.csv → subreddit="dataisbeautiful", time_filter="month"
+        data/r_dataisbeautiful_yearly/posts.csv → subreddit="dataisbeautiful", time_filter="year"
+        (Same pattern for all 13 subreddits)
+
+    Error Handling:
+        - Missing files: logged but skip (no crash)
+        - Corrupt CSVs: logged but skip
+        - Missing columns: safely defaults to empty string / 0
+        - NaN values: filled with defaults
+
+    Returns empty DataFrame if:
+        - data/ directory doesn't exist
+        - No CSV files found
+        - All CSVs are empty or corrupt
+
+    WHY SAFE DEFAULTS MATTER:
+        - Some posts might not have all fields
+        - Dashboard should never crash due to missing data
+        - Partial data is better than nothing
+    """
+    data_dir = Path("data")
+    all_posts = []
+
+    if not data_dir.exists():
+        return pd.DataFrame()
+
+    # Monthly posts: data/r_*/posts.csv  (excluding _yearly folders)
+    for csv_file in sorted(glob.glob(str(data_dir / "r_*/posts.csv"))):
+        if "_yearly" in csv_file:
+            continue
+        try:
+            df = pd.read_csv(csv_file)
+            if df.empty or "id" not in df.columns:
+                continue
+            sub_name = Path(csv_file).parent.name.replace("r_", "")
+            df["subreddit"] = sub_name
+            df["time_filter"] = "month"
+            all_posts.append(df)
+        except Exception as e:
+            logger.warning(f"Skipping {csv_file}: {e}")
+
+    # Yearly posts: data/r_*_yearly/posts.csv
+    for csv_file in sorted(glob.glob(str(data_dir / "r_*_yearly/posts.csv"))):
+        try:
+            df = pd.read_csv(csv_file)
+            if df.empty or "id" not in df.columns:
+                continue
+            sub_name = Path(csv_file).parent.name.replace("r_", "").replace("_yearly", "")
+            df["subreddit"] = sub_name
+            df["time_filter"] = "year"
+            all_posts.append(df)
+        except Exception as e:
+            logger.warning(f"Skipping {csv_file}: {e}")
+
+    if not all_posts:
+        return pd.DataFrame()
+
+    combined = pd.concat(all_posts, ignore_index=True)
+
+    # Ensure required columns exist with safe defaults
+    for col, default in [
+        ("score", 0),
+        ("num_comments", 0),
+        ("author", "unknown"),
+        ("selftext", ""),
+        ("permalink", ""),
+        ("title", "Untitled"),
+    ]:
+        if col not in combined.columns:
+            combined[col] = default
+
+    # Fill NaN values with defaults
+    combined["score"] = pd.to_numeric(combined["score"], errors="coerce").fillna(0).astype(int)
+    combined["num_comments"] = pd.to_numeric(combined["num_comments"], errors="coerce").fillna(0).astype(int)
+    combined["author"] = combined["author"].fillna("unknown")
+    combined["selftext"] = combined["selftext"].fillna("")
+    combined["title"] = combined["title"].fillna("Untitled")
+    combined["id"] = combined["id"].astype(str)
+
+    # Deduplicate by post id within each time_filter group
+    combined = combined.drop_duplicates(subset=["id", "time_filter"], keep="first")
+
+    return combined
+
+
+# ============================================================================
+# DATA LOADING — NEWS ARTICLES
+# ============================================================================
+
+
+def load_news_articles() -> pd.DataFrame:
+    """
+    Load scraped Daily Star articles from CSV.
+
+    Returns:
+        pd.DataFrame: Articles with columns:
+            - article_id, title, url, description, pub_date, author, category,
+            - matched_keywords, feed_source, scraped_at
+
+    Data Source:
+        data/dailystar/articles.csv (created by scrape_dailystar.py)
+
+    Error Handling:
+        - Missing file: returns empty DataFrame (news tab shows helpful message)
+        - Corrupt CSV: returns empty DataFrame
+        - Missing columns: safely defaults to empty string
+        - NaN values: filled with defaults
+
+    Why empty description OK:
+        - Some RSS feeds have minimal descriptions
+        - Dashboard still shows title + preview
+    """
+    csv_path = Path("data/dailystar/articles.csv")
+    if not csv_path.exists():
+        return pd.DataFrame()
+
+    try:
+        df = pd.read_csv(csv_path)
+        if df.empty or "article_id" not in df.columns:
+            return pd.DataFrame()
+
+        for col, default in [
+            ("title", "Untitled"),
+            ("url", ""),
+            ("description", ""),
+            ("pub_date", ""),
+            ("author", "Unknown"),
+            ("category", "Uncategorized"),
+            ("matched_keywords", ""),
+        ]:
+            if col not in df.columns:
+                df[col] = default
+
+        df["article_id"] = df["article_id"].astype(str)
+        df["title"] = df["title"].fillna("Untitled")
+        df["description"] = df["description"].fillna("")
+        df["author"] = df["author"].fillna("Unknown")
+        df = df.drop_duplicates(subset=["article_id", "category"], keep="first")
+        return df
+    except Exception as e:
+        logger.warning(f"Failed to load news articles: {e}")
+        return pd.DataFrame()
+
+
+# ============================================================================
+# SUBREDDIT NAME DISPLAY
+# ============================================================================
+
+
+def get_display_name(sub: str) -> str:
+    """
+    Map subreddit name to human-readable display name.
+
+    Args:
+        sub (str): Subreddit name (case-insensitive)
+
+    Returns:
+        str: Display name from config.SUBREDDITS, or "r/{sub}" as fallback
+
+    Example:
+        get_display_name("dataisbeautiful") → "Data Is Beautiful"
+        get_display_name("unknown_sub") → "r/unknown_sub"
+    """
+    for s in config.SUBREDDITS:
+        if s["name"].lower() == sub.lower():
+            return s["display_name"]
+    return f"r/{sub}"
+
+
+# ============================================================================
+# REDDIT POST RENDERING
+# ============================================================================
+
+
+def render_post_card(row, is_read: bool) -> None:
+    """
+    Render a single Reddit post card with Tokyo Night styling.
+
+    Args:
+        row (pd.Series): Post data from DataFrame
+        is_read (bool): Whether post is marked as read
+
+    Card Contents:
+        1. Subreddit badge (left) | Time filter badge or READ badge (right)
+        2. Post title
+        3. Post preview (self text, truncated to 250 chars)
+        4. Metrics: score, comments, author | Open & Mark Read buttons
+
+    Behavior when read:
+        - "READ" badge instead of time filter
+        - Unread button instead of Mark Read button
+        - Styling indicates read status
+
+    IMPORTANT: Key format: "rd_{post_id}_{time_filter}" to ensure unique keys
+    across reruns (Streamlit requirement).
+    """
+    post_id = str(row["id"])
+    read_class = "read-card" if is_read else ""
+
+    with st.container(border=True):
+        # Header: subreddit badge + time filter + read status
+        col_left, col_right = st.columns([1, 1])
+        with col_left:
+            st.markdown(
+                f'<span class="subreddit-badge">{get_display_name(row["subreddit"])}</span>',
+                unsafe_allow_html=True,
+            )
+        with col_right:
+            badge = row.get("time_filter", "month").upper()
+            if is_read:
+                st.markdown(
+                    f'<div style="text-align:right"><span class="read-badge">READ</span></div>',
+                    unsafe_allow_html=True,
+                )
+            else:
+                st.markdown(
+                    f'<div style="text-align:right"><span class="time-filter-badge">{badge}</span></div>',
+                    unsafe_allow_html=True,
+                )
+
+        # Title
+        title_text = str(row.get("title", "Untitled"))
+        st.markdown(f'<div class="post-title">{title_text}</div>', unsafe_allow_html=True)
+
+        # Self text preview
+        selftext = str(row.get("selftext", ""))
+        if selftext and selftext != "nan":
+            preview = selftext[:250] + "..." if len(selftext) > 250 else selftext
+            st.markdown(f'<div class="post-preview">{preview}</div>', unsafe_allow_html=True)
+
+        # Metrics row
+        score = int(row.get("score", 0))
+        comments = int(row.get("num_comments", 0))
+        author = str(row.get("author", "unknown"))
+
+        m_col, b_col = st.columns([2, 1.2])
+        with m_col:
+            st.markdown(
+                f'<div class="post-metrics">'
+                f'<span class="metric-score">{score:,}</span> points'
+                f'<span class="metric-sep"></span>'
+                f'<span class="metric-comments">{comments:,}</span> comments'
+                f'<span class="metric-sep"></span>'
+                f'<span class="metric-author">u/{author}</span>'
+                f'</div>',
+                unsafe_allow_html=True,
+            )
+        with b_col:
+            btn_left, btn_right = st.columns(2)
+            with btn_left:
+                permalink = str(row.get("permalink", ""))
+                if permalink:
+                    st.link_button("Open", f"https://reddit.com{permalink}", use_container_width=True)
+            with btn_right:
+                if is_read:
+                    if st.button("Unread", key=f"un_{post_id}_{row.get('time_filter','m')}", use_container_width=True, type="secondary"):
+                        st.session_state.read_posts.discard(post_id)
+                        save_read_posts(st.session_state.read_posts)
+                        st.rerun()
+                else:
+                    if st.button("Mark Read", key=f"rd_{post_id}_{row.get('time_filter','m')}", use_container_width=True, type="primary"):
+                        st.session_state.read_posts.add(post_id)
+                        save_read_posts(st.session_state.read_posts)
+                        st.rerun()
+
+
+# ============================================================================
+# REDDIT TAB RENDERING
+# ============================================================================
+
+
+def render_tab(df: pd.DataFrame, tab_key: str) -> None:
+    """
+    Render a full Reddit tab with filters and post cards.
+
+    Args:
+        df (pd.DataFrame): Filtered posts to display
+        tab_key (str): Unique key for filters ("monthly" or "yearly")
+
+    Tab Layout:
+        1. Filter row: Subreddit dropdown | Sort dropdown
+        2. Caption showing post count
+        3. Post cards (up to 50)
+
+    Filters:
+        - Subreddit: "All" or specific subreddit
+        - Sort: "Score" (descending) or "Comments" (descending)
+
+    Pagination:
+        - Shows "Showing X of Y" caption
+        - Renders up to 50 posts (limit prevents performance issues)
+    """
+    if df.empty:
+        st.info("No posts to show.")
+        return
+
+    col1, col2 = st.columns([1, 1])
+
+    # Build subreddit list with proper case
+    sub_list = sorted(df["subreddit"].unique().tolist(), key=str.lower)
+    subs = ["All"] + sub_list
+    sel = col1.selectbox("Subreddit", subs, key=f"sub_{tab_key}")
+    sort_opt = col2.selectbox("Sort by", ["Score", "Comments"], key=f"sort_{tab_key}")
+
+    if sel != "All":
+        df = df[df["subreddit"] == sel]  # Exact match, no .lower()
+
+    sort_col = "score" if sort_opt == "Score" else "num_comments"
+    df = df.sort_values(sort_col, ascending=False)
+
+    # Show post count
+    st.caption(f"Showing {min(len(df), 50)} of {len(df)} posts")
+
+    for _, row in df.head(50).iterrows():
+        post_id = str(row["id"])
+        render_post_card(row, post_id in st.session_state.read_posts)
+
+
+# ============================================================================
+# NEWS ARTICLE RENDERING
+# ============================================================================
+
+
+def render_article_card(row, is_read: bool) -> None:
+    """
+    Render a single news article card with Tokyo Night styling.
+
+    Args:
+        row (pd.Series): Article data from DataFrame
+        is_read (bool): Whether article is marked as read
+
+    Card Contents:
+        1. Category badge (left, colored) | Publication date or READ badge (right)
+        2. Article title
+        3. Article description (first 300 chars)
+        4. Author | "Read Article" & "Mark Read" buttons
+
+    Styling:
+        - Category badges: cyan (Relations), orange (Economy), green (Good News)
+        - Date display: yellow monospace
+        - Matched keywords: muted gray text
+
+    Key format: "dsr_{article_id}_{category}" to ensure unique keys
+    (Streamlit requirement, different from Reddit key format).
+    """
+    article_id = str(row["article_id"])
+    read_key = f"dsr_{article_id}"
+
+    with st.container(border=True):
+        # Header: category badge + date/read status
+        col_left, col_right = st.columns([1, 1])
+        with col_left:
+            category = str(row.get("category", ""))
+            badge_class = "news-cat-relations"
+            if "Economy" in category:
+                badge_class = "news-cat-economy"
+            elif "Good" in category:
+                badge_class = "news-cat-goodnews"
+            st.markdown(
+                f'<span class="{badge_class}">{category}</span>',
+                unsafe_allow_html=True,
+            )
+        with col_right:
+            if is_read:
+                st.markdown(
+                    '<div style="text-align:right"><span class="read-badge">READ</span></div>',
+                    unsafe_allow_html=True,
+                )
+            else:
+                pub_date = str(row.get("pub_date", ""))
+                date_display = pub_date[:10] if len(pub_date) >= 10 else pub_date
+                st.markdown(
+                    f'<div style="text-align:right"><span class="news-date">{date_display}</span></div>',
+                    unsafe_allow_html=True,
+                )
+
+        # Title
+        title_text = str(row.get("title", "Untitled"))
+        st.markdown(f'<div class="post-title">{title_text}</div>', unsafe_allow_html=True)
+
+        # Description preview
+        description = str(row.get("description", ""))
+        if description and description != "nan":
+            preview = description[:300] + "..." if len(description) > 300 else description
+            st.markdown(f'<div class="post-preview">{preview}</div>', unsafe_allow_html=True)
+
+        # Metrics row: author + matched keywords
+        author = str(row.get("author", "Unknown"))
+        matched_kw = str(row.get("matched_keywords", ""))
+
+        m_col, b_col = st.columns([2, 1.2])
+        with m_col:
+            kw_html = ""
+            if matched_kw and matched_kw != "nan":
+                kw_html = (
+                    f'<span class="metric-sep"></span>'
+                    f'<span class="news-keywords">Keywords: {matched_kw}</span>'
+                )
+            st.markdown(
+                f'<div class="post-metrics">'
+                f'<span class="metric-author">{author}</span>'
+                f'{kw_html}'
+                f'</div>',
+                unsafe_allow_html=True,
+            )
+        with b_col:
+            btn_left, btn_right = st.columns(2)
+            with btn_left:
+                url = str(row.get("url", ""))
+                if url and url != "nan":
+                    st.link_button("Read Article", url, use_container_width=True)
+            with btn_right:
+                if is_read:
+                    if st.button("Unread", key=f"nun_{read_key}_{row.get('category','')}", use_container_width=True, type="secondary"):
+                        st.session_state.read_posts.discard(read_key)
+                        save_read_posts(st.session_state.read_posts)
+                        st.rerun()
+                else:
+                    if st.button("Mark Read", key=f"nrd_{read_key}_{row.get('category','')}", use_container_width=True, type="primary"):
+                        st.session_state.read_posts.add(read_key)
+                        save_read_posts(st.session_state.read_posts)
+                        st.rerun()
+
+
+# ============================================================================
+# NEWS TAB RENDERING
+# ============================================================================
+
+
+def render_news_tab(df: pd.DataFrame) -> None:
+    """
+    Render the Daily Star News tab with category filter and article cards.
+
+    Args:
+        df (pd.DataFrame): News articles to display
+
+    Tab Layout:
+        1. Filter row: Category dropdown | Date sort dropdown
+        2. Caption showing article count
+        3. Article cards (up to 50)
+
+    Filters:
+        - Category: "All Categories" or specific category
+        - Sort: "Date (Newest)" or "Date (Oldest)"
+
+    Pagination:
+        - Shows "Showing X of Y" caption
+        - Renders up to 50 articles (limit prevents performance issues)
+    """
+    if df.empty:
+        st.info("No news articles found. Run `python scrape_dailystar.py` to fetch news.")
+        return
+
+    col1, col2 = st.columns([1, 1])
+
+    # Category filter
+    cat_list = sorted(df["category"].unique().tolist())
+    cats = ["All Categories"] + cat_list
+    sel_cat = col1.selectbox("Category", cats, key="news_cat")
+    sort_opt = col2.selectbox("Sort by", ["Date (Newest)", "Date (Oldest)"], key="news_sort")
+
+    if sel_cat != "All Categories":
+        df = df[df["category"] == sel_cat]
+
+    ascending = sort_opt == "Date (Oldest)"
+    df = df.sort_values("pub_date", ascending=ascending, na_position="last")
+
+    st.caption(f"Showing {min(len(df), 50)} of {len(df)} articles")
+
+    for _, row in df.head(50).iterrows():
+        read_key = f"dsr_{row['article_id']}"
+        render_article_card(row, read_key in st.session_state.read_posts)
+
+
+# ============================================================================
+# SIDEBAR
+# ========================
+
+# ========================
+with st.sidebar:
+    st.markdown('<div class="sidebar-header">Settings</div>', unsafe_allow_html=True)
+
+    show_read = st.checkbox("Show read posts", value=False)
+
+    st.markdown("---")
+
+    read_count = len(st.session_state.read_posts)
+    st.markdown(f'<div class="sidebar-stat">Posts marked read: **{read_count}**</div>', unsafe_allow_html=True)
+
+    if st.button("Clear all read markers", use_container_width=True, type="secondary"):
+        st.session_state.read_posts = set()
+        save_read_posts(set())
+        st.rerun()
+
+    st.markdown("---")
+    st.markdown(
+        '<div class="sidebar-tip">Posts you mark as read are saved to disk and stay hidden across sessions.</div>',
+        unsafe_allow_html=True,
+    )
+
+
+# ============================================================================
+# MAIN CONTENT
+# ============================================================================
+st.markdown('<h1 class="main-title">Reddit Daily</h1>', unsafe_allow_html=True)
+st.markdown('<p class="main-subtitle">Top insights across your favorite subreddits</p>', unsafe_allow_html=True)
+
+# Load data
+posts_df = load_posts()
+news_df = load_news_articles()
+
+has_reddit = not posts_df.empty
+has_news = not news_df.empty
+
+if not has_reddit and not has_news:
+    st.warning("No data found. Run `python scrape_top.py` and/or `python scrape_dailystar.py` first.")
+    st.stop()
+
+# Filter out read posts unless toggled
+filtered_df = posts_df
+if has_reddit and not show_read:
+    filtered_df = posts_df[~posts_df["id"].astype(str).isin(st.session_state.read_posts)]
+
+filtered_news = news_df
+if has_news and not show_read:
+    filtered_news = news_df[~news_df["article_id"].astype(str).apply(lambda x: f"dsr_{x}").isin(st.session_state.read_posts)]
+
+# Stats row
+monthly_count = len(filtered_df[filtered_df["time_filter"] == "month"]) if has_reddit else 0
+yearly_count = len(filtered_df[filtered_df["time_filter"] == "year"]) if has_reddit else 0
+news_count = len(filtered_news) if has_news else 0
+unread_total = (len(filtered_df) if has_reddit else 0) + news_count
+total = (len(posts_df) if has_reddit else 0) + (len(news_df) if has_news else 0)
+
+c1, c2, c3, c4, c5 = st.columns(5)
+c1.metric("Monthly", monthly_count)
+c2.metric("Yearly", yearly_count)
+c3.metric("News", news_count)
+c4.metric("Unread", unread_total)
+c5.metric("Total", total)
+
+st.markdown('<div class="divider"></div>', unsafe_allow_html=True)
+
+# Tabs
+tab_monthly, tab_yearly, tab_news = st.tabs(["Monthly Top", "Yearly Top", "Daily Star News"])
+
+with tab_monthly:
+    if has_reddit:
+        render_tab(
+            filtered_df[filtered_df["time_filter"] == "month"].copy(),
+            "monthly",
+        )
+    else:
+        st.info("No Reddit posts found. Run `python scrape_top.py` to fetch data.")
+
+with tab_yearly:
+    if has_reddit:
+        render_tab(
+            filtered_df[filtered_df["time_filter"] == "year"].copy(),
+            "yearly",
+        )
+    else:
+        st.info("No Reddit posts found. Run `python scrape_top.py` to fetch data.")
+
+with tab_news:
+    render_news_tab(filtered_news.copy() if has_news else pd.DataFrame())
+
+st.markdown('<div class="divider"></div>', unsafe_allow_html=True)
+st.markdown(
+    '<p class="footer-text">Read posts are saved to disk and persist across sessions.</p>',
+    unsafe_allow_html=True,
+)

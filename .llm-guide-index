@@ -1,0 +1,51 @@
+LLM DOCUMENTATION INDEX
+=======================
+
+START HERE:
+→ READ_ME_FIRST_FOR_LLM.md (Comprehensive starter guide, common tasks, troubleshooting)
+
+THEN READ (by purpose):
+
+Architecture & Design:
+  → CLAUDE.md (system design, file structure, data flow)
+  → IMPLEMENTATION_NOTES.md (design decisions, why things work this way)
+
+Code Quality & Optimization:
+  → LLM_OPTIMIZATION_SUMMARY.md (what was optimized, how to use LLMs effectively)
+
+Code Files (well-documented):
+  → config.py (all settings, heavily commented)
+  → scrape_dailystar.py (RSS scraper, full docstrings)
+  → dashboard.py (UI and read tracking, complete documentation)
+
+For Quick Answers:
+  Question: "How do I add a new subreddit?"
+  Answer: READ_ME_FIRST_FOR_LLM.md → "Add a new subreddit" section
+
+  Question: "How does read tracking work?"
+  Answer: READ_ME_FIRST_FOR_LLM.md → "Read Tracking System" section
+
+  Question: "What files should I edit?"
+  Answer: CLAUDE.md → "Critical Files" table
+
+  Question: "Why does it crash?"
+  Answer: READ_ME_FIRST_FOR_LLM.md → "Troubleshooting" section
+
+STRUCTURE:
+  Master Guide (READ_ME_FIRST_FOR_LLM.md)
+     ↓
+  Pick your question type:
+     - Troubleshooting? → READ_ME_FIRST_FOR_LLM.md troubleshooting section
+     - Adding features? → READ_ME_FIRST_FOR_LLM.md common tasks section
+     - Understanding design? → CLAUDE.md
+     - Editing code? → Code files with inline docstrings
+
+TELL ANY LLM:
+  "This project has extensive documentation optimized for LLMs.
+   Read READ_ME_FIRST_FOR_LLM.md first before making any changes.
+   All code files have detailed docstrings and inline comments.
+   The .llm-guide-index file shows the documentation hierarchy."
+
+VERSION: 1.0 (Production-grade LLM documentation)
+CREATED: 2026-02-26
+STATUS: ✅ Ready for autonomous LLM use

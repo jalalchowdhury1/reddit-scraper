@@ -1,0 +1,25 @@
+version: '3.8'
+
+services:
+  scraper:
+    image: usaiinc/scraper:latest
+    ports:
+      - "5006:5006"
+    # volumes:
+    #   - ./.env:/app/.env
+    # Uncomment above to add API keys
+
+  # Optional: Streamlit dashboard
+  dashboard:
+    build: .
+    ports:
+      - "8501:8501"
+    volumes:
+      - ./data:/app/data
+    environment:
+      - REDDIT_CLIENT_ID=${REDDIT_CLIENT_ID}
+      - REDDIT_CLIENT_SECRET=${REDDIT_CLIENT_SECRET}
+      - SCRAPESERV_URL=http://scraper:5006
+    depends_on:
+      - scraper
+    command: streamlit run dashboard.py
