@@ -1,0 +1,16 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Data
+seen_posts.csv
+data/
+
+# Repository Clone
+.repo_clone/
+
+# IDE
+.vscode/
+.idea/
+.DS_Store
