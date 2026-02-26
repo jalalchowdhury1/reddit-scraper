@@ -1,12 +1,62 @@
 """
-Custom Scraper for Top Monthly and Yearly Posts
+Reddit Top Posts Scraper — Monthly & Yearly Top Posts
+
+WHAT IT DOES:
+1. Fetches top posts from 13 subreddits using old.reddit.com JSON API
+2. Saves monthly posts to data/r_<subreddit>/posts.csv
+3. Saves yearly posts to data/r_<subreddit>_yearly/posts.csv
+4. Merges with existing CSV files (deduplicates by post ID)
+
+KEY FEATURES:
+- Simple, lightweight scraping (no API keys required)
+- Uses old.reddit.com JSON endpoints (reliable mirror)
+- Deduplication prevents duplicate posts across runs
+- 1 second delay between requests (rate limiting)
+
+USAGE:
+    python3 scrape_top.py
+
+OUTPUT:
+    data/r_<subreddit>/posts.csv (monthly)
+    data/r_<subreddit>_yearly/posts.csv (yearly)
+
+DEPENDENCIES:
+    - requests (HTTP fetching)
+    - pandas (CSV handling)
+
+IMPORTANT FOR LLMs:
+- Subreddits are defined in config.py → SUBREDDITS list
+- This scraper does NOT use the database (database.py is unused)
+- Uses config.POSTS_PER_SUBREDDIT for post count
+- Dashboard loads from CSVs, not database
+
+TODO FOR LLM OPTIMIZATION:
+- Add try/except around HTTP requests with proper error logging
+- Add input validation for subreddit names
+- Consider adding retry logic for failed requests
 """
 import requests
 import pandas as pd
 import time
 from datetime import datetime
 import os
+import logging
+from typing import List, Dict, Optional
 
+import config
+
+# ============================================================================
+# LOGGING SETUP
+# ============================================================================
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(levelname)s - %(message)s"
+)
+logger = logging.getLogger(__name__)
+
+# ============================================================================
+# CONFIGURATION
+# ============================================================================
 # Reddit mirrors (old.reddit.com works best for JSON)
 MIRRORS = [
     "https://old.reddit.com",
@@ -14,24 +64,11 @@ MIRRORS = [
 
 USER_AGENT = "RedditDaily/1.0"
 
-# Subreddits to scrape (from your image)
-SUBREDDITS = [
-    "dataisbeautiful",
-    "todayilearned",
-    "sobooksoc",
-    "Fitness",
-    "getmotivated",
-    "UnethicalLifeProTips",
-    "LifeProTips",
-    "TrueReddit",
-    "UpliftingNews",
-    "lifehacks",
-    "Productivity",
-    "PersonalFinance",
-    "explainlikeimfive"
-]
+# Subreddits to scrape (from config.py - single source of truth)
+# Note: Using config.SUBREDDITS for consistency
+SUBREDDITS = [s["name"] for s in config.SUBREDDITS]
 
-POSTS_PER_SUBREDDIT = 20
+POSTS_PER_SUBREDDIT = config.POSTS_PER_SUBREDDIT
 
 
 def get_top_posts(subreddit, time_filter="month", limit=20):

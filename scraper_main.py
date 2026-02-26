@@ -1,6 +1,55 @@
 """
 🤖 Universal Reddit Scraper Suite
-Full-featured scraper with analytics, dashboard, notifications, and scheduling.
+
+WHAT IT DOES:
+1. Full-featured Reddit scraper with multiple modes:
+   - Full mode: Posts + images + videos + comments
+   - History mode: Posts only (lightweight)
+   - Monitor mode: RSS-based new post detection
+2. Media downloading (images, videos, galleries)
+3. Comment extraction with nested reply support
+4. Deduplication against existing CSV files
+5. Plugin system for post-processing
+
+KEY FEATURES:
+- Multiple mirror support (fallback if one is down)
+- Rate limiting and retry logic
+- Progress tracking and statistics
+- Optional media download with ffmpeg audio merging
+- Plugin architecture for extensibility
+
+USAGE:
+    # Full scrape with media and comments
+    python3 scraper_main.py <subreddit> --mode full --limit 100
+
+    # Lightweight history scrape (no media)
+    python3 scraper_main.py <subreddit> --mode history --limit 500
+
+    # Monitor mode (RSS-based)
+    python3 scraper_main.py <subreddit> --mode monitor
+
+    # Dry run (test without saving)
+    python3 scraper_main.py <subreddit> --dry-run
+
+    # Full options list
+    python3 scraper_main.py --help
+
+DEPENDENCIES:
+    - requests (HTTP fetching)
+    - pandas (CSV handling)
+    - beautifulsoup4 (HTML parsing)
+    - ffmpeg (optional, for video audio merging)
+
+IMPORTANT FOR LLMs:
+- This is the ADVANCED scraper (more complex than scrape_top.py)
+- Used by scheduler.py for daily scraping
+- Outputs to: data/r_<subreddit>/posts.csv and data/r_<subreddit>/comments.csv
+- Uses mirror fallbacks for reliability
+- The dashboard can load data from this OR scrape_top.py
+
+NOTE:
+    This is a comprehensive scraping tool. For simple daily scraping,
+    the lighter scrape_top.py is often sufficient and faster.
 """
 import requests
 import pandas as pd

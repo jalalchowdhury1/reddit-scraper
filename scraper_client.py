@@ -1,6 +1,41 @@
 """
-ScrapeServ Client Module
-Takes screenshots of Reddit posts using the ScrapeServ API
+ScrapeServ Client Module — Screenshot Taking Service
+
+WHAT IT DOES:
+1. Connects to ScrapeServ API (Docker container)
+2. Takes screenshots of Reddit posts
+3. Saves screenshots to data/screenshots/
+4. Provides multipart response parsing
+
+KEY FEATURES:
+- HTTP-based API client
+- Supports batch screenshot taking
+- Multipart response parsing for images
+- Automatic file naming and organization
+
+USAGE:
+    # Check if server is running
+    from scraper_client import ScrapeServClient
+    client = ScrapeServClient()
+    if client.is_server_running():
+        print("Server is running!")
+
+    # Take a screenshot
+    result = client.screenshot_post("https://reddit.com/...")
+
+DEPENDENCIES:
+    - requests (HTTP client)
+    - config.py (for SCRAPESERV_URL)
+
+IMPORTANT FOR LLMs:
+- This is an OPTIONAL component
+- Requires ScrapeServ Docker container to be running
+- The dashboard does NOT use screenshots by default
+- Started via: docker compose up (see docker-compose.yml)
+
+NOTE:
+    This is for advanced use cases. The main dashboard doesn't require
+    screenshots. It's useful for creating visual archives of posts.
 """
 import os
 import logging

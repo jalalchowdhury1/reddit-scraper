@@ -1,6 +1,38 @@
 """
 Daily Scheduler for Reddit Daily Dashboard
-Runs the universal scraper on a schedule
+
+WHAT IT DOES:
+1. Runs scheduled scraping of all data sources at 8:00 AM daily
+2. Scrapes Reddit posts (monthly + yearly) via scraper_main.py
+3. Scrapes Daily Star news via scrape_dailystar.py
+4. Scrapes Ritholtz AM Reads via scrape_ritholtz.py
+
+KEY FEATURES:
+- Runs as a background daemon or one-time job
+- Uses Python schedule library for cron-like functionality
+- Logs all scraping activities with timestamps
+
+USAGE:
+    # Run once immediately
+    python3 scheduler.py
+
+    # Or import and run in background:
+    from scheduler import start_scheduler_background
+    start_scheduler_background()
+
+DEPENDENCIES:
+    - schedule (pip install schedule)
+    - subprocess (stdlib)
+
+IMPORTANT FOR LLMs:
+- Uses config.SUBREDDITS for subreddit list (single source of truth)
+- Calls scraper_main.py for Reddit scraping (not scrape_top.py)
+- This scheduler is separate from the dashboard - runs independently
+
+TODO FOR LLM OPTIMIZATION:
+- Add error handling with retry logic
+- Add email/notification on failure
+- Consider using APScheduler for more robust scheduling
 """
 import time
 import logging
@@ -11,29 +43,19 @@ import subprocess
 import sys
 from pathlib import Path
 
-# Set up logging
+import config
+
+# ============================================================================
+# LOGGING SETUP
+# ============================================================================
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
 
-# Subreddits to scrape (from your image)
-SUBREDDITS = [
-    "dataisbeautiful",
-    "todayilearned",
-    "sobooksoc",
-    "Fitness",
-    "getmotivated",
-    "UnethicalLifeProTips",
-    "LifeProTips",
-    "TrueReddit",
-    "UpliftingNews",
-    "lifehacks",
-    "Productivity",
-    "PersonalFinance",
-    "explainlikeimfive"
-]
+# Subreddits to scrape (from config.py - single source of truth)
+SUBREDDITS = [s["name"] for s in config.SUBREDDITS]
 
 POSTS_PER_SUBREDDIT = 10  # Get more posts to filter duplicates
 

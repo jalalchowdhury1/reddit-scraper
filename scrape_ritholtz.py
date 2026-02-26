@@ -208,23 +208,18 @@ def extract_articles(post_url: str, session: requests.Session) -> List[Dict]:
         # The format appears to be: "• [Publication] [Actual Title] [Description]"
         # The link text is the publication name (NYT, WSJ, etc.) which should be author
         
-        # Remove the link text from li_text to get the full text
+        # Clean up - remove link text, bullets, and special characters BEFORE splitting
+        # This ensures the subsequent split on " : " or " - " works on a clean string
         full_text = li_text.replace(link_text, "", 1).strip()
         
-        # DEBUG: Print what's happening
-        print(f"    DEBUG: li_text={repr(li_text[:80])}", flush=True)
-        
-        # Clean up - remove bullet points using simple string ops
-        # Use Unicode codepoint to match the bullet
-        bullet_char = "\u2022"  # Unicode bullet
-        while full_text and (full_text[0] in " \t\n\r•·-–—:" or full_text[0] == bullet_char):
-            print(f"    DEBUG: Removing char {repr(full_text[0])} (ord={ord(full_text[0])})", flush=True)
+        # Strip bullets and special characters once here
+        # Characters to strip: bullet (unicode and standard), dots, dashes, colons, and whitespace
+        chars_to_strip = " \t\n\r•·-–—:." + "\u2022"
+        while full_text and full_text[0] in chars_to_strip:
             full_text = full_text[1:]
         full_text = full_text.strip()
-        print(f"    DEBUG: full_text after={repr(full_text[:80])}", flush=True)
         
-        # Now we have: "[Title] : [Description]" or "[Title] [Description]"
-        # Split on " : " (space-colon-space) to separate title from description
+        # Now split the clean string into title and description
         author = link_text
         
         if " : " in full_text:
@@ -232,31 +227,23 @@ def extract_articles(post_url: str, session: requests.Session) -> List[Dict]:
             title = parts[0].strip()
             description = parts[1].strip() if len(parts) > 1 else ""
         elif " - " in full_text:
-            # Some use " - " instead of " : "
             parts = full_text.split(" - ", 1)
             title = parts[0].strip()
             description = parts[1].strip() if len(parts) > 1 else ""
         else:
-            # No clear separator - try to extract title and description
-            # Title is usually the first sentence or part before first period/colon
+            # No clear separator - try splitting by the first colon if it exists
             if ": " in full_text:
                 colon_idx = full_text.index(": ")
                 title = full_text[:colon_idx].strip()
                 description = full_text[colon_idx+2:].strip()
             else:
-                # Just use first 150 chars as title
-                title = full_text[:150].strip()
-                description = full_text
+                # Fallback: title is the whole thing (capped by length later)
+                title = full_text
+                description = ""
         
-        # Clean up title - remove any remaining leading special chars
-        while title and title[0] in " \t\n\r•·-–—:":
-            title = title[1:]
-        title = title.strip()
-        
-        # Also clean up description
-        while description and description[0] in " \t\n\r•·-–—:":
-            description = description[1:]
-        description = description.strip()
+        # Final safety cleanup for title and description
+        title = title.strip().lstrip(" \t\n\r•·-–—:.")
+        description = description.strip().lstrip(" \t\n\r•·-–—:.")
         
         # Generate article ID
         article_id = make_article_id(href, title)

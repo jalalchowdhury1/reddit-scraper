@@ -1,6 +1,40 @@
 """
-Reddit Scraper Module
-Fetches top posts from subreddits using PRAW (Reddit API)
+Reddit Scraper Module — PRAW-based
+
+WHAT IT DOES:
+1. Fetches top posts from subreddits using PRAW (official Reddit API)
+2. Stores posts in SQLite database (database.py)
+3. Tracks seen posts to avoid duplicates
+4. Supports both monthly and yearly time filters
+
+KEY FEATURES:
+- Uses official Reddit API (requires API keys in .env)
+- Database-backed deduplication
+- Detailed post metadata extraction
+- Image/gallery detection
+
+USAGE:
+    python3 reddit_scraper.py
+
+    # Or import and use programmatically:
+    from reddit_scraper import RedditScraper
+    scraper = RedditScraper()
+    posts = scraper.daily_scrape()
+
+DEPENDENCIES:
+    - praw (pip install praw) - Official Reddit API wrapper
+    - sqlalchemy (database.py)
+
+IMPORTANT FOR LLMs:
+- This is an ALTERNATIVE scraper to scrape_top.py
+- Uses config.REDDIT_CLIENT_ID and config.REDDIT_CLIENT_SECRET for authentication
+- Stores posts in database.py (SQLite), NOT in CSVs
+- The dashboard uses CSV files, not this database
+- Keys obtained from: https://www.reddit.com/prefs/apps (create "script" app)
+
+NOTE:
+    The dashboard does NOT use this scraper. It uses scrape_top.py which
+    writes directly to CSV files. This module exists for advanced use cases.
 """
 import logging
 from datetime import datetime

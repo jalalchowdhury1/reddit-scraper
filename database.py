@@ -1,6 +1,35 @@
 """
-Database models for Reddit Daily Dashboard
-Handles tracking of seen posts to avoid duplicates
+Database Models for Reddit Daily Dashboard
+
+WHAT IT DOES:
+1. Defines SQLAlchemy ORM models for Reddit posts and scrape history
+2. Provides functions for CRUD operations on posts
+3. Handles database initialization and session management
+
+KEY FEATURES:
+- SQLite database (config.DATABASE_PATH)
+- Two models: RedditPost and ScrapeHistory
+- Automatic table creation on import
+
+USAGE:
+    # Import and use:
+    import database
+    posts = database.get_all_posts(limit=10)
+
+DEPENDENCIES:
+    - sqlalchemy (pip install sqlalchemy)
+    - config.py
+
+IMPORTANT FOR LLLM:
+- The DASHBOARD does NOT use this database!
+- Dashboard reads from CSV files instead (data/r_*/posts.csv)
+- This database is used by reddit_scraper.py (PRAW-based scraper)
+- For dashboard purposes, you can largely ignore this file
+- DO NOT edit manually - use reddit_scraper.py functions
+
+NOTE:
+    This is legacy code. The current system uses CSV files for simplicity
+    and portability. This database module exists for advanced use cases.
 """
 from datetime import datetime
 from pathlib import Path
