@@ -517,3 +517,20 @@ footer {
     font-weight: 400;
     font-style: normal !important;
 }
+
+/* ============================================================
+   Ritholtz AM Reads — Badge Styling
+   ============================================================ */
+
+/* Ritholtz AM Reads badge — Magenta (matching the Ritholtz theme) */
+.ritholtz-badge {
+    background: rgba(187, 154, 247, 0.1) !important;
+    color: var(--tn-magenta) !important;
+    border: 1px solid rgba(187, 154, 247, 0.25) !important;
+    padding: 3px 10px;
+    border-radius: 6px;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.3px;
+    display: inline-block;
+}

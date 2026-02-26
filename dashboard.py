@@ -335,6 +335,61 @@ def load_news_articles() -> pd.DataFrame:
 
 
 # ============================================================================
+# DATA LOADING — RITHOLTZ AM READS
+# ============================================================================
+
+
+def load_ritholtz_articles() -> pd.DataFrame:
+    """
+    Load scraped Ritholtz AM Reads articles from CSV.
+
+    Returns:
+        pd.DataFrame: Articles with columns:
+            - article_id, title, url, description, pub_date, author,
+            - source_post, scraped_at
+
+    Data Source:
+        data/ritholtz/articles.csv (created by scrape_ritholtz.py)
+
+    Error Handling:
+        - Missing file: returns empty DataFrame (AM Reads tab shows helpful message)
+        - Corrupt CSV: returns empty DataFrame
+        - Missing columns: safely defaults to empty string
+        - NaN values: filled with defaults
+    """
+    csv_path = Path("data/ritholtz/articles.csv")
+    if not csv_path.exists():
+        return pd.DataFrame()
+
+    try:
+        df = pd.read_csv(csv_path)
+        if df.empty or "article_id" not in df.columns:
+            return pd.DataFrame()
+
+        for col, default in [
+            ("title", "Untitled"),
+            ("url", ""),
+            ("description", ""),
+            ("pub_date", ""),
+            ("author", "Unknown"),
+            ("source_post", ""),
+        ]:
+            if col not in df.columns:
+                df[col] = default
+
+        df["article_id"] = df["article_id"].astype(str)
+        df["title"] = df["title"].fillna("Untitled")
+        df["description"] = df["description"].fillna("")
+        df["author"] = df["author"].fillna("Unknown")
+        df = df.drop_duplicates(subset=["article_id"], keep="first")
+        return df
+    except Exception as e:
+        logger.warning(f"Failed to load Ritholtz articles: {e}")
+        return pd.DataFrame()
+
+
+
+# ============================================================================
 # SUBREDDIT NAME DISPLAY
 # ============================================================================
 
@@ -665,6 +720,129 @@ def render_news_tab(df: pd.DataFrame) -> None:
 
 
 # ============================================================================
+# RITHOLTZ AM READS ARTICLE RENDERING
+# ============================================================================
+
+
+def render_ritholtz_card(row, is_read: bool) -> None:
+    """
+    Render a single Ritholtz AM Reads article card with Tokyo Night styling.
+
+    Args:
+        row (pd.Series): Article data from DataFrame
+        is_read (bool): Whether article is marked as read
+
+    Card Contents:
+        1. AM Reads badge (left) | Publication date or READ badge (right)
+        2. Article title
+        3. Article description (first 300 chars)
+        4. Author | "Read Article" & "Mark Read" buttons
+
+    Styling:
+        - AM Reads badge: magenta (matching the Ritholtz theme)
+        - Date display: yellow monospace
+
+    Key format: "rth_{article_id}" to ensure unique keys
+    (Streamlit requirement, different from other key formats).
+    """
+    article_id = str(row["article_id"])
+    read_key = f"rth_{article_id}"
+
+    with st.container(border=True):
+        # Header: AM Reads badge + date/read status
+        col_left, col_right = st.columns([1, 1])
+        with col_left:
+            st.markdown(
+                '<span class="ritholtz-badge">AM Reads</span>',
+                unsafe_allow_html=True,
+            )
+        with col_right:
+            if is_read:
+                st.markdown(
+                    '<div style="text-align:right"><span class="read-badge">READ</span></div>',
+                    unsafe_allow_html=True,
+                )
+            else:
+                pub_date = str(row.get("pub_date", ""))
+                date_display = pub_date[:10] if len(pub_date) >= 10 else pub_date
+                st.markdown(
+                    f'<div style="text-align:right"><span class="news-date">{date_display}</span></div>',
+                    unsafe_allow_html=True,
+                )
+
+        # Title
+        title_text = str(row.get("title", "Untitled"))
+        st.markdown(f'<div class="post-title">{title_text}</div>', unsafe_allow_html=True)
+
+        # Description preview
+        description = str(row.get("description", ""))
+        if description and description != "nan":
+            preview = description[:300] + "..." if len(description) > 300 else description
+            st.markdown(f'<div class="post-preview">{preview}</div>', unsafe_allow_html=True)
+
+        # Metrics row: author
+        author = str(row.get("author", "Unknown"))
+
+        m_col, b_col = st.columns([2, 1.2])
+        with m_col:
+            st.markdown(
+                f'<div class="post-metrics">'
+                f'<span class="metric-author">{author}</span>'
+                f'</div>',
+                unsafe_allow_html=True,
+            )
+        with b_col:
+            btn_left, btn_right = st.columns(2)
+            with btn_left:
+                url = str(row.get("url", ""))
+                if url and url != "nan":
+                    st.link_button("Read Article", url, use_container_width=True)
+            with btn_right:
+                if is_read:
+                    if st.button("Unread", key=f"rth_un_{read_key}", use_container_width=True, type="secondary"):
+                        st.session_state.read_posts.discard(read_key)
+                        save_read_posts(st.session_state.read_posts)
+                        st.rerun()
+                else:
+                    if st.button("Mark Read", key=f"rth_rd_{read_key}", use_container_width=True, type="primary"):
+                        st.session_state.read_posts.add(read_key)
+                        save_read_posts(st.session_state.read_posts)
+                        st.rerun()
+
+
+# ============================================================================
+# RITHOLTZ AM READS TAB RENDERING
+# ============================================================================
+
+
+def render_ritholtz_tab(df: pd.DataFrame) -> None:
+    """
+    Render the Ritholtz AM Reads tab with article cards.
+
+    Args:
+        df (pd.DataFrame): AM Reads articles to display
+
+    Tab Layout:
+        1. Caption showing article count (10 articles per day)
+        2. Article cards (up to 10)
+
+    Note:
+        - Articles are pre-filtered to 10 per day
+        - No filters needed (all 10 are shown)
+    """
+    if df.empty:
+        st.info("No AM Reads articles found. Run `python scrape_ritholtz.py` to fetch articles.")
+        return
+
+    st.caption(f"Showing {len(df)} articles")
+
+    for _, row in df.iterrows():
+        read_key = f"rth_{row['article_id']}"
+        render_ritholtz_card(row, read_key in st.session_state.read_posts)
+
+
+
+# ============================================================================
 # SIDEBAR
 # ========================
 
@@ -700,12 +878,14 @@ st.markdown('<p class="main-subtitle">Top insights across your favorite subreddi
 # Load data
 posts_df = load_posts()
 news_df = load_news_articles()
+ritholtz_df = load_ritholtz_articles()
 
 has_reddit = not posts_df.empty
 has_news = not news_df.empty
+has_ritholtz = not ritholtz_df.empty
 
-if not has_reddit and not has_news:
-    st.warning("No data found. Run `python scrape_top.py` and/or `python scrape_dailystar.py` first.")
+if not has_reddit and not has_news and not has_ritholtz:
+    st.warning("No data found. Run `python scrape_top.py`, `python scrape_dailystar.py` and/or `python scrape_ritholtz.py` first.")
     st.stop()
 
 # Filter out read posts unless toggled
@@ -717,24 +897,30 @@ filtered_news = news_df
 if has_news and not show_read:
     filtered_news = news_df[~news_df["article_id"].astype(str).apply(lambda x: f"dsr_{x}").isin(st.session_state.read_posts)]
 
+filtered_ritholtz = ritholtz_df
+if has_ritholtz and not show_read:
+    filtered_ritholtz = ritholtz_df[~ritholtz_df["article_id"].astype(str).apply(lambda x: f"rth_{x}").isin(st.session_state.read_posts)]
+
 # Stats row
 monthly_count = len(filtered_df[filtered_df["time_filter"] == "month"]) if has_reddit else 0
 yearly_count = len(filtered_df[filtered_df["time_filter"] == "year"]) if has_reddit else 0
 news_count = len(filtered_news) if has_news else 0
-unread_total = (len(filtered_df) if has_reddit else 0) + news_count
-total = (len(posts_df) if has_reddit else 0) + (len(news_df) if has_news else 0)
+amreads_count = len(filtered_ritholtz) if has_ritholtz else 0
+unread_total = (len(filtered_df) if has_reddit else 0) + news_count + amreads_count
+total = (len(posts_df) if has_reddit else 0) + (len(news_df) if has_news else 0) + (len(ritholtz_df) if has_ritholtz else 0)
 
-c1, c2, c3, c4, c5 = st.columns(5)
+c1, c2, c3, c4, c5, c6 = st.columns(6)
 c1.metric("Monthly", monthly_count)
 c2.metric("Yearly", yearly_count)
 c3.metric("News", news_count)
-c4.metric("Unread", unread_total)
-c5.metric("Total", total)
+c4.metric("AM Reads", amreads_count)
+c5.metric("Unread", unread_total)
+c6.metric("Total", total)
 
 st.markdown('<div class="divider"></div>', unsafe_allow_html=True)
 
 # Tabs
-tab_monthly, tab_yearly, tab_news = st.tabs(["Monthly Top", "Yearly Top", "Daily Star News"])
+tab_monthly, tab_yearly, tab_news, tab_amreads = st.tabs(["Monthly Top", "Yearly Top", "Daily Star News", "AM Reads"])
 
 with tab_monthly:
     if has_reddit:
@@ -757,8 +943,12 @@ with tab_yearly:
 with tab_news:
     render_news_tab(filtered_news.copy() if has_news else pd.DataFrame())
 
+with tab_amreads:
+    render_ritholtz_tab(filtered_ritholtz.copy() if has_ritholtz else pd.DataFrame())
+
 st.markdown('<div class="divider"></div>', unsafe_allow_html=True)
 st.markdown(
     '<p class="footer-text">Read posts are saved to disk and persist across sessions.</p>',
     unsafe_allow_html=True,
 )
+

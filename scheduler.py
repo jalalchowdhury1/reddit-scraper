@@ -39,12 +39,13 @@ POSTS_PER_SUBREDDIT = 10  # Get more posts to filter duplicates
 
 
 def run_daily_scrape():
-    """Run the daily scrape for all subreddits"""
+    """Run the daily scrape for all sources"""
     logger.info("=" * 50)
     logger.info("Starting scheduled daily scrape...")
     logger.info(f"Time: {datetime.now()}")
     logger.info("=" * 50)
     
+    # Scrape Reddit posts
     for subreddit in SUBREDDITS:
         try:
             logger.info(f"Scraping r/{subreddit}...")
@@ -64,9 +65,42 @@ def run_daily_scrape():
         except Exception as e:
             logger.error(f"Exception scraping r/{subreddit}: {e}")
     
+    # Scrape Daily Star news
+    try:
+        logger.info("Scraping Daily Star news...")
+        result = subprocess.run(
+            [sys.executable, "scrape_dailystar.py"],
+            capture_output=True,
+            text=True,
+            cwd=Path(__file__).parent
+        )
+        if result.returncode == 0:
+            logger.info("Successfully scraped Daily Star news")
+        else:
+            logger.error(f"Error scraping Daily Star: {result.stderr}")
+    except Exception as e:
+        logger.error(f"Exception scraping Daily Star: {e}")
+    
+    # Scrape Ritholtz AM Reads
+    try:
+        logger.info("Scraping Ritholtz AM Reads...")
+        result = subprocess.run(
+            [sys.executable, "scrape_ritholtz.py"],
+            capture_output=True,
+            text=True,
+            cwd=Path(__file__).parent
+        )
+        if result.returncode == 0:
+            logger.info("Successfully scraped Ritholtz AM Reads")
+        else:
+            logger.error(f"Error scraping Ritholtz: {result.stderr}")
+    except Exception as e:
+        logger.error(f"Exception scraping Ritholtz: {e}")
+    
     logger.info("=" * 50)
     logger.info("Daily scrape completed!")
     logger.info("=" * 50)
+
 
 
 def run_scheduler():
