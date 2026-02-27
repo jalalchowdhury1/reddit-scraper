@@ -19,8 +19,9 @@
 </head>
 <body class="antialiased selection:bg-zinc-800 font-sans">
 
-    <div class="max-w-6xl mx-auto px-6 pt-8 pb-24">
-        <div class="flex justify-between items-center border-b border-zinc-800 pb-3 mb-8">
+    <div class="max-w-6xl mx-auto px-6 pt-8 pb-24 relative">
+        
+        <div class="sticky top-0 z-50 flex justify-between items-center border-b border-zinc-800/40 pb-3 mb-8 pt-8 -mt-8 bg-black/70 backdrop-blur-md transition-all">
             <div class="flex space-x-8 text-[0.75rem] font-medium text-zinc-500 uppercase tracking-widest" id="tabs">
                 <button onclick="switchTab('monthly')" id="tab-monthly" class="tab-active pb-3 transition-colors hover:text-zinc-300">Monthly</button>
                 <button onclick="switchTab('yearly')" id="tab-yearly" class="pb-3 transition-colors hover:text-zinc-300">Yearly</button>
@@ -53,6 +54,9 @@
             currentTab = tab;
             document.querySelectorAll('#tabs button').forEach(b => b.classList.remove('tab-active', 'text-zinc-200'));
             document.getElementById(`tab-${tab}`).classList.add('tab-active');
+            
+            // Scroll to top smoothly when switching tabs
+            window.scrollTo({ top: 0, behavior: 'smooth' });
             renderFeed();
         }
 
@@ -67,7 +71,6 @@
             });
             const result = await res.json();
             
-            // 1. Update local data cache so tab switching remains accurate
             const updateCache = (arr) => {
                 arr.forEach(item => {
                     if (item.id === id) {
@@ -81,25 +84,33 @@
             updateCache(appData.news);
             updateCache(appData.ritholtz);
 
-            // 2. Check if we need to hide the item from the current view
             const showRead = document.getElementById('showReadToggle').checked;
             const container = btnElement.closest('.group');
             let shouldHide = false;
 
             if (action === 'read' && result.is_active && !showRead) {
-                shouldHide = true; // Hide if marked read and "Show Read" is off
+                shouldHide = true;
             } else if (action === 'fav' && !result.is_active && currentTab === 'favorites') {
-                shouldHide = true; // Hide if unfavorited while inside Favorites tab
+                shouldHide = true;
             } else if (action === 'fav' && result.is_active && currentTab !== 'favorites') {
-                shouldHide = true; // Hide from main feed if favorited (moves to favorites)
+                shouldHide = true;
             }
 
-            // 3. Smoothly fade out without losing scroll position, or just update button
             if (shouldHide) {
-                container.style.transition = "opacity 0.2s ease, height 0.2s ease";
+                container.style.transition = "opacity 0.3s ease, transform 0.3s ease";
                 container.style.opacity = "0";
-                setTimeout(() => container.style.display = "none", 200);
+                container.style.transform = "scale(0.98)";
+                setTimeout(() => container.style.display = "none", 300);
             } else {
+                // 3. DYNAMIC VISUAL DIMMING: Apply opacity instantly if keeping item on screen
+                if (action === 'read') {
+                    if (result.is_active) {
+                        container.classList.add('opacity-40');
+                    } else {
+                        container.classList.remove('opacity-40');
+                    }
+                }
+
                 if (action === 'fav') {
                     btnElement.innerHTML = result.is_active ? '★' : '☆';
                     btnElement.className = result.is_active ? 'text-amber-500 hover:text-amber-400 transition-all text-lg focus:outline-none' : 'text-zinc-700 hover:text-zinc-500 transition-all text-lg focus:outline-none';
@@ -116,7 +127,6 @@
                 items = [...appData.monthly, ...appData.yearly, ...appData.news, ...appData.ritholtz].filter(i => i.is_fav);
                 items = Array.from(new Map(items.map(item => [item.id, item])).values()); 
             } else {
-                // CRITICAL FIX: Hide favorited items from the main feed
                 items = (appData[currentTab] || []).filter(i => !i.is_fav);
             }
 
@@ -126,8 +136,10 @@
                 return;
             }
 
+            // 2. THE WHISPER GLOW: Added hover:bg-zinc-900/20 to container
+            // 3. THE MUTE STATE: Added inline opacity logic based on item.is_read
             feed.innerHTML = items.map(item => `
-                <div class="group py-4 relative flex flex-col justify-center">
+                <div class="group py-4 px-5 -mx-5 relative flex flex-col justify-center rounded-2xl transition-all duration-500 hover:bg-zinc-900/20 ${item.is_read ? 'opacity-40 hover:opacity-70' : ''}">
                     <div class="flex justify-between items-start">
                         <div class="pr-12 flex-1">
                             <a href="${item.url}" target="_blank" rel="noopener noreferrer" class="font-editorial text-[1.05rem] font-medium text-zinc-100 hover:text-zinc-400 leading-snug transition-colors block mb-1.5">
@@ -147,7 +159,7 @@
                             </button>
                         </div>
                     </div>
-                    <div class="feed-divider mt-5"></div>
+                    <div class="feed-divider mt-5 opacity-40 group-hover:opacity-100 transition-opacity duration-500"></div>
                 </div>
             `).join('');
         }
