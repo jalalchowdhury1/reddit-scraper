@@ -446,51 +446,50 @@ def render_post_card(row, is_read: bool) -> None:
     time_badge = row.get("time_filter", "month").upper()
     title_text = str(row.get("title", "Untitled"))
     selftext = str(row.get("selftext", ""))
+    permalink = str(row.get("permalink", ""))
+    url = f"[https://reddit.com](https://reddit.com){permalink}" if permalink else "#"
     
     score = int(row.get("score", 0))
     score_display = f" • {score:,} pts" if score > 0 else ""
     
-    with st.container(border=True):
+    with st.container(border=False):
         html_content = f"""
-            <div class="reader-title">{title_text}</div>
+            <a href="{url}" target="_blank" class="reader-title">{title_text}</a>
             <div class="reader-desc">{selftext}</div>
         """
         st.markdown(html_content, unsafe_allow_html=True)
         
-        # Meta info now lives in the first column, utilizing the empty space
-        col_meta, col_link, col_fav, col_read = st.columns([4.5, 1.5, 1.5, 1.5])
+        col_meta, col_fav, col_read = st.columns([8.5, 0.75, 0.75])
         
         with col_meta:
             meta_text = f'{get_display_name(row["subreddit"])} • {time_badge}{score_display}'
             st.markdown(f'<div class="bottom-meta">{meta_text}</div>', unsafe_allow_html=True)
             
-        with col_link:
-            permalink = str(row.get("permalink", ""))
-            if permalink:
-                st.link_button("↗ Open", f"https://reddit.com{permalink}", use_container_width=True)
         with col_fav:
             is_fav = post_id in st.session_state.favorite_posts
             if is_fav:
-                if st.button("★ Saved", key=f"ufav_{post_id}_{row.get('time_filter','m')}", use_container_width=True):
+                if st.button("★", key=f"ufav_{post_id}_{row.get('time_filter','m')}", help="Remove from Favorites", use_container_width=True):
                     st.session_state.favorite_posts.discard(post_id)
                     save_favorite_posts(st.session_state.favorite_posts)
                     st.rerun()
             else:
-                if st.button("☆ Save", key=f"fav_{post_id}_{row.get('time_filter','m')}", use_container_width=True):
+                if st.button("☆", key=f"fav_{post_id}_{row.get('time_filter','m')}", help="Save to Favorites", use_container_width=True):
                     st.session_state.favorite_posts.add(post_id)
                     save_favorite_posts(st.session_state.favorite_posts)
                     st.rerun()
         with col_read:
             if is_read:
-                if st.button("↺ Unread", key=f"un_{post_id}_{row.get('time_filter','m')}", use_container_width=True, type="secondary"):
+                if st.button("↺", key=f"un_{post_id}_{row.get('time_filter','m')}", help="Mark as Unread", use_container_width=True, type="secondary"):
                     st.session_state.read_posts.discard(post_id)
                     save_read_posts(st.session_state.read_posts)
                     st.rerun()
             else:
-                if st.button("✓ Mark Read", key=f"rd_{post_id}_{row.get('time_filter','m')}", use_container_width=True, type="primary"):
+                if st.button("✓", key=f"rd_{post_id}_{row.get('time_filter','m')}", help="Mark as Read", use_container_width=True, type="primary"):
                     st.session_state.read_posts.add(post_id)
                     save_read_posts(st.session_state.read_posts)
                     st.rerun()
+                    
+        st.markdown('<div class="feed-divider"></div>', unsafe_allow_html=True)
 
 
 # ============================================================================
@@ -557,47 +556,46 @@ def render_article_card(row, is_read: bool) -> None:
     pub_date = str(row.get("pub_date", ""))[:10]
     title_text = str(row.get("title", "Untitled"))
     description = str(row.get("description", ""))
+    url = str(row.get("url", "#"))
     
-    with st.container(border=True):
+    with st.container(border=False):
         html_content = f"""
-            <div class="reader-title">{title_text}</div>
+            <a href="{url}" target="_blank" class="reader-title">{title_text}</a>
             <div class="reader-desc">{description}</div>
         """
         st.markdown(html_content, unsafe_allow_html=True)
         
-        col_meta, col_link, col_fav, col_read = st.columns([4.5, 1.5, 1.5, 1.5])
+        col_meta, col_fav, col_read = st.columns([8.5, 0.75, 0.75])
         
         with col_meta:
             meta_text = f'DAILY STAR • {category} • {pub_date}'
             st.markdown(f'<div class="bottom-meta">{meta_text}</div>', unsafe_allow_html=True)
             
-        with col_link:
-            url = str(row.get("url", ""))
-            if url and url != "nan":
-                st.link_button("↗ Open", url, use_container_width=True)
         with col_fav:
             is_fav = read_key in st.session_state.favorite_posts
             if is_fav:
-                if st.button("★ Saved", key=f"ufav_{read_key}_{row.get('category','')}", use_container_width=True):
+                if st.button("★", key=f"ufav_{read_key}_{row.get('category','')}", help="Remove from Favorites", use_container_width=True):
                     st.session_state.favorite_posts.discard(read_key)
                     save_favorite_posts(st.session_state.favorite_posts)
                     st.rerun()
             else:
-                if st.button("☆ Save", key=f"fav_{read_key}_{row.get('category','')}", use_container_width=True):
+                if st.button("☆", key=f"fav_{read_key}_{row.get('category','')}", help="Save to Favorites", use_container_width=True):
                     st.session_state.favorite_posts.add(read_key)
                     save_favorite_posts(st.session_state.favorite_posts)
                     st.rerun()
         with col_read:
             if is_read:
-                if st.button("↺ Unread", key=f"nun_{read_key}_{row.get('category','')}", use_container_width=True, type="secondary"):
+                if st.button("↺", key=f"nun_{read_key}_{row.get('category','')}", help="Mark as Unread", use_container_width=True, type="secondary"):
                     st.session_state.read_posts.discard(read_key)
                     save_read_posts(st.session_state.read_posts)
                     st.rerun()
             else:
-                if st.button("✓ Mark Read", key=f"nrd_{read_key}_{row.get('category','')}", use_container_width=True, type="primary"):
+                if st.button("✓", key=f"nrd_{read_key}_{row.get('category','')}", help="Mark as Read", use_container_width=True, type="primary"):
                     st.session_state.read_posts.add(read_key)
                     save_read_posts(st.session_state.read_posts)
                     st.rerun()
+                    
+        st.markdown('<div class="feed-divider"></div>', unsafe_allow_html=True)
 
 
 # ============================================================================
@@ -661,47 +659,46 @@ def render_ritholtz_card(row, is_read: bool) -> None:
     pub_date = str(row.get("pub_date", ""))[:10]
     title_text = str(row.get("title", "Untitled"))
     description = str(row.get("description", ""))
+    url = str(row.get("url", "#"))
 
-    with st.container(border=True):
+    with st.container(border=False):
         html_content = f"""
-            <div class="reader-title">{title_text}</div>
+            <a href="{url}" target="_blank" class="reader-title">{title_text}</a>
             <div class="reader-desc">{description}</div>
         """
         st.markdown(html_content, unsafe_allow_html=True)
 
-        col_meta, col_link, col_fav, col_read = st.columns([4.5, 1.5, 1.5, 1.5])
+        col_meta, col_fav, col_read = st.columns([8.5, 0.75, 0.75])
         
         with col_meta:
             meta_text = f'AM READS • {pub_date}'
             st.markdown(f'<div class="bottom-meta">{meta_text}</div>', unsafe_allow_html=True)
             
-        with col_link:
-            url = str(row.get("url", ""))
-            if url and url != "nan":
-                st.link_button("↗ Open", url, use_container_width=True)
         with col_fav:
             is_fav = read_key in st.session_state.favorite_posts
             if is_fav:
-                if st.button("★ Saved", key=f"ufav_{read_key}", use_container_width=True):
+                if st.button("★", key=f"ufav_{read_key}", help="Remove from Favorites", use_container_width=True):
                     st.session_state.favorite_posts.discard(read_key)
                     save_favorite_posts(st.session_state.favorite_posts)
                     st.rerun()
             else:
-                if st.button("☆ Save", key=f"fav_{read_key}", use_container_width=True):
+                if st.button("☆", key=f"fav_{read_key}", help="Save to Favorites", use_container_width=True):
                     st.session_state.favorite_posts.add(read_key)
                     save_favorite_posts(st.session_state.favorite_posts)
                     st.rerun()
         with col_read:
             if is_read:
-                if st.button("↺ Unread", key=f"rth_un_{read_key}", use_container_width=True, type="secondary"):
+                if st.button("↺", key=f"rth_un_{read_key}", help="Mark as Unread", use_container_width=True, type="secondary"):
                     st.session_state.read_posts.discard(read_key)
                     save_read_posts(st.session_state.read_posts)
                     st.rerun()
             else:
-                if st.button("✓ Mark Read", key=f"rth_rd_{read_key}", use_container_width=True, type="primary"):
+                if st.button("✓", key=f"rth_rd_{read_key}", help="Mark as Read", use_container_width=True, type="primary"):
                     st.session_state.read_posts.add(read_key)
                     save_read_posts(st.session_state.read_posts)
                     st.rerun()
+                    
+        st.markdown('<div class="feed-divider"></div>', unsafe_allow_html=True)
 
 
 # ============================================================================
@@ -797,27 +794,6 @@ filtered_df = posts_df[~posts_df["id"].astype(str).isin(hide_reddit)] if has_red
 filtered_news = news_df[~news_df["article_id"].astype(str).apply(lambda x: f"dsr_{x}").isin(hide_news)] if has_news else news_df
 filtered_ritholtz = ritholtz_df[~ritholtz_df["article_id"].astype(str).apply(lambda x: f"rth_{x}").isin(hide_ritholtz)] if has_ritholtz else ritholtz_df
 
-# Stats row
-monthly_count = len(filtered_df[filtered_df["time_filter"] == "month"]) if has_reddit else 0
-yearly_count = len(filtered_df[filtered_df["time_filter"] == "year"]) if has_reddit else 0
-news_count = len(filtered_news) if has_news else 0
-amreads_count = len(filtered_ritholtz) if has_ritholtz else 0
-unread_total = (len(filtered_df) if has_reddit else 0) + news_count + amreads_count
-total = (len(posts_df) if has_reddit else 0) + (len(news_df) if has_news else 0) + (len(ritholtz_df) if has_ritholtz else 0)
-
-st.markdown(
-    f'<div class="discreet-stats">'
-    f'Monthly: <b>{monthly_count}</b> &nbsp;|&nbsp; '
-    f'Yearly: <b>{yearly_count}</b> &nbsp;|&nbsp; '
-    f'News: <b>{news_count}</b> &nbsp;|&nbsp; '
-    f'AM Reads: <b>{amreads_count}</b> &nbsp;|&nbsp; '
-    f'<span style="color: var(--tn-blue)">Unread: <b>{unread_total}</b></span> &nbsp;|&nbsp; '
-    f'Total: <b>{total}</b>'
-    f'</div>', 
-    unsafe_allow_html=True
-)
-
-st.markdown('<div class="divider"></div>', unsafe_allow_html=True)
 
 # Tabs
 tab_monthly, tab_yearly, tab_news, tab_amreads, tab_favorites = st.tabs(["Monthly Top", "Yearly Top", "Daily Star News", "AM Reads", "⭐ Favorites"])

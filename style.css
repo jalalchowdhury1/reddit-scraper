@@ -1,14 +1,11 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 
 :root {
-    --bg-main: #0f172a;       /* Deep slate background */
-    --bg-card: #1e293b;       /* Slightly lighter card background */
-    --bg-hover: #334155;      /* Card hover state */
-    --text-primary: #f8fafc;  /* Crisp off-white for titles */
-    --text-secondary: #94a3b8;/* Soft gray for descriptions */
-    --text-muted: #64748b;    /* Very dim gray for meta info */
-    --accent: #38bdf8;        /* Soft blue accent */
-    --border-color: rgba(255, 255, 255, 0.08);
+    --bg-main: #0b0f19;       
+    --text-primary: #f8fafc;  
+    --text-secondary: #94a3b8;
+    --text-muted: #475569;    
+    --accent: #38bdf8;        
 }
 
 html, body, .stApp, .main {
@@ -17,114 +14,94 @@ html, body, .stApp, .main {
     font-family: 'Inter', sans-serif !important;
 }
 
-/* Eliminate Streamlit dead space */
 div[data-testid="block-container"] {
-    padding-top: 0.5rem !important; /* Reclaiming top space */
+    padding-top: 0.2rem !important;
     padding-bottom: 2rem !important;
-    max-width: 900px !important; /* Optimal reading width */
+    max-width: 900px !important; 
 }
 
-/* Reader Card Styling */
-div[data-testid="stVerticalBlockBorderWrapper"] > div[style*="border"],
-div.st-emotion-cache-16idsys {
-    background: var(--bg-card) !important;
-    border: 1px solid var(--border-color) !important;
-    border-radius: 12px !important;
-    padding: 20px 24px !important;
-    margin-bottom: 8px !important;
-    transition: all 0.2s ease;
+div[data-testid="stVerticalBlock"] {
+    gap: 0rem !important;
 }
 
-div[data-testid="stVerticalBlockBorderWrapper"]:hover > div[style*="border"] {
-    background: var(--bg-hover) !important;
-    border-color: rgba(255, 255, 255, 0.15) !important;
-}
-
-/* Typography Overrides */
-.reader-category {
-    font-size: 0.7rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 1px;
-    color: var(--accent);
-    margin-bottom: 8px;
-    display: block;
-}
-
+/* Typography Polish */
 .reader-title {
     font-size: 1.15rem !important;
     font-weight: 600 !important;
-    color: var(--text-primary) !important;
-    line-height: 1.4 !important;
-    margin: 0 0 10px 0 !important;
+    color: #ffffff !important;
+    line-height: 1.3 !important;
+    text-decoration: none !important;
+    display: block;
+    margin-top: 8px;
+    margin-bottom: 4px;
+    letter-spacing: -0.01em;
+    transition: color 0.2s ease;
+}
+
+.reader-title:hover {
+    color: var(--accent) !important;
 }
 
 .reader-desc {
-    font-size: 0.95rem !important;
+    font-size: 0.9rem !important;
     color: var(--text-secondary) !important;
-    line-height: 1.6 !important;
-    margin: 0 0 16px 0 !important;
+    line-height: 1.5 !important;
+    margin: 0 0 4px 0 !important;
     display: -webkit-box;
-    -webkit-line-clamp: 3;
+    -webkit-line-clamp: 2; 
     -webkit-box-orient: vertical;
     overflow: hidden;
 }
 
-.reader-meta {
-    font-size: 0.75rem;
-    color: var(--text-muted);
-    display: flex;
-    gap: 12px;
-}
-
-/* Button Overrides (Subtle & Elegant) */
-.stButton button, 
-button[data-testid^="stBaseButton"],
-a[data-testid="stBaseLinkButton-secondary"] {
-    background: transparent !important;
-    border: 1px solid var(--border-color) !important;
-    color: var(--text-secondary) !important;
-    border-radius: 6px !important;
-    padding: 4px 12px !important;
-    font-size: 0.8rem !important;
-    font-weight: 500 !important;
-    min-height: 32px !important;
-    width: 100% !important;
-}
-
-.stButton button:hover, 
-a[data-testid="stBaseLinkButton-secondary"]:hover {
-    background: rgba(255, 255, 255, 0.05) !important;
-    color: var(--text-primary) !important;
-    border-color: rgba(255, 255, 255, 0.2) !important;
-}
-
-/* Mark Read Button (Subtle Primary) */
-button[data-testid="stBaseButton-primary"] {
-    background: rgba(56, 189, 248, 0.1) !important;
-    color: var(--accent) !important;
-    border: 1px solid rgba(56, 189, 248, 0.2) !important;
-}
-
-button[data-testid="stBaseButton-primary"]:hover {
-    background: rgba(56, 189, 248, 0.2) !important;
-}
-
-/* Top discreet stats */
-.discreet-stats {
-    font-size: 0.75rem;
-    color: var(--text-muted);
-    text-align: center;
-    margin-bottom: 2rem;
-    letter-spacing: 0.5px;
-}
-
-/* Bottom metadata styling (shared row with buttons) */
 .bottom-meta {
     font-size: 0.7rem;
     font-weight: 600;
     text-transform: uppercase;
-    letter-spacing: 1px;
-    color: var(--accent);
-    padding-top: 8px; /* Visually aligns text with the adjacent buttons */
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+    padding-top: 10px; 
 }
+
+/* Fading Gradient Divider (Ultra Premium) */
+.feed-divider {
+    height: 1px;
+    background: linear-gradient(90deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0) 100%);
+    margin: 14px 0 16px 0;
+    width: 100%;
+}
+
+/* Pure Icon Buttons - No Borders, No Backgrounds */
+.stButton button, 
+button[data-testid^="stBaseButton"] {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    color: var(--text-muted) !important;
+    font-size: 1.1rem !important;
+    padding: 0 !important;
+    min-height: 28px !important;
+    transition: color 0.2s ease, transform 0.2s ease !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: flex-end !important;
+}
+
+/* Hover effects (slight scale and brightness) */
+.stButton button:hover {
+    background: transparent !important;
+    color: var(--text-primary) !important;
+    transform: scale(1.15) !important;
+    border: none !important;
+}
+
+/* Active states (e.g., already saved or read) */
+button[data-testid="stBaseButton-primary"] {
+    color: var(--accent) !important;
+}
+button[data-testid="stBaseButton-primary"]:hover {
+    color: #7dd3fc !important; /* Lighter accent on hover */
+    background: transparent !important;
+}
+
+/* Hide original elements */
+.divider { display: none !important; }
