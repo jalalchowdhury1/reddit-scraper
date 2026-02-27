@@ -284,21 +284,52 @@ def extract_articles(post_url: str, session: requests.Session) -> List[Dict]:
             
             # Get parent to find description
             description = ""
+            art_title = "Untitled"
             parent = link.find_parent("li") or link.find_parent("p") or link.find_parent("div")
             if parent:
                 parent_text = parent.get_text(separator=" ", strip=True)
-                description = parent_text.replace(title, "", 1).strip()
-                description = " ".join(description.split())
+                
+                # Clean up - remove link text, bullets, and special characters BEFORE splitting
+                full_text = parent_text.replace(title, "", 1).strip()
+                
+                chars_to_strip = " \t\n\r•·-–—:." + "\u2022"
+                while full_text and full_text[0] in chars_to_strip:
+                    full_text = full_text[1:]
+                full_text = full_text.strip()
+                
+                # Now split the clean string into title and description
+                if " : " in full_text:
+                    parts = full_text.split(" : ", 1)
+                    extracted_title = parts[0].strip()
+                    extracted_desc = parts[1].strip() if len(parts) > 1 else ""
+                elif " - " in full_text:
+                    parts = full_text.split(" - ", 1)
+                    extracted_title = parts[0].strip()
+                    extracted_desc = parts[1].strip() if len(parts) > 1 else ""
+                else:
+                    if ": " in full_text:
+                        colon_idx = full_text.index(": ")
+                        extracted_title = full_text[:colon_idx].strip()
+                        extracted_desc = full_text[colon_idx+2:].strip()
+                    else:
+                        extracted_title = full_text
+                        extracted_desc = ""
+                
+                extracted_title = extracted_title.strip().lstrip(" \t\n\r•·-–—:.")
+                extracted_desc = extracted_desc.strip().lstrip(" \t\n\r•·-–—:.")
+                
+                art_title = extracted_title if extracted_title else "Untitled"
+                description = extracted_desc
             
             # Use the link text as author
             author = title
             
             # Generate article ID
-            article_id = make_article_id(href, title)
+            article_id = make_article_id(href, art_title)
             
             articles.append({
                 "article_id": article_id,
-                "title": description[:200] if description else "Untitled",
+                "title": art_title[:200],
                 "url": href,
                 "description": description[:500] if description else "",
                 "pub_date": datetime.now().isoformat(),
