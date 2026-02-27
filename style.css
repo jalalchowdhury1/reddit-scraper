@@ -534,3 +534,41 @@ footer {
     letter-spacing: 0.3px;
     display: inline-block;
 }
+
+/* ============================================================
+   Favorite Button Styling — Golden Star Theme
+   ============================================================ */
+
+/* Favorite button (☆ Fav) — Golden/yellow theme */
+button:contains("☆ Fav"),
+button:contains("★ Unfav") {
+    background: rgba(224, 175, 104, 0.1) !important;
+    color: var(--tn-yellow) !important;
+    border: 1px solid rgba(224, 175, 104, 0.3) !important;
+}
+
+/* Target favorite buttons by their text content using contains selector workaround */
+button:has(span:contains("☆ Fav")),
+button:has(span:contains("★ Unfav")) {
+    background: rgba(224, 175, 104, 0.1) !important;
+    color: var(--tn-yellow) !important;
+    border: 1px solid rgba(224, 175, 104, 0.3) !important;
+}
+
+/* Button containing "Fav" text */
+button:has(span:contains("Fav")) {
+    background: rgba(224, 175, 104, 0.1) !important;
+    color: var(--tn-yellow) !important;
+    border: 1px solid rgba(224, 175, 104, 0.3) !important;
+    border-radius: 8px !important;
+    font-weight: 700 !important;
+    font-size: 0.78rem !important;
+    transition: all 0.2s ease !important;
+}
+
+button:has(span:contains("Fav")):hover {
+    background: var(--tn-yellow) !important;
+    color: var(--tn-bg-dark) !important;
+    border-color: var(--tn-yellow) !important;
+    box-shadow: 0 0 15px rgba(224, 175, 104, 0.3) !important;
+}

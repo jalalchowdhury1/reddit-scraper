@@ -63,6 +63,25 @@ logger = logging.getLogger(__name__)
 READ_POSTS_FILE = Path("data/read_posts.json")
 
 # ============================================================================
+# FAVORITE TRACKING CONFIGURATION
+# ============================================================================
+FAVORITE_POSTS_FILE = Path("data/favorite_posts.json")
+
+def load_favorite_posts() -> set:
+    if not FAVORITE_POSTS_FILE.exists(): return set()
+    try:
+        with open(FAVORITE_POSTS_FILE, "r") as f: return set(json.load(f))
+    except: return set()
+
+def save_favorite_posts(fav_set: set) -> None:
+    FAVORITE_POSTS_FILE.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        fd, tmp_path = tempfile.mkstemp(dir=str(FAVORITE_POSTS_FILE.parent), suffix=".tmp")
+        with os.fdopen(fd, "w") as f: json.dump(sorted(fav_set), f, indent=2)
+        os.replace(tmp_path, str(FAVORITE_POSTS_FILE))
+    except: pass
+
+# ============================================================================
 # READ TRACKING FUNCTIONS
 # ============================================================================
 
@@ -165,6 +184,9 @@ def local_css(file_name: str) -> None:
 # ============================================================================
 if "read_posts" not in st.session_state:
     st.session_state.read_posts = load_read_posts()
+
+if "favorite_posts" not in st.session_state:
+    st.session_state.favorite_posts = load_favorite_posts()
 
 st.set_page_config(
     page_title="Reddit Daily",
@@ -480,7 +502,7 @@ def render_post_card(row, is_read: bool) -> None:
         comments = int(row.get("num_comments", 0))
         author = str(row.get("author", "unknown"))
 
-        m_col, b_col = st.columns([2, 1.2])
+        m_col, b_col = st.columns([2, 1.8])
         with m_col:
             st.markdown(
                 f'<div class="post-metrics">'
@@ -493,12 +515,24 @@ def render_post_card(row, is_read: bool) -> None:
                 unsafe_allow_html=True,
             )
         with b_col:
-            btn_left, btn_right = st.columns(2)
-            with btn_left:
+            c_link, c_fav, c_read = st.columns(3)
+            with c_link:
                 permalink = str(row.get("permalink", ""))
                 if permalink:
                     st.link_button("Open", f"https://reddit.com{permalink}", use_container_width=True)
-            with btn_right:
+            with c_fav:
+                is_fav = post_id in st.session_state.favorite_posts
+                if is_fav:
+                    if st.button("★ Unfav", key=f"ufav_{post_id}_{row.get('time_filter','m')}", use_container_width=True):
+                        st.session_state.favorite_posts.discard(post_id)
+                        save_favorite_posts(st.session_state.favorite_posts)
+                        st.rerun()
+                else:
+                    if st.button("☆ Fav", key=f"fav_{post_id}_{row.get('time_filter','m')}", use_container_width=True):
+                        st.session_state.favorite_posts.add(post_id)
+                        save_favorite_posts(st.session_state.favorite_posts)
+                        st.rerun()
+            with c_read:
                 if is_read:
                     if st.button("Unread", key=f"un_{post_id}_{row.get('time_filter','m')}", use_container_width=True, type="secondary"):
                         st.session_state.read_posts.discard(post_id)
@@ -635,7 +669,7 @@ def render_article_card(row, is_read: bool) -> None:
         author = str(row.get("author", "Unknown"))
         matched_kw = str(row.get("matched_keywords", ""))
 
-        m_col, b_col = st.columns([2, 1.2])
+        m_col, b_col = st.columns([2, 1.8])
         with m_col:
             kw_html = ""
             if matched_kw and matched_kw != "nan":
@@ -651,12 +685,24 @@ def render_article_card(row, is_read: bool) -> None:
                 unsafe_allow_html=True,
             )
         with b_col:
-            btn_left, btn_right = st.columns(2)
-            with btn_left:
+            c_link, c_fav, c_read = st.columns(3)
+            with c_link:
                 url = str(row.get("url", ""))
                 if url and url != "nan":
                     st.link_button("Read Article", url, use_container_width=True)
-            with btn_right:
+            with c_fav:
+                is_fav = read_key in st.session_state.favorite_posts
+                if is_fav:
+                    if st.button("★ Unfav", key=f"ufav_{read_key}_{row.get('category','')}", use_container_width=True):
+                        st.session_state.favorite_posts.discard(read_key)
+                        save_favorite_posts(st.session_state.favorite_posts)
+                        st.rerun()
+                else:
+                    if st.button("☆ Fav", key=f"fav_{read_key}_{row.get('category','')}", use_container_width=True):
+                        st.session_state.favorite_posts.add(read_key)
+                        save_favorite_posts(st.session_state.favorite_posts)
+                        st.rerun()
+            with c_read:
                 if is_read:
                     if st.button("Unread", key=f"nun_{read_key}_{row.get('category','')}", use_container_width=True, type="secondary"):
                         st.session_state.read_posts.discard(read_key)
@@ -783,7 +829,7 @@ def render_ritholtz_card(row, is_read: bool) -> None:
         # Metrics row: author
         author = str(row.get("author", "Unknown"))
 
-        m_col, b_col = st.columns([2, 1.2])
+        m_col, b_col = st.columns([2, 1.8])
         with m_col:
             st.markdown(
                 f'<div class="post-metrics">'
@@ -792,12 +838,24 @@ def render_ritholtz_card(row, is_read: bool) -> None:
                 unsafe_allow_html=True,
             )
         with b_col:
-            btn_left, btn_right = st.columns(2)
-            with btn_left:
+            c_link, c_fav, c_read = st.columns(3)
+            with c_link:
                 url = str(row.get("url", ""))
                 if url and url != "nan":
                     st.link_button("Read Article", url, use_container_width=True)
-            with btn_right:
+            with c_fav:
+                is_fav = read_key in st.session_state.favorite_posts
+                if is_fav:
+                    if st.button("★ Unfav", key=f"ufav_{read_key}", use_container_width=True):
+                        st.session_state.favorite_posts.discard(read_key)
+                        save_favorite_posts(st.session_state.favorite_posts)
+                        st.rerun()
+                else:
+                    if st.button("☆ Fav", key=f"fav_{read_key}", use_container_width=True):
+                        st.session_state.favorite_posts.add(read_key)
+                        save_favorite_posts(st.session_state.favorite_posts)
+                        st.rerun()
+            with c_read:
                 if is_read:
                     if st.button("Unread", key=f"rth_un_{read_key}", use_container_width=True, type="secondary"):
                         st.session_state.read_posts.discard(read_key)
@@ -857,6 +915,9 @@ with st.sidebar:
     read_count = len(st.session_state.read_posts)
     st.markdown(f'<div class="sidebar-stat">Posts marked read: **{read_count}**</div>', unsafe_allow_html=True)
 
+    fav_count = len(st.session_state.favorite_posts)
+    st.markdown(f'<div class="sidebar-stat">Favorited items: **{fav_count}**</div>', unsafe_allow_html=True)
+
     if st.button("Clear all read markers", use_container_width=True, type="secondary"):
         st.session_state.read_posts = set()
         save_read_posts(set())
@@ -888,18 +949,20 @@ if not has_reddit and not has_news and not has_ritholtz:
     st.warning("No data found. Run `python scrape_top.py`, `python scrape_dailystar.py` and/or `python scrape_ritholtz.py` first.")
     st.stop()
 
-# Filter out read posts unless toggled
-filtered_df = posts_df
-if has_reddit and not show_read:
-    filtered_df = posts_df[~posts_df["id"].astype(str).isin(st.session_state.read_posts)]
+# Create sets of items to hide from main tabs
+hide_reddit = st.session_state.favorite_posts.copy()
+hide_news = st.session_state.favorite_posts.copy()
+hide_ritholtz = st.session_state.favorite_posts.copy()
 
-filtered_news = news_df
-if has_news and not show_read:
-    filtered_news = news_df[~news_df["article_id"].astype(str).apply(lambda x: f"dsr_{x}").isin(st.session_state.read_posts)]
+if not show_read:
+    hide_reddit.update(st.session_state.read_posts)
+    hide_news.update(st.session_state.read_posts)
+    hide_ritholtz.update(st.session_state.read_posts)
 
-filtered_ritholtz = ritholtz_df
-if has_ritholtz and not show_read:
-    filtered_ritholtz = ritholtz_df[~ritholtz_df["article_id"].astype(str).apply(lambda x: f"rth_{x}").isin(st.session_state.read_posts)]
+# Apply filters
+filtered_df = posts_df[~posts_df["id"].astype(str).isin(hide_reddit)] if has_reddit else posts_df
+filtered_news = news_df[~news_df["article_id"].astype(str).apply(lambda x: f"dsr_{x}").isin(hide_news)] if has_news else news_df
+filtered_ritholtz = ritholtz_df[~ritholtz_df["article_id"].astype(str).apply(lambda x: f"rth_{x}").isin(hide_ritholtz)] if has_ritholtz else ritholtz_df
 
 # Stats row
 monthly_count = len(filtered_df[filtered_df["time_filter"] == "month"]) if has_reddit else 0
@@ -920,7 +983,7 @@ c6.metric("Total", total)
 st.markdown('<div class="divider"></div>', unsafe_allow_html=True)
 
 # Tabs
-tab_monthly, tab_yearly, tab_news, tab_amreads = st.tabs(["Monthly Top", "Yearly Top", "Daily Star News", "AM Reads"])
+tab_monthly, tab_yearly, tab_news, tab_amreads, tab_favorites = st.tabs(["Monthly Top", "Yearly Top", "Daily Star News", "AM Reads", "⭐ Favorites"])
 
 with tab_monthly:
     if has_reddit:
@@ -945,6 +1008,37 @@ with tab_news:
 
 with tab_amreads:
     render_ritholtz_tab(filtered_ritholtz.copy() if has_ritholtz else pd.DataFrame())
+
+with tab_favorites:
+    st.markdown("### ⭐ Favorited Items")
+    found_any = False
+    
+    if has_reddit:
+        fav_reddit = posts_df[posts_df["id"].astype(str).isin(st.session_state.favorite_posts)]
+        if not fav_reddit.empty:
+            found_any = True
+            st.markdown("#### Reddit Posts")
+            for _, row in fav_reddit.iterrows():
+                render_post_card(row, str(row["id"]) in st.session_state.read_posts)
+                
+    if has_news:
+        fav_news = news_df[news_df["article_id"].astype(str).apply(lambda x: f"dsr_{x}").isin(st.session_state.favorite_posts)]
+        if not fav_news.empty:
+            found_any = True
+            st.markdown("#### Daily Star News")
+            for _, row in fav_news.iterrows():
+                render_article_card(row, f"dsr_{row['article_id']}" in st.session_state.read_posts)
+                
+    if has_ritholtz:
+        fav_rith = ritholtz_df[ritholtz_df["article_id"].astype(str).apply(lambda x: f"rth_{x}").isin(st.session_state.favorite_posts)]
+        if not fav_rith.empty:
+            found_any = True
+            st.markdown("#### AM Reads")
+            for _, row in fav_rith.iterrows():
+                render_ritholtz_card(row, f"rth_{row['article_id']}" in st.session_state.read_posts)
+                
+    if not found_any:
+        st.info("You haven't favorited any items yet. Click the '☆ Fav' button on any post to save it here!")
 
 st.markdown('<div class="divider"></div>', unsafe_allow_html=True)
 st.markdown(
