@@ -1,574 +1,130 @@
-/* ============================================================
-   Reddit Daily — Tokyo Night Premium Theme
-   Color palette based on Tokyo Night (folke/tokyonight.nvim)
-   ============================================================ */
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 
-/* --- Tokyo Night Color Tokens --- */
 :root {
-    --tn-bg:          #1a1b26;
-    --tn-bg-dark:     #16161e;
-    --tn-bg-float:    #1f2335;
-    --tn-bg-highlight:#292e42;
-    --tn-bg-sidebar:  #16161e;
-    --tn-fg:          #c0caf5;
-    --tn-fg-dark:     #a9b1d6;
-    --tn-fg-gutter:   #3b4261;
-    --tn-comment:     #565f89;
-    --tn-blue:        #7aa2f7;
-    --tn-cyan:        #7dcfff;
-    --tn-green:       #9ece6a;
-    --tn-magenta:     #bb9af7;
-    --tn-orange:      #ff9e64;
-    --tn-red:         #f7768e;
-    --tn-teal:        #73daca;
-    --tn-yellow:      #e0af68;
-    --tn-border:      rgba(122, 162, 247, 0.08);
-    --tn-border-highlight: rgba(122, 162, 247, 0.2);
-    --tn-glow-blue:   rgba(122, 162, 247, 0.15);
-    --tn-glow-red:    rgba(247, 118, 142, 0.2);
+    --bg-main: #0f172a;       /* Deep slate background */
+    --bg-card: #1e293b;       /* Slightly lighter card background */
+    --bg-hover: #334155;      /* Card hover state */
+    --text-primary: #f8fafc;  /* Crisp off-white for titles */
+    --text-secondary: #94a3b8;/* Soft gray for descriptions */
+    --text-muted: #64748b;    /* Very dim gray for meta info */
+    --accent: #38bdf8;        /* Soft blue accent */
+    --border-color: rgba(255, 255, 255, 0.08);
 }
 
-/* --- Global Reset --- */
-html, body, .stApp {
-    background-color: var(--tn-bg) !important;
-    color: var(--tn-fg) !important;
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif !important;
+html, body, .stApp, .main {
+    background-color: var(--bg-main) !important;
+    color: var(--text-primary) !important;
+    font-family: 'Inter', sans-serif !important;
 }
 
-.main {
-    background-color: var(--tn-bg) !important;
+/* Eliminate Streamlit dead space */
+div[data-testid="block-container"] {
+    padding-top: 0.5rem !important; /* Reclaiming top space */
+    padding-bottom: 2rem !important;
+    max-width: 900px !important; /* Optimal reading width */
 }
 
-/* Remove all unwanted italics */
-* {
-    font-style: normal !important;
+/* Reader Card Styling */
+div[data-testid="stVerticalBlockBorderWrapper"] > div[style*="border"],
+div.st-emotion-cache-16idsys {
+    background: var(--bg-card) !important;
+    border: 1px solid var(--border-color) !important;
+    border-radius: 12px !important;
+    padding: 20px 24px !important;
+    margin-bottom: 8px !important;
+    transition: all 0.2s ease;
 }
 
-/* --- Sidebar --- */
-[data-testid="stSidebar"] {
-    background: var(--tn-bg-dark) !important;
-    border-right: 1px solid var(--tn-border) !important;
-}
-
-[data-testid="stSidebar"] [data-testid="stMarkdownContainer"] {
-    color: var(--tn-fg-dark) !important;
-}
-
-.sidebar-header {
-    color: var(--tn-blue) !important;
-    font-size: 1.1rem;
-    font-weight: 700;
-    letter-spacing: 0.5px;
-    text-transform: uppercase;
-    margin-bottom: 0.5rem;
-}
-
-.sidebar-stat {
-    color: var(--tn-fg-dark);
-    font-size: 0.85rem;
-    padding: 0.5rem 0;
-}
-
-.sidebar-tip {
-    color: var(--tn-comment);
-    font-size: 0.78rem;
-    line-height: 1.5;
-    padding: 0.75rem;
-    background: var(--tn-bg-float);
-    border-radius: 8px;
-    border-left: 3px solid var(--tn-blue);
-}
-
-/* --- Typography --- */
-h1, h2, h3, h4 {
-    color: #ffffff !important;
-    font-weight: 800 !important;
-    word-break: break-word !important;
-    overflow-wrap: anywhere !important;
-}
-
-.main-title {
-    font-size: 2.4rem !important;
-    font-weight: 900 !important;
-    background: linear-gradient(135deg, var(--tn-blue) 0%, var(--tn-magenta) 50%, var(--tn-cyan) 100%);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
-    letter-spacing: -1px;
-    margin-bottom: 0 !important;
-    padding-bottom: 0 !important;
-}
-
-.main-subtitle {
-    color: var(--tn-comment) !important;
-    font-size: 0.95rem;
-    font-weight: 400;
-    margin-top: 0;
-    letter-spacing: 0.3px;
-}
-
-.footer-text {
-    color: var(--tn-fg-gutter) !important;
-    font-size: 0.75rem;
-    text-align: center;
-    padding: 1rem 0;
-}
-
-.divider {
-    height: 1px;
-    background: linear-gradient(90deg, transparent, var(--tn-border-highlight), transparent);
-    margin: 1.5rem 0;
-}
-
-/* --- Metric Cards --- */
-[data-testid="stMetricValue"] {
-    color: var(--tn-blue) !important;
-    font-weight: 800 !important;
-    font-size: 1.8rem !important;
-    font-family: 'JetBrains Mono', monospace !important;
-}
-
-[data-testid="stMetricLabel"] {
-    color: var(--tn-comment) !important;
-    font-weight: 600 !important;
-    text-transform: uppercase;
-    font-size: 0.7rem !important;
-    letter-spacing: 1.2px;
-}
-
-/* --- Post Cards --- */
-/* Target Streamlit's container border */
-[data-testid="stVerticalBlockBorderWrapper"]:has(> div > [data-testid="stVerticalBlock"]) {
-    transition: transform 0.2s ease, box-shadow 0.2s ease;
-}
-
-div[data-testid="stExpander"],
-div.st-emotion-cache-16idsys,
-div[data-testid="stVerticalBlockBorderWrapper"] > div[style*="border"] {
-    background: var(--tn-bg-float) !important;
-    border: 1px solid var(--tn-border) !important;
-    border-radius: 14px !important;
-    padding: 0.25rem !important;
-    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-/* Card hover effect */
-div.st-emotion-cache-16idsys:hover,
 div[data-testid="stVerticalBlockBorderWrapper"]:hover > div[style*="border"] {
-    border-color: var(--tn-border-highlight) !important;
-    box-shadow:
-        0 4px 24px rgba(0, 0, 0, 0.3),
-        0 0 0 1px var(--tn-border-highlight),
-        inset 0 1px 0 rgba(255, 255, 255, 0.02);
-    transform: translateY(-1px);
+    background: var(--bg-hover) !important;
+    border-color: rgba(255, 255, 255, 0.15) !important;
 }
 
-/* Post title */
-.post-title {
+/* Typography Overrides */
+.reader-category {
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--accent);
+    margin-bottom: 8px;
+    display: block;
+}
+
+.reader-title {
     font-size: 1.15rem !important;
-    font-weight: 700 !important;
-    line-height: 1.45 !important;
-    margin: 12px 0 8px !important;
-    display: block !important;
-    color: var(--tn-fg) !important;
-    word-break: break-word;
-    overflow-wrap: anywhere;
+    font-weight: 600 !important;
+    color: var(--text-primary) !important;
+    line-height: 1.4 !important;
+    margin: 0 0 10px 0 !important;
 }
 
-/* Post preview text */
-.post-preview {
-    color: var(--tn-fg-dark);
-    font-size: 0.82rem;
-    line-height: 1.55;
-    padding: 8px 12px;
-    background: var(--tn-bg-highlight);
-    border-radius: 8px;
-    border-left: 3px solid var(--tn-fg-gutter);
-    margin: 4px 0 8px;
-    max-height: 120px;
+.reader-desc {
+    font-size: 0.95rem !important;
+    color: var(--text-secondary) !important;
+    line-height: 1.6 !important;
+    margin: 0 0 16px 0 !important;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
     overflow: hidden;
-    position: relative;
 }
 
-.post-preview::after {
-    content: '';
-    position: absolute;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    height: 30px;
-    background: linear-gradient(transparent, var(--tn-bg-highlight));
-}
-
-/* --- Badges --- */
-.subreddit-badge {
-    background: rgba(122, 162, 247, 0.1) !important;
-    color: var(--tn-blue) !important;
-    border: 1px solid rgba(122, 162, 247, 0.25) !important;
-    padding: 3px 10px;
-    border-radius: 6px;
-    font-size: 0.72rem;
-    font-weight: 700;
-    letter-spacing: 0.3px;
-    display: inline-block;
-}
-
-.time-filter-badge {
-    color: var(--tn-teal) !important;
-    background: rgba(115, 218, 202, 0.08);
-    border: 1px solid rgba(115, 218, 202, 0.2);
-    padding: 3px 10px;
-    border-radius: 6px;
-    font-weight: 800;
-    font-size: 0.65rem;
-    text-transform: uppercase;
-    letter-spacing: 1.5px;
-    display: inline-block;
-}
-
-.read-badge {
-    color: var(--tn-comment) !important;
-    background: rgba(86, 95, 137, 0.15);
-    border: 1px solid rgba(86, 95, 137, 0.3);
-    padding: 3px 10px;
-    border-radius: 6px;
-    font-weight: 800;
-    font-size: 0.65rem;
-    text-transform: uppercase;
-    letter-spacing: 1.5px;
-    display: inline-block;
-}
-
-/* --- Post Metrics --- */
-.post-metrics {
-    color: var(--tn-comment);
-    font-size: 0.78rem;
-    font-weight: 500;
+.reader-meta {
+    font-size: 0.75rem;
+    color: var(--text-muted);
     display: flex;
-    align-items: center;
-    gap: 4px;
-    flex-wrap: wrap;
-    padding-top: 4px;
+    gap: 12px;
 }
 
-.metric-score {
-    color: var(--tn-orange);
-    font-weight: 700;
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 0.82rem;
+/* Button Overrides (Subtle & Elegant) */
+.stButton button, 
+button[data-testid^="stBaseButton"],
+a[data-testid="stBaseLinkButton-secondary"] {
+    background: transparent !important;
+    border: 1px solid var(--border-color) !important;
+    color: var(--text-secondary) !important;
+    border-radius: 6px !important;
+    padding: 4px 12px !important;
+    font-size: 0.8rem !important;
+    font-weight: 500 !important;
+    min-height: 32px !important;
+    width: 100% !important;
 }
 
-.metric-comments {
-    color: var(--tn-cyan);
-    font-weight: 700;
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 0.82rem;
+.stButton button:hover, 
+a[data-testid="stBaseLinkButton-secondary"]:hover {
+    background: rgba(255, 255, 255, 0.05) !important;
+    color: var(--text-primary) !important;
+    border-color: rgba(255, 255, 255, 0.2) !important;
 }
 
-.metric-author {
-    color: var(--tn-magenta);
-    font-weight: 500;
-}
-
-.metric-sep {
-    display: inline-block;
-    width: 4px;
-    height: 4px;
-    background: var(--tn-fg-gutter);
-    border-radius: 50%;
-    margin: 0 6px;
-    vertical-align: middle;
-}
-
-/* --- Buttons --- */
-
-/* Mark Read button (primary) — Red/rose theme */
-.stButton button[kind="primary"],
+/* Mark Read Button (Subtle Primary) */
 button[data-testid="stBaseButton-primary"] {
-    background: rgba(247, 118, 142, 0.15) !important;
-    color: var(--tn-red) !important;
-    border: 1px solid rgba(247, 118, 142, 0.35) !important;
-    border-radius: 8px !important;
-    font-weight: 700 !important;
-    font-size: 0.78rem !important;
-    transition: all 0.2s ease !important;
-    letter-spacing: 0.3px;
+    background: rgba(56, 189, 248, 0.1) !important;
+    color: var(--accent) !important;
+    border: 1px solid rgba(56, 189, 248, 0.2) !important;
 }
 
 button[data-testid="stBaseButton-primary"]:hover {
-    background: var(--tn-red) !important;
-    color: var(--tn-bg-dark) !important;
-    border-color: var(--tn-red) !important;
-    box-shadow: 0 0 20px var(--tn-glow-red) !important;
-    transform: translateY(-1px);
+    background: rgba(56, 189, 248, 0.2) !important;
 }
 
-/* Secondary / Unread button */
-.stButton button[kind="secondary"],
-button[data-testid="stBaseButton-secondary"] {
-    background: rgba(122, 162, 247, 0.08) !important;
-    color: var(--tn-comment) !important;
-    border: 1px solid rgba(122, 162, 247, 0.15) !important;
-    border-radius: 8px !important;
-    font-weight: 600 !important;
-    font-size: 0.78rem !important;
-    transition: all 0.2s ease !important;
-}
-
-button[data-testid="stBaseButton-secondary"]:hover {
-    background: rgba(122, 162, 247, 0.15) !important;
-    color: var(--tn-blue) !important;
-    border-color: rgba(122, 162, 247, 0.3) !important;
-}
-
-/* Link button (Open on Reddit) */
-a[data-testid="stBaseLinkButton-secondary"],
-.stLinkButton a {
-    background: rgba(115, 218, 202, 0.08) !important;
-    color: var(--tn-teal) !important;
-    border: 1px solid rgba(115, 218, 202, 0.2) !important;
-    border-radius: 8px !important;
-    font-weight: 600 !important;
-    font-size: 0.78rem !important;
-    transition: all 0.2s ease !important;
-    text-decoration: none !important;
-}
-
-a[data-testid="stBaseLinkButton-secondary"]:hover,
-.stLinkButton a:hover {
-    background: rgba(115, 218, 202, 0.15) !important;
-    color: var(--tn-teal) !important;
-    border-color: rgba(115, 218, 202, 0.35) !important;
-    box-shadow: 0 0 12px rgba(115, 218, 202, 0.1) !important;
-}
-
-/* --- Tabs --- */
-[data-testid="stTabs"] button {
-    color: var(--tn-comment) !important;
-    font-weight: 600 !important;
-    font-size: 0.88rem !important;
-    border-bottom: 2px solid transparent !important;
-    transition: all 0.2s ease !important;
-    padding: 0.6rem 1.2rem !important;
-    background: transparent !important;
-}
-
-[data-testid="stTabs"] button:hover {
-    color: var(--tn-fg) !important;
-    background: var(--tn-bg-float) !important;
-}
-
-[data-testid="stTabs"] button[aria-selected="true"] {
-    color: var(--tn-blue) !important;
-    border-bottom-color: var(--tn-blue) !important;
-    background: rgba(122, 162, 247, 0.05) !important;
-}
-
-/* Tab underline bar */
-[data-testid="stTabs"] [role="tablist"] {
-    border-bottom: 1px solid var(--tn-border) !important;
-    gap: 0 !important;
-}
-
-/* --- Selectbox / Dropdowns --- */
-[data-testid="stSelectbox"] > div > div {
-    background: var(--tn-bg-float) !important;
-    border: 1px solid var(--tn-border) !important;
-    border-radius: 8px !important;
-    color: var(--tn-fg) !important;
-}
-
-[data-testid="stSelectbox"] label {
-    color: var(--tn-comment) !important;
-    font-weight: 600 !important;
-    font-size: 0.78rem !important;
-    text-transform: uppercase;
-    letter-spacing: 0.8px;
-}
-
-/* --- Checkbox --- */
-[data-testid="stCheckbox"] label span {
-    color: var(--tn-fg-dark) !important;
-}
-
-/* --- Caption --- */
-[data-testid="stCaptionContainer"] {
-    color: var(--tn-fg-gutter) !important;
-    font-size: 0.75rem !important;
-}
-
-/* --- Warnings/Info --- */
-[data-testid="stAlert"] {
-    background: var(--tn-bg-float) !important;
-    border: 1px solid var(--tn-border) !important;
-    border-radius: 10px !important;
-    color: var(--tn-fg-dark) !important;
-}
-
-/* --- Scrollbar --- */
-::-webkit-scrollbar {
-    width: 6px;
-    height: 6px;
-}
-
-::-webkit-scrollbar-track {
-    background: var(--tn-bg-dark);
-}
-
-::-webkit-scrollbar-thumb {
-    background: var(--tn-fg-gutter);
-    border-radius: 3px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-    background: var(--tn-comment);
-}
-
-/* --- Divider overrides --- */
-[data-testid="stHorizontalBlock"] hr,
-hr {
-    border-color: var(--tn-border) !important;
-    opacity: 0.5;
-}
-
-/* --- Selection highlight --- */
-::selection {
-    background: rgba(122, 162, 247, 0.3);
-    color: #ffffff;
-}
-
-/* --- Streamlit header/toolbar cleanup --- */
-header[data-testid="stHeader"] {
-    background: var(--tn-bg) !important;
-    border-bottom: 1px solid var(--tn-border) !important;
-}
-
-/* Hide Streamlit deploy button & menu for cleaner look */
-#MainMenu {
-    visibility: hidden;
-}
-
-footer {
-    visibility: hidden;
-}
-
-/* ============================================================
-   Daily Star News — Category Badges & News Styling
-   ============================================================ */
-
-/* India-Bangladesh Relations badge — Cyan */
-.news-cat-relations {
-    background: rgba(125, 207, 255, 0.1) !important;
-    color: var(--tn-cyan) !important;
-    border: 1px solid rgba(125, 207, 255, 0.25) !important;
-    padding: 3px 10px;
-    border-radius: 6px;
-    font-size: 0.72rem;
-    font-weight: 700;
-    letter-spacing: 0.3px;
-    display: inline-block;
-}
-
-/* Bangladesh Economy badge — Orange */
-.news-cat-economy {
-    background: rgba(255, 158, 100, 0.1) !important;
-    color: var(--tn-orange) !important;
-    border: 1px solid rgba(255, 158, 100, 0.25) !important;
-    padding: 3px 10px;
-    border-radius: 6px;
-    font-size: 0.72rem;
-    font-weight: 700;
-    letter-spacing: 0.3px;
-    display: inline-block;
-}
-
-/* Good News badge — Green */
-.news-cat-goodnews {
-    background: rgba(158, 206, 106, 0.1) !important;
-    color: var(--tn-green) !important;
-    border: 1px solid rgba(158, 206, 106, 0.25) !important;
-    padding: 3px 10px;
-    border-radius: 6px;
-    font-size: 0.72rem;
-    font-weight: 700;
-    letter-spacing: 0.3px;
-    display: inline-block;
-}
-
-/* News date display */
-.news-date {
-    color: var(--tn-yellow) !important;
-    background: rgba(224, 175, 104, 0.08);
-    border: 1px solid rgba(224, 175, 104, 0.2);
-    padding: 3px 10px;
-    border-radius: 6px;
-    font-weight: 700;
-    font-size: 0.65rem;
+/* Top discreet stats */
+.discreet-stats {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    text-align: center;
+    margin-bottom: 2rem;
     letter-spacing: 0.5px;
-    display: inline-block;
-    font-family: 'JetBrains Mono', monospace;
 }
 
-/* Matched keywords in article metrics */
-.news-keywords {
-    color: var(--tn-fg-gutter);
-    font-size: 0.72rem;
-    font-weight: 400;
-    font-style: normal !important;
-}
-
-/* ============================================================
-   Ritholtz AM Reads — Badge Styling
-   ============================================================ */
-
-/* Ritholtz AM Reads badge — Magenta (matching the Ritholtz theme) */
-.ritholtz-badge {
-    background: rgba(187, 154, 247, 0.1) !important;
-    color: var(--tn-magenta) !important;
-    border: 1px solid rgba(187, 154, 247, 0.25) !important;
-    padding: 3px 10px;
-    border-radius: 6px;
-    font-size: 0.72rem;
-    font-weight: 700;
-    letter-spacing: 0.3px;
-    display: inline-block;
-}
-
-/* ============================================================
-   Favorite Button Styling — Golden Star Theme
-   ============================================================ */
-
-/* Favorite button (☆ Fav) — Golden/yellow theme */
-button:contains("☆ Fav"),
-button:contains("★ Unfav") {
-    background: rgba(224, 175, 104, 0.1) !important;
-    color: var(--tn-yellow) !important;
-    border: 1px solid rgba(224, 175, 104, 0.3) !important;
-}
-
-/* Target favorite buttons by their text content using contains selector workaround */
-button:has(span:contains("☆ Fav")),
-button:has(span:contains("★ Unfav")) {
-    background: rgba(224, 175, 104, 0.1) !important;
-    color: var(--tn-yellow) !important;
-    border: 1px solid rgba(224, 175, 104, 0.3) !important;
-}
-
-/* Button containing "Fav" text */
-button:has(span:contains("Fav")) {
-    background: rgba(224, 175, 104, 0.1) !important;
-    color: var(--tn-yellow) !important;
-    border: 1px solid rgba(224, 175, 104, 0.3) !important;
-    border-radius: 8px !important;
-    font-weight: 700 !important;
-    font-size: 0.78rem !important;
-    transition: all 0.2s ease !important;
-}
-
-button:has(span:contains("Fav")):hover {
-    background: var(--tn-yellow) !important;
-    color: var(--tn-bg-dark) !important;
-    border-color: var(--tn-yellow) !important;
-    box-shadow: 0 0 15px rgba(224, 175, 104, 0.3) !important;
+/* Bottom metadata styling (shared row with buttons) */
+.bottom-meta {
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--accent);
+    padding-top: 8px; /* Visually aligns text with the adjacent buttons */
 }

@@ -442,107 +442,55 @@ def get_display_name(sub: str) -> str:
 
 
 def render_post_card(row, is_read: bool) -> None:
-    """
-    Render a single Reddit post card with Tokyo Night styling.
-
-    Args:
-        row (pd.Series): Post data from DataFrame
-        is_read (bool): Whether post is marked as read
-
-    Card Contents:
-        1. Subreddit badge (left) | Time filter badge or READ badge (right)
-        2. Post title
-        3. Post preview (self text, truncated to 250 chars)
-        4. Metrics: score, comments, author | Open & Mark Read buttons
-
-    Behavior when read:
-        - "READ" badge instead of time filter
-        - Unread button instead of Mark Read button
-        - Styling indicates read status
-
-    IMPORTANT: Key format: "rd_{post_id}_{time_filter}" to ensure unique keys
-    across reruns (Streamlit requirement).
-    """
     post_id = str(row["id"])
-    read_class = "read-card" if is_read else ""
-
+    time_badge = row.get("time_filter", "month").upper()
+    title_text = str(row.get("title", "Untitled"))
+    selftext = str(row.get("selftext", ""))
+    
+    score = int(row.get("score", 0))
+    score_display = f" • {score:,} pts" if score > 0 else ""
+    
     with st.container(border=True):
-        # Header: subreddit badge + time filter + read status
-        col_left, col_right = st.columns([1, 1])
-        with col_left:
-            st.markdown(
-                f'<span class="subreddit-badge">{get_display_name(row["subreddit"])}</span>',
-                unsafe_allow_html=True,
-            )
-        with col_right:
-            badge = row.get("time_filter", "month").upper()
-            if is_read:
-                st.markdown(
-                    f'<div style="text-align:right"><span class="read-badge">READ</span></div>',
-                    unsafe_allow_html=True,
-                )
+        html_content = f"""
+            <div class="reader-title">{title_text}</div>
+            <div class="reader-desc">{selftext}</div>
+        """
+        st.markdown(html_content, unsafe_allow_html=True)
+        
+        # Meta info now lives in the first column, utilizing the empty space
+        col_meta, col_link, col_fav, col_read = st.columns([4.5, 1.5, 1.5, 1.5])
+        
+        with col_meta:
+            meta_text = f'{get_display_name(row["subreddit"])} • {time_badge}{score_display}'
+            st.markdown(f'<div class="bottom-meta">{meta_text}</div>', unsafe_allow_html=True)
+            
+        with col_link:
+            permalink = str(row.get("permalink", ""))
+            if permalink:
+                st.link_button("↗ Open", f"https://reddit.com{permalink}", use_container_width=True)
+        with col_fav:
+            is_fav = post_id in st.session_state.favorite_posts
+            if is_fav:
+                if st.button("★ Saved", key=f"ufav_{post_id}_{row.get('time_filter','m')}", use_container_width=True):
+                    st.session_state.favorite_posts.discard(post_id)
+                    save_favorite_posts(st.session_state.favorite_posts)
+                    st.rerun()
             else:
-                st.markdown(
-                    f'<div style="text-align:right"><span class="time-filter-badge">{badge}</span></div>',
-                    unsafe_allow_html=True,
-                )
-
-        # Title
-        title_text = str(row.get("title", "Untitled"))
-        st.markdown(f'<div class="post-title">{title_text}</div>', unsafe_allow_html=True)
-
-        # Self text preview
-        selftext = str(row.get("selftext", ""))
-        if selftext and selftext != "nan":
-            preview = selftext[:250] + "..." if len(selftext) > 250 else selftext
-            st.markdown(f'<div class="post-preview">{preview}</div>', unsafe_allow_html=True)
-
-        # Metrics row
-        score = int(row.get("score", 0))
-        comments = int(row.get("num_comments", 0))
-        author = str(row.get("author", "unknown"))
-
-        m_col, b_col = st.columns([2, 1.8])
-        with m_col:
-            st.markdown(
-                f'<div class="post-metrics">'
-                f'<span class="metric-score">{score:,}</span> points'
-                f'<span class="metric-sep"></span>'
-                f'<span class="metric-comments">{comments:,}</span> comments'
-                f'<span class="metric-sep"></span>'
-                f'<span class="metric-author">u/{author}</span>'
-                f'</div>',
-                unsafe_allow_html=True,
-            )
-        with b_col:
-            c_link, c_fav, c_read = st.columns(3)
-            with c_link:
-                permalink = str(row.get("permalink", ""))
-                if permalink:
-                    st.link_button("Open", f"https://reddit.com{permalink}", use_container_width=True)
-            with c_fav:
-                is_fav = post_id in st.session_state.favorite_posts
-                if is_fav:
-                    if st.button("★ Unfav", key=f"ufav_{post_id}_{row.get('time_filter','m')}", use_container_width=True):
-                        st.session_state.favorite_posts.discard(post_id)
-                        save_favorite_posts(st.session_state.favorite_posts)
-                        st.rerun()
-                else:
-                    if st.button("☆ Fav", key=f"fav_{post_id}_{row.get('time_filter','m')}", use_container_width=True):
-                        st.session_state.favorite_posts.add(post_id)
-                        save_favorite_posts(st.session_state.favorite_posts)
-                        st.rerun()
-            with c_read:
-                if is_read:
-                    if st.button("Unread", key=f"un_{post_id}_{row.get('time_filter','m')}", use_container_width=True, type="secondary"):
-                        st.session_state.read_posts.discard(post_id)
-                        save_read_posts(st.session_state.read_posts)
-                        st.rerun()
-                else:
-                    if st.button("Mark Read", key=f"rd_{post_id}_{row.get('time_filter','m')}", use_container_width=True, type="primary"):
-                        st.session_state.read_posts.add(post_id)
-                        save_read_posts(st.session_state.read_posts)
-                        st.rerun()
+                if st.button("☆ Save", key=f"fav_{post_id}_{row.get('time_filter','m')}", use_container_width=True):
+                    st.session_state.favorite_posts.add(post_id)
+                    save_favorite_posts(st.session_state.favorite_posts)
+                    st.rerun()
+        with col_read:
+            if is_read:
+                if st.button("↺ Unread", key=f"un_{post_id}_{row.get('time_filter','m')}", use_container_width=True, type="secondary"):
+                    st.session_state.read_posts.discard(post_id)
+                    save_read_posts(st.session_state.read_posts)
+                    st.rerun()
+            else:
+                if st.button("✓ Mark Read", key=f"rd_{post_id}_{row.get('time_filter','m')}", use_container_width=True, type="primary"):
+                    st.session_state.read_posts.add(post_id)
+                    save_read_posts(st.session_state.read_posts)
+                    st.rerun()
 
 
 # ============================================================================
@@ -603,116 +551,53 @@ def render_tab(df: pd.DataFrame, tab_key: str) -> None:
 
 
 def render_article_card(row, is_read: bool) -> None:
-    """
-    Render a single news article card with Tokyo Night styling.
-
-    Args:
-        row (pd.Series): Article data from DataFrame
-        is_read (bool): Whether article is marked as read
-
-    Card Contents:
-        1. Category badge (left, colored) | Publication date or READ badge (right)
-        2. Article title
-        3. Article description (first 300 chars)
-        4. Author | "Read Article" & "Mark Read" buttons
-
-    Styling:
-        - Category badges: cyan (Relations), orange (Economy), green (Good News)
-        - Date display: yellow monospace
-        - Matched keywords: muted gray text
-
-    Key format: "dsr_{article_id}_{category}" to ensure unique keys
-    (Streamlit requirement, different from Reddit key format).
-    """
     article_id = str(row["article_id"])
     read_key = f"dsr_{article_id}"
-
+    category = str(row.get("category", ""))
+    pub_date = str(row.get("pub_date", ""))[:10]
+    title_text = str(row.get("title", "Untitled"))
+    description = str(row.get("description", ""))
+    
     with st.container(border=True):
-        # Header: category badge + date/read status
-        col_left, col_right = st.columns([1, 1])
-        with col_left:
-            category = str(row.get("category", ""))
-            badge_class = "news-cat-relations"
-            if "Economy" in category:
-                badge_class = "news-cat-economy"
-            elif "Good" in category:
-                badge_class = "news-cat-goodnews"
-            st.markdown(
-                f'<span class="{badge_class}">{category}</span>',
-                unsafe_allow_html=True,
-            )
-        with col_right:
-            if is_read:
-                st.markdown(
-                    '<div style="text-align:right"><span class="read-badge">READ</span></div>',
-                    unsafe_allow_html=True,
-                )
+        html_content = f"""
+            <div class="reader-title">{title_text}</div>
+            <div class="reader-desc">{description}</div>
+        """
+        st.markdown(html_content, unsafe_allow_html=True)
+        
+        col_meta, col_link, col_fav, col_read = st.columns([4.5, 1.5, 1.5, 1.5])
+        
+        with col_meta:
+            meta_text = f'DAILY STAR • {category} • {pub_date}'
+            st.markdown(f'<div class="bottom-meta">{meta_text}</div>', unsafe_allow_html=True)
+            
+        with col_link:
+            url = str(row.get("url", ""))
+            if url and url != "nan":
+                st.link_button("↗ Open", url, use_container_width=True)
+        with col_fav:
+            is_fav = read_key in st.session_state.favorite_posts
+            if is_fav:
+                if st.button("★ Saved", key=f"ufav_{read_key}_{row.get('category','')}", use_container_width=True):
+                    st.session_state.favorite_posts.discard(read_key)
+                    save_favorite_posts(st.session_state.favorite_posts)
+                    st.rerun()
             else:
-                pub_date = str(row.get("pub_date", ""))
-                date_display = pub_date[:10] if len(pub_date) >= 10 else pub_date
-                st.markdown(
-                    f'<div style="text-align:right"><span class="news-date">{date_display}</span></div>',
-                    unsafe_allow_html=True,
-                )
-
-        # Title
-        title_text = str(row.get("title", "Untitled"))
-        st.markdown(f'<div class="post-title">{title_text}</div>', unsafe_allow_html=True)
-
-        # Description preview
-        description = str(row.get("description", ""))
-        if description and description != "nan":
-            preview = description[:300] + "..." if len(description) > 300 else description
-            st.markdown(f'<div class="post-preview">{preview}</div>', unsafe_allow_html=True)
-
-        # Metrics row: author + matched keywords
-        author = str(row.get("author", "Unknown"))
-        matched_kw = str(row.get("matched_keywords", ""))
-
-        m_col, b_col = st.columns([2, 1.8])
-        with m_col:
-            kw_html = ""
-            if matched_kw and matched_kw != "nan":
-                kw_html = (
-                    f'<span class="metric-sep"></span>'
-                    f'<span class="news-keywords">Keywords: {matched_kw}</span>'
-                )
-            st.markdown(
-                f'<div class="post-metrics">'
-                f'<span class="metric-author">{author}</span>'
-                f'{kw_html}'
-                f'</div>',
-                unsafe_allow_html=True,
-            )
-        with b_col:
-            c_link, c_fav, c_read = st.columns(3)
-            with c_link:
-                url = str(row.get("url", ""))
-                if url and url != "nan":
-                    st.link_button("Read Article", url, use_container_width=True)
-            with c_fav:
-                is_fav = read_key in st.session_state.favorite_posts
-                if is_fav:
-                    if st.button("★ Unfav", key=f"ufav_{read_key}_{row.get('category','')}", use_container_width=True):
-                        st.session_state.favorite_posts.discard(read_key)
-                        save_favorite_posts(st.session_state.favorite_posts)
-                        st.rerun()
-                else:
-                    if st.button("☆ Fav", key=f"fav_{read_key}_{row.get('category','')}", use_container_width=True):
-                        st.session_state.favorite_posts.add(read_key)
-                        save_favorite_posts(st.session_state.favorite_posts)
-                        st.rerun()
-            with c_read:
-                if is_read:
-                    if st.button("Unread", key=f"nun_{read_key}_{row.get('category','')}", use_container_width=True, type="secondary"):
-                        st.session_state.read_posts.discard(read_key)
-                        save_read_posts(st.session_state.read_posts)
-                        st.rerun()
-                else:
-                    if st.button("Mark Read", key=f"nrd_{read_key}_{row.get('category','')}", use_container_width=True, type="primary"):
-                        st.session_state.read_posts.add(read_key)
-                        save_read_posts(st.session_state.read_posts)
-                        st.rerun()
+                if st.button("☆ Save", key=f"fav_{read_key}_{row.get('category','')}", use_container_width=True):
+                    st.session_state.favorite_posts.add(read_key)
+                    save_favorite_posts(st.session_state.favorite_posts)
+                    st.rerun()
+        with col_read:
+            if is_read:
+                if st.button("↺ Unread", key=f"nun_{read_key}_{row.get('category','')}", use_container_width=True, type="secondary"):
+                    st.session_state.read_posts.discard(read_key)
+                    save_read_posts(st.session_state.read_posts)
+                    st.rerun()
+            else:
+                if st.button("✓ Mark Read", key=f"nrd_{read_key}_{row.get('category','')}", use_container_width=True, type="primary"):
+                    st.session_state.read_posts.add(read_key)
+                    save_read_posts(st.session_state.read_posts)
+                    st.rerun()
 
 
 # ============================================================================
@@ -771,101 +656,52 @@ def render_news_tab(df: pd.DataFrame) -> None:
 
 
 def render_ritholtz_card(row, is_read: bool) -> None:
-    """
-    Render a single Ritholtz AM Reads article card with Tokyo Night styling.
-
-    Args:
-        row (pd.Series): Article data from DataFrame
-        is_read (bool): Whether article is marked as read
-
-    Card Contents:
-        1. AM Reads badge (left) | Publication date or READ badge (right)
-        2. Article title
-        3. Article description (first 300 chars)
-        4. Author | "Read Article" & "Mark Read" buttons
-
-    Styling:
-        - AM Reads badge: magenta (matching the Ritholtz theme)
-        - Date display: yellow monospace
-
-    Key format: "rth_{article_id}" to ensure unique keys
-    (Streamlit requirement, different from other key formats).
-    """
     article_id = str(row["article_id"])
     read_key = f"rth_{article_id}"
+    pub_date = str(row.get("pub_date", ""))[:10]
+    title_text = str(row.get("title", "Untitled"))
+    description = str(row.get("description", ""))
 
     with st.container(border=True):
-        # Header: AM Reads badge + date/read status
-        col_left, col_right = st.columns([1, 1])
-        with col_left:
-            st.markdown(
-                '<span class="ritholtz-badge">AM Reads</span>',
-                unsafe_allow_html=True,
-            )
-        with col_right:
-            if is_read:
-                st.markdown(
-                    '<div style="text-align:right"><span class="read-badge">READ</span></div>',
-                    unsafe_allow_html=True,
-                )
+        html_content = f"""
+            <div class="reader-title">{title_text}</div>
+            <div class="reader-desc">{description}</div>
+        """
+        st.markdown(html_content, unsafe_allow_html=True)
+
+        col_meta, col_link, col_fav, col_read = st.columns([4.5, 1.5, 1.5, 1.5])
+        
+        with col_meta:
+            meta_text = f'AM READS • {pub_date}'
+            st.markdown(f'<div class="bottom-meta">{meta_text}</div>', unsafe_allow_html=True)
+            
+        with col_link:
+            url = str(row.get("url", ""))
+            if url and url != "nan":
+                st.link_button("↗ Open", url, use_container_width=True)
+        with col_fav:
+            is_fav = read_key in st.session_state.favorite_posts
+            if is_fav:
+                if st.button("★ Saved", key=f"ufav_{read_key}", use_container_width=True):
+                    st.session_state.favorite_posts.discard(read_key)
+                    save_favorite_posts(st.session_state.favorite_posts)
+                    st.rerun()
             else:
-                pub_date = str(row.get("pub_date", ""))
-                date_display = pub_date[:10] if len(pub_date) >= 10 else pub_date
-                st.markdown(
-                    f'<div style="text-align:right"><span class="news-date">{date_display}</span></div>',
-                    unsafe_allow_html=True,
-                )
-
-        # Title
-        title_text = str(row.get("title", "Untitled"))
-        st.markdown(f'<div class="post-title">{title_text}</div>', unsafe_allow_html=True)
-
-        # Description preview
-        description = str(row.get("description", ""))
-        if description and description != "nan":
-            preview = description[:300] + "..." if len(description) > 300 else description
-            st.markdown(f'<div class="post-preview">{preview}</div>', unsafe_allow_html=True)
-
-        # Metrics row: author
-        author = str(row.get("author", "Unknown"))
-
-        m_col, b_col = st.columns([2, 1.8])
-        with m_col:
-            st.markdown(
-                f'<div class="post-metrics">'
-                f'<span class="metric-author">{author}</span>'
-                f'</div>',
-                unsafe_allow_html=True,
-            )
-        with b_col:
-            c_link, c_fav, c_read = st.columns(3)
-            with c_link:
-                url = str(row.get("url", ""))
-                if url and url != "nan":
-                    st.link_button("Read Article", url, use_container_width=True)
-            with c_fav:
-                is_fav = read_key in st.session_state.favorite_posts
-                if is_fav:
-                    if st.button("★ Unfav", key=f"ufav_{read_key}", use_container_width=True):
-                        st.session_state.favorite_posts.discard(read_key)
-                        save_favorite_posts(st.session_state.favorite_posts)
-                        st.rerun()
-                else:
-                    if st.button("☆ Fav", key=f"fav_{read_key}", use_container_width=True):
-                        st.session_state.favorite_posts.add(read_key)
-                        save_favorite_posts(st.session_state.favorite_posts)
-                        st.rerun()
-            with c_read:
-                if is_read:
-                    if st.button("Unread", key=f"rth_un_{read_key}", use_container_width=True, type="secondary"):
-                        st.session_state.read_posts.discard(read_key)
-                        save_read_posts(st.session_state.read_posts)
-                        st.rerun()
-                else:
-                    if st.button("Mark Read", key=f"rth_rd_{read_key}", use_container_width=True, type="primary"):
-                        st.session_state.read_posts.add(read_key)
-                        save_read_posts(st.session_state.read_posts)
-                        st.rerun()
+                if st.button("☆ Save", key=f"fav_{read_key}", use_container_width=True):
+                    st.session_state.favorite_posts.add(read_key)
+                    save_favorite_posts(st.session_state.favorite_posts)
+                    st.rerun()
+        with col_read:
+            if is_read:
+                if st.button("↺ Unread", key=f"rth_un_{read_key}", use_container_width=True, type="secondary"):
+                    st.session_state.read_posts.discard(read_key)
+                    save_read_posts(st.session_state.read_posts)
+                    st.rerun()
+            else:
+                if st.button("✓ Mark Read", key=f"rth_rd_{read_key}", use_container_width=True, type="primary"):
+                    st.session_state.read_posts.add(read_key)
+                    save_read_posts(st.session_state.read_posts)
+                    st.rerun()
 
 
 # ============================================================================
@@ -933,9 +769,6 @@ with st.sidebar:
 # ============================================================================
 # MAIN CONTENT
 # ============================================================================
-st.markdown('<h1 class="main-title">Reddit Daily</h1>', unsafe_allow_html=True)
-st.markdown('<p class="main-subtitle">Top insights across your favorite subreddits</p>', unsafe_allow_html=True)
-
 # Load data
 posts_df = load_posts()
 news_df = load_news_articles()
@@ -972,13 +805,17 @@ amreads_count = len(filtered_ritholtz) if has_ritholtz else 0
 unread_total = (len(filtered_df) if has_reddit else 0) + news_count + amreads_count
 total = (len(posts_df) if has_reddit else 0) + (len(news_df) if has_news else 0) + (len(ritholtz_df) if has_ritholtz else 0)
 
-c1, c2, c3, c4, c5, c6 = st.columns(6)
-c1.metric("Monthly", monthly_count)
-c2.metric("Yearly", yearly_count)
-c3.metric("News", news_count)
-c4.metric("AM Reads", amreads_count)
-c5.metric("Unread", unread_total)
-c6.metric("Total", total)
+st.markdown(
+    f'<div class="discreet-stats">'
+    f'Monthly: <b>{monthly_count}</b> &nbsp;|&nbsp; '
+    f'Yearly: <b>{yearly_count}</b> &nbsp;|&nbsp; '
+    f'News: <b>{news_count}</b> &nbsp;|&nbsp; '
+    f'AM Reads: <b>{amreads_count}</b> &nbsp;|&nbsp; '
+    f'<span style="color: var(--tn-blue)">Unread: <b>{unread_total}</b></span> &nbsp;|&nbsp; '
+    f'Total: <b>{total}</b>'
+    f'</div>', 
+    unsafe_allow_html=True
+)
 
 st.markdown('<div class="divider"></div>', unsafe_allow_html=True)
 
