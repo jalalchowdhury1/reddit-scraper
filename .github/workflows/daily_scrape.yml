@@ -1,0 +1,47 @@
+name: Daily Scraper Fortress
+
+on:
+  schedule:
+    # Runs daily at 10:00 UTC (6:00 AM EST).
+    - cron: '0 10 * * *' 
+  workflow_dispatch: # Allows manual triggering from the GitHub UI
+
+jobs:
+  scrape-and-update:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.9
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.9'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt 
+
+      - name: Run Core Scrapers
+        run: |
+          # Execute the engines from their new core/ paths
+          python core/scrape_top.py
+          python core/scrape_ritholtz.py
+          python core/scrape_googlenews.py
+
+      - name: Commit and Push Data Updates
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          
+          # Stage ONLY the data directory to prevent logging bloat
+          git add data/
+          
+          # Commit the changes (or exit cleanly if no new data was fetched)
+          git commit -m "Automated data update from Core Scrapers" || exit 0
+          
+          # Push to the main branch
+          git push
