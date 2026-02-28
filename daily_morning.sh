@@ -7,9 +7,9 @@ source venv/bin/activate
 
 # 3. Run all scrapers silently
 echo "📡 Refreshing Reddit, AM Reads, and Google News..."
-python3 scrape_top.py
-python3 scrape_ritholtz.py
-python3 scrape_googlenews.py
+python3 core/scrape_top.py
+python3 core/scrape_ritholtz.py
+python3 core/scrape_googlenews.py
 
 # 4. Open the browser automatically
 open "http://localhost:8000"

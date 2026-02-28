@@ -11,8 +11,8 @@ echo ""
 
 # Scrape data from subreddits
 echo "📡 Scraping data..."
-python3 scraper_main.py dataisbeautiful --mode history --limit 20
-python3 scraper_main.py todayilearned --mode history --limit 20
+python3 diagnostics/scraper_main.py dataisbeautiful --mode history --limit 20
+python3 diagnostics/scraper_main.py todayilearned --mode history --limit 20
 
 echo ""
 echo "✅ Scraping complete! Starting dashboard..."

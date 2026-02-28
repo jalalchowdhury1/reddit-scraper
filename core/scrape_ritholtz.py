@@ -40,8 +40,6 @@ from datetime import datetime
 from bs4 import BeautifulSoup
 from typing import List, Dict, Optional
 
-import config
-
 # ============================================================================
 # CONSTANTS
 # ============================================================================
@@ -78,16 +76,7 @@ def make_article_id(url: str, title: str) -> str:
 
 def find_am_reads_url(session: requests.Session) -> Optional[str]:
     """
-    Find the URL of today's AM Reads post from the category page.
-    
-    The category/links page lists recent posts. We look for one containing
-    "am reads" in the title (e.g., "Thursday AM Reads", "Friday AM Reads").
-    
-    Args:
-        session (requests.Session): Reusable HTTP session
-        
-    Returns:
-        str or None: URL of today's AM Reads post, or None if not found
+    Find the URL of today's AM Reads or Weekend Reads post from the category page.
     """
     print(f"  Fetching {CATEGORY_URL}...")
     try:
@@ -98,42 +87,36 @@ def find_am_reads_url(session: requests.Session) -> Optional[str]:
         return None
     
     soup = BeautifulSoup(resp.content, "html.parser")
-    
-    # Find all links on the page
     all_links = soup.find_all("a", href=True)
     
+    # Valid keywords for both weekdays and weekends
+    url_keywords = ["am-reads", "weekend-reads"]
+    text_keywords = ["am reads", "weekend reads"]
+    
     for link in all_links:
-        href = link.get("href", "")
+        href = link.get("href", "").lower()
         text = link.get_text().lower()
         
-        # Skip Twitter, Facebook, and other social links
-        if any(x in href.lower() for x in ["twitter.com", "facebook.com", "linkedin.com", "mailto:", "rss"]):
-            continue
-            
-        # Skip the share/intent links
-        if "/intent/" in href or "share?" in href:
+        # Skip social and share links
+        if any(x in href for x in ["twitter.com", "facebook.com", "linkedin.com", "mailto:", "rss", "/intent/", "share?"]):
             continue
         
-        # Look for actual AM Reads post URLs
-        # These are in the format: https://ritholtz.com/2026/02/XX-xxxxday-am-reads-XXX/
-        if "am-reads" in href.lower() or "am reads" in text:
-            # Make sure it's an actual post URL, not a category/tag
+        # Look for AM Reads OR Weekend Reads
+        if any(k in href for k in url_keywords) or any(k in text for k in text_keywords):
             if href.startswith("http") and "ritholtz.com/202" in href:
-                # This is the actual post
-                print(f"    Found AM Reads post: {href}")
-                return href
+                print(f"    Found reading list post: {link.get('href', '')}")
+                return link.get("href", "")
     
-    # Fallback: look for any ritholtz.com post with am-reads in URL
+    # Fallback
     for link in all_links:
-        href = link.get("href", "")
-        if href.startswith("http") and "ritholtz.com" in href and "am-reads" in href.lower():
-            # Skip share links
+        href = link.get("href", "").lower()
+        if href.startswith("http") and "ritholtz.com" in href and any(k in href for k in url_keywords):
             if "/intent/" in href or "share" in href:
                 continue
-            print(f"    Found AM Reads post (fallback): {href}")
-            return href
+            print(f"    Found reading list post (fallback): {link.get('href', '')}")
+            return link.get("href", "")
     
-    print("    WARNING: Could not find AM Reads post")
+    print("    WARNING: Could not find AM/Weekend Reads post")
     return None
 
 
