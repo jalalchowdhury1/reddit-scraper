@@ -1,12 +1,19 @@
 #!/bin/bash
-export PATH="/Users/jalalchowdhury/Library/Python/3.9/bin:$PATH"
+# 1. Navigate to project
 cd "/Users/jalalchowdhury/PycharmProjects/Reddit Scraping"
 
-echo "Closing old dashboard..."
-pkill -f "streamlit" 
+# 2. Activate virtual environment
+source venv/bin/activate
 
-echo "Running scraper..."
-python3 scraper_main.py dataisbeautiful --mode history --limit 20
+# 3. Run all scrapers silently
+echo "📡 Refreshing Reddit, AM Reads, and Google News..."
+python3 scrape_top.py
+python3 scrape_ritholtz.py
+python3 scrape_googlenews.py
 
-echo "Starting dashboard..."
-streamlit run dashboard.py
+# 4. Open the browser automatically
+open "http://localhost:8000"
+
+# 5. Start the server
+echo "🚀 Launching Dashboard..."
+uvicorn server:app --reload --reload-exclude '.repo_clone/*'

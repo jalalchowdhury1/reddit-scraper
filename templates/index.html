@@ -25,7 +25,7 @@
             <div class="flex space-x-8 text-[0.75rem] font-medium text-zinc-500 uppercase tracking-widest" id="tabs">
                 <button onclick="switchTab('monthly')" id="tab-monthly" class="tab-active pb-3 transition-colors hover:text-zinc-300">Monthly</button>
                 <button onclick="switchTab('yearly')" id="tab-yearly" class="pb-3 transition-colors hover:text-zinc-300">Yearly</button>
-                <button onclick="switchTab('news')" id="tab-news" class="pb-3 transition-colors hover:text-zinc-300">Daily Star</button>
+                <button onclick="switchTab('news')" id="tab-news" class="pb-3 transition-colors hover:text-zinc-300">Google News</button>
                 <button onclick="switchTab('ritholtz')" id="tab-ritholtz" class="pb-3 transition-colors hover:text-zinc-300">AM Reads</button>
                 <button onclick="switchTab('favorites')" id="tab-favorites" class="pb-3 transition-colors hover:text-amber-600">★ Favorites</button>
             </div>
@@ -55,7 +55,6 @@
             document.querySelectorAll('#tabs button').forEach(b => b.classList.remove('tab-active', 'text-zinc-200'));
             document.getElementById(`tab-${tab}`).classList.add('tab-active');
             
-            // Scroll to top smoothly when switching tabs
             window.scrollTo({ top: 0, behavior: 'smooth' });
             renderFeed();
         }
@@ -102,7 +101,6 @@
                 container.style.transform = "scale(0.98)";
                 setTimeout(() => container.style.display = "none", 300);
             } else {
-                // 3. DYNAMIC VISUAL DIMMING: Apply opacity instantly if keeping item on screen
                 if (action === 'read') {
                     if (result.is_active) {
                         container.classList.add('opacity-40');
@@ -136,8 +134,6 @@
                 return;
             }
 
-            // 2. THE WHISPER GLOW: Added hover:bg-zinc-900/20 to container
-            // 3. THE MUTE STATE: Added inline opacity logic based on item.is_read
             feed.innerHTML = items.map(item => `
                 <div class="group py-4 px-5 -mx-5 relative flex flex-col justify-center rounded-2xl transition-all duration-500 hover:bg-zinc-900/20 ${item.is_read ? 'opacity-40 hover:opacity-70' : ''}">
                     <div class="flex justify-between items-start">

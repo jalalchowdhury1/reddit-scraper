@@ -71,10 +71,7 @@ def get_data(show_read: bool = False):
         if dfs:
             combined = pd.concat(dfs, ignore_index=True).fillna("")
             combined['id'] = combined['id'].astype(str)
-            
-            # CRITICAL FIX: Strip duplicates so pagination/read tracking works properly
             combined = combined.drop_duplicates(subset=["id", "time_filter"], keep="first")
-            
             combined['score'] = pd.to_numeric(combined['score'], errors='coerce').fillna(0).astype(int)
             combined = combined.sort_values("score", ascending=False)
             
@@ -92,22 +89,26 @@ def get_data(show_read: bool = False):
                 }
                 data[row['time_filter']].append(item)
 
-    # Load News
-    if Path("data/dailystar/articles.csv").exists():
+    # Load Google News (Replaces Daily Star)
+    if Path("data/googlenews/articles.csv").exists():
         try:
-            news_df = pd.read_csv("data/dailystar/articles.csv").fillna("")
+            news_df = pd.read_csv("data/googlenews/articles.csv").fillna("")
             if not news_df.empty and "article_id" in news_df.columns:
                 news_df = news_df.drop_duplicates(subset=["article_id", "category"], keep="first")
                 news_df = news_df.sort_values("pub_date", ascending=False)
                 for _, row in news_df.iterrows():
-                    pid = f"dsr_{row['article_id']}"
+                    pid = f"gn_{row['article_id']}"
                     if not show_read and pid in read_posts and pid not in fav_posts: continue
+                    
+                    # Premium formatting: Publisher Name • Category • Date
+                    publisher = str(row.get('author', 'NEWS')).upper()
+                    
                     data["news"].append({
                         "id": pid, 
                         "title": clean_text(row['title']), 
                         "desc": clean_text(str(row.get('description', ''))[:300]),
                         "url": str(row['url']).replace("http://", "https://"), 
-                        "meta": f"DAILY STAR • {row.get('category', '')} • {str(row.get('pub_date', ''))[:10]}",
+                        "meta": f"{publisher} • {row.get('category', '').upper()} • {str(row.get('pub_date', ''))[:10]}",
                         "is_read": pid in read_posts, "is_fav": pid in fav_posts
                     })
         except: pass
