@@ -38,7 +38,7 @@ jobs:
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           
           # Stage ONLY the data directory to prevent logging bloat
-          git add data/
+          git add -f data/
           
           # Commit the changes (or exit cleanly if no new data was fetched)
           git commit -m "Automated data update from Core Scrapers" || exit 0

@@ -6,6 +6,8 @@ __pycache__/
 # Data
 seen_posts.csv
 data/
+!data/**/*.csv
+!data/**/*.json
 
 # Repository Clone
 .repo_clone/
