@@ -15,7 +15,19 @@
         .line-clamp-2 { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
         .feed-divider { background: #27272a; height: 1px; width: 100%; }
         .tab-active { color: #f4f4f5; border-bottom: 1px solid #f4f4f5; }
+        
+        /* Active state styling */
+        .active-fav { color: #fbbf24 !important; /* gold */ }
+        .active-read { color: #34d399 !important; /* green */ }
+        .dimmed-read-post { opacity: 0.5; }
+        
+        /* Default button states */
+        .fav-btn { color: #3f3f46; }
+        .fav-btn:hover { color: #a1a1aa; }
+        .read-btn { color: #71717a; }
+        .read-btn:hover { color: #d4d4d8; }
     </style>
+
 </head>
 <body class="antialiased selection:bg-zinc-800 font-sans">
 
@@ -30,26 +42,73 @@
                 <button onclick="switchTab('favorites')" id="tab-favorites" class="pb-3 transition-colors hover:text-amber-600">★ Favorites</button>
             </div>
             <label class="text-[0.65rem] uppercase tracking-widest text-zinc-500 flex items-center cursor-pointer hover:text-zinc-300 transition-colors">
-                <input type="checkbox" id="showReadToggle" class="mr-2 accent-zinc-600" onchange="fetchData()"> Show Read
+                <input type="checkbox" id="showReadToggle" class="mr-2 accent-zinc-600" onchange="toggleShowRead()"> Show Read
             </label>
+
         </div>
 
         <div id="feed" class="space-y-0"></div>
     </div>
 
     <script>
-        let appData = { monthly: [], yearly: [], news: [], ritholtz: [] };
+        // --- 1. INITIALIZE LOCAL STATE ---
+        let readPosts = new Set(JSON.parse(localStorage.getItem('reddit_dash_read')) || []);
+        let favPosts = new Set(JSON.parse(localStorage.getItem('reddit_dash_fav')) || []);
+        let showRead = JSON.parse(localStorage.getItem('reddit_dash_show_read')) || false;
+        let allData = { monthly: [], yearly: [], news: [], ritholtz: [] };
         let currentTab = 'monthly';
 
-        async function fetchData() {
-            const showRead = document.getElementById('showReadToggle').checked;
-            document.getElementById('feed').innerHTML = '<div class="text-zinc-600 text-xs py-10 text-center animate-pulse tracking-widest uppercase">Loading feed...</div>';
-            
-            const res = await fetch(`/api/data?show_read=${showRead}`);
-            appData = await res.json();
-            renderFeed();
+        // --- 2. SAVE STATE HELPER ---
+        function saveState() {
+            localStorage.setItem('reddit_dash_read', JSON.stringify([...readPosts]));
+            localStorage.setItem('reddit_dash_fav', JSON.stringify([...favPosts]));
+            localStorage.setItem('reddit_dash_show_read', JSON.stringify(showRead));
         }
 
+        // --- 3. TOGGLE ACTIONS ---
+        window.toggleRead = function(id) {
+            if (readPosts.has(id)) {
+                readPosts.delete(id);
+            } else {
+                readPosts.add(id);
+            }
+            saveState();
+            renderFeed(); // Re-render the current tab to reflect changes
+        };
+
+        window.toggleFav = function(id) {
+            if (favPosts.has(id)) {
+                favPosts.delete(id);
+            } else {
+                favPosts.add(id);
+            }
+            saveState();
+            renderFeed();
+        };
+
+        window.toggleShowRead = function() {
+            showRead = !showRead;
+            saveState();
+            
+            // Update the UI checkbox to match state
+            const checkbox = document.getElementById('showReadToggle');
+            if (checkbox) checkbox.checked = showRead;
+            
+            renderFeed();
+        };
+
+        // --- 4. DATA FETCHING ---
+        async function loadData() {
+            try {
+                const response = await fetch('/api/data');
+                allData = await response.json();
+                renderFeed();
+            } catch (error) {
+                console.error("Error fetching data:", error);
+            }
+        }
+
+        // --- 5. TAB SWITCHING ---
         function switchTab(tab) {
             currentTab = tab;
             document.querySelectorAll('#tabs button').forEach(b => b.classList.remove('tab-active', 'text-zinc-200'));
@@ -59,108 +118,76 @@
             renderFeed();
         }
 
-        async function toggleAction(id, action, btnElement) {
-            btnElement.style.transform = "scale(1.15)";
-            setTimeout(() => btnElement.style.transform = "scale(1)", 150);
-
-            const res = await fetch('/api/toggle', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({id, action})
-            });
-            const result = await res.json();
-            
-            const updateCache = (arr) => {
-                arr.forEach(item => {
-                    if (item.id === id) {
-                        if (action === 'read') item.is_read = result.is_active;
-                        if (action === 'fav') item.is_fav = result.is_active;
-                    }
-                });
-            };
-            updateCache(appData.monthly);
-            updateCache(appData.yearly);
-            updateCache(appData.news);
-            updateCache(appData.ritholtz);
-
-            const showRead = document.getElementById('showReadToggle').checked;
-            const container = btnElement.closest('.group');
-            let shouldHide = false;
-
-            if (action === 'read' && result.is_active && !showRead) {
-                shouldHide = true;
-            } else if (action === 'fav' && !result.is_active && currentTab === 'favorites') {
-                shouldHide = true;
-            } else if (action === 'fav' && result.is_active && currentTab !== 'favorites') {
-                shouldHide = true;
-            }
-
-            if (shouldHide) {
-                container.style.transition = "opacity 0.3s ease, transform 0.3s ease";
-                container.style.opacity = "0";
-                container.style.transform = "scale(0.98)";
-                setTimeout(() => container.style.display = "none", 300);
-            } else {
-                if (action === 'read') {
-                    if (result.is_active) {
-                        container.classList.add('opacity-40');
-                    } else {
-                        container.classList.remove('opacity-40');
-                    }
-                }
-
-                if (action === 'fav') {
-                    btnElement.innerHTML = result.is_active ? '★' : '☆';
-                    btnElement.className = result.is_active ? 'text-amber-500 hover:text-amber-400 transition-all text-lg focus:outline-none' : 'text-zinc-700 hover:text-zinc-500 transition-all text-lg focus:outline-none';
-                } else {
-                    btnElement.innerHTML = result.is_active ? '↺' : '✓';
-                    btnElement.className = result.is_active ? 'text-zinc-700 hover:text-zinc-500 transition-all text-lg focus:outline-none' : 'text-zinc-400 hover:text-zinc-200 transition-all text-lg focus:outline-none';
-                }
-            }
-        }
-
+        // --- 6. RENDERING LOGIC ---
         function renderFeed() {
-            let items = [];
+            const container = document.getElementById('feed');
+            container.innerHTML = '';
+            
+            // Determine which dataset to use based on the active tab
+            let itemsToRender = [];
             if (currentTab === 'favorites') {
-                items = [...appData.monthly, ...appData.yearly, ...appData.news, ...appData.ritholtz].filter(i => i.is_fav);
-                items = Array.from(new Map(items.map(item => [item.id, item])).values()); 
+                // Flatten all categories and filter only favorites
+                const allItems = [...allData.monthly, ...allData.yearly, ...allData.news, ...allData.ritholtz];
+                // Deduplicate in case a favorite exists in multiple arrays
+                const uniqueItems = Array.from(new Map(allItems.map(item => [item.id, item])).values());
+                itemsToRender = uniqueItems.filter(item => favPosts.has(item.id));
             } else {
-                items = (appData[currentTab] || []).filter(i => !i.is_fav);
+                itemsToRender = allData[currentTab] || [];
             }
 
-            const feed = document.getElementById('feed');
-            if (items.length === 0) {
-                feed.innerHTML = '<div class="text-zinc-600 text-xs py-10 text-center uppercase tracking-widest">No items found.</div>';
+            if (itemsToRender.length === 0) {
+                container.innerHTML = '<div class="text-zinc-600 text-xs py-10 text-center uppercase tracking-widest">No items found.</div>';
                 return;
             }
 
-            feed.innerHTML = items.map(item => `
-                <div class="group py-4 px-5 -mx-5 relative flex flex-col justify-center rounded-2xl transition-all duration-500 hover:bg-zinc-900/20 ${item.is_read ? 'opacity-40 hover:opacity-70' : ''}">
+            itemsToRender.forEach(post => {
+                const isRead = readPosts.has(post.id);
+                const isFav = favPosts.has(post.id);
+
+                // FILTER: Skip rendering if it's read, not a favorite, and "Show Read" is false
+                if (!showRead && isRead && !isFav && currentTab !== 'favorites') {
+                    return; 
+                }
+
+                // Determine CSS classes for active icons
+                const favClass = isFav ? 'active-fav' : '';
+                const readClass = isRead ? 'active-read' : '';
+                
+                // Build the HTML for the post
+                const postElement = document.createElement('div');
+                postElement.className = `group py-4 px-5 -mx-5 relative flex flex-col justify-center rounded-2xl transition-all duration-500 hover:bg-zinc-900/20 ${isRead ? 'dimmed-read-post' : ''}`;
+                postElement.innerHTML = `
                     <div class="flex justify-between items-start">
                         <div class="pr-12 flex-1">
-                            <a href="${item.url}" target="_blank" rel="noopener noreferrer" class="font-editorial text-[1.05rem] font-medium text-zinc-100 hover:text-zinc-400 leading-snug transition-colors block mb-1.5">
-                                ${item.title}
+                            <a href="${post.url}" target="_blank" rel="noopener noreferrer" class="font-editorial text-[1.05rem] font-medium text-zinc-100 hover:text-zinc-400 leading-snug transition-colors block mb-1.5">
+                                ${post.title}
                             </a>
-                            ${item.desc ? `<div class="text-[0.8rem] text-zinc-500 leading-relaxed line-clamp-2 mb-2 font-light">${item.desc}</div>` : ''}
+                            ${post.desc ? `<div class="text-[0.8rem] text-zinc-500 leading-relaxed line-clamp-2 mb-2 font-light">${post.desc}</div>` : ''}
                             <div class="text-[0.65rem] font-medium uppercase tracking-widest text-zinc-600 mt-1.5">
-                                ${item.meta}
+                                ${post.meta}
                             </div>
                         </div>
                         <div class="flex items-center space-x-5 pt-1 flex-shrink-0">
-                            <button onclick="toggleAction('${item.id}', 'fav', this)" class="transition-all text-lg focus:outline-none ${item.is_fav ? 'text-amber-500 hover:text-amber-400' : 'text-zinc-700 hover:text-zinc-500'}" title="Toggle Favorite">
-                                ${item.is_fav ? '★' : '☆'}
+                            <button onclick="toggleFav('${post.id}')" class="fav-btn transition-all text-lg focus:outline-none ${favClass}" title="Toggle Favorite">
+                                ${isFav ? '★' : '☆'}
                             </button>
-                            <button onclick="toggleAction('${item.id}', 'read', this)" class="transition-all text-lg focus:outline-none ${item.is_read ? 'text-zinc-700 hover:text-zinc-500' : 'text-zinc-400 hover:text-zinc-200'}" title="Toggle Read">
-                                ${item.is_read ? '↺' : '✓'}
+                            <button onclick="toggleRead('${post.id}')" class="read-btn transition-all text-lg focus:outline-none ${readClass}" title="Toggle Read">
+                                ${isRead ? '↺' : '✓'}
                             </button>
                         </div>
                     </div>
                     <div class="feed-divider mt-5 opacity-40 group-hover:opacity-100 transition-opacity duration-500"></div>
-                </div>
-            `).join('');
+                `;
+                container.appendChild(postElement);
+            });
         }
 
-        fetchData();
+        // --- 7. INITIALIZATION ---
+        // Initialize checkbox state from localStorage
+        document.addEventListener('DOMContentLoaded', () => {
+            document.getElementById('showReadToggle').checked = showRead;
+            loadData();
+        });
     </script>
 </body>
 </html>
