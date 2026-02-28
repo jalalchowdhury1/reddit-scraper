@@ -54,11 +54,16 @@ def get_data():
             
             for _, row in combined.iterrows():
                 pid = str(row['id']).strip()
+                # Inside the Reddit loop in server.py:
+                raw_url = f"https://www.reddit.com{row.get('permalink', '')}" if not str(row.get('permalink', '')).startswith('http') else row.get('permalink', '')
+                # Safety check for double-prefixes
+                clean_url = raw_url.replace("https://www.reddit.comhttps://", "https://")
+                
                 item = {
                     "id": pid, 
                     "title": clean_text(row['title']), 
                     "desc": clean_text(str(row.get('selftext', ''))[:300]),
-                    "url": f"https://www.reddit.com{row.get('permalink', '')}",
+                    "url": clean_url,
                     "meta": f"r/{row['subreddit']} • {row['time_filter'].upper()} • {row['score']:,} pts"
                 }
                 data[row['time_filter']].append(item)

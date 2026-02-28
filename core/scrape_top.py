@@ -62,7 +62,7 @@ def fetch_via_html(subreddit: str, time_filter: str) -> list:
         return []
 
 def fetch_via_rss(subreddit: str, time_filter: str) -> list:
-    """TERTIARY (LAST RESORT): Fetches posts via Reddit's basic RSS feed - No scores available."""
+    """TERTIARY (LAST RESORT): Fetches posts via RSS - Fixed for Absolute URLs and Sorting."""
     print(f"  ⚠️ Attempting Tertiary Fallback (RSS) for r/{subreddit}...")
     url = f"https://www.reddit.com/r/{subreddit}/top/.rss?t={time_filter}&limit=50"
     try:
@@ -72,13 +72,25 @@ def fetch_via_rss(subreddit: str, time_filter: str) -> list:
         
         posts = []
         ns = {'atom': 'http://www.w3.org/2005/Atom'}
-        for entry in root.findall('atom:entry', ns):
+        # Track index to create a descending 'dummy' score
+        for i, entry in enumerate(root.findall('atom:entry', ns)):
+            raw_link = entry.find('atom:link', ns).attrib.get('href', '') if entry.find('atom:link', ns) is not None else ''
+            
+            # FIX 1: Ensure absolute URL
+            full_link = raw_link
+            if raw_link.startswith('/'):
+                full_link = f"https://www.reddit.com{raw_link}"
+            
+            # FIX 2: Give a descending dummy score so the dashboard sorts correctly
+            # (Higher index = older post = lower dummy score)
+            dummy_score = 50 - i 
+            
             posts.append({
                 'id': entry.findtext('atom:id', '', ns).split('_')[-1],
                 'title': entry.findtext('atom:title', '', ns),
                 'selftext': "", 
-                'permalink': entry.find('atom:link', ns).attrib.get('href', '') if entry.find('atom:link', ns) is not None else '',
-                'score': 0 
+                'permalink': full_link,
+                'score': dummy_score 
             })
         return posts
     except Exception as e:
