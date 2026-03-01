@@ -4,9 +4,9 @@ Ritholtz.com AM Reads Scraper
 
 WHAT IT DOES:
 1. Fetches the category/links page to find today's AM Reads post
-2. Fetches the individual post to extract 10 articles
+2. Fetches the individual post to extract 12 articles
 3. Saves articles to data/ritholtz/articles.csv
-4. Overwrites each day (fresh 10 articles daily)
+4. Overwrites each day (fresh articles daily)
 
 KEY FEATURES:
 - Two-step scraping: category page → individual post
@@ -15,7 +15,7 @@ KEY FEATURES:
 - Polite delay between requests
 
 USAGE:
-    python3 scrape_ritholtz.py
+    python3 core/scrape_ritholtz.py
 
 OUTPUT:
     Saved/Updated: data/ritholtz/articles.csv
@@ -27,7 +27,7 @@ DEPENDENCIES:
 
 IMPORTANT FOR LLMs:
 - This scraper overwrites data each run (daily posts change)
-- Articles are not keyword-matched (all 10 are included)
+- Articles are not keyword-matched (all are included)
 - Read tracking prefix: "rth_" (different from Reddit and Daily Star)
 """
 import requests
@@ -127,7 +127,7 @@ def find_am_reads_url(session: requests.Session) -> Optional[str]:
 
 def extract_articles(post_url: str, session: requests.Session) -> List[Dict]:
     """
-    Extract the 10 articles from an AM Reads post.
+    Extract articles from an AM Reads post.
     
     The AM Reads post contains a list of links with titles and descriptions.
     We extract: title, URL, description for each article.
@@ -164,7 +164,8 @@ def extract_articles(post_url: str, session: requests.Session) -> List[Dict]:
     list_items = content.find_all("li")
     
     for li in list_items:
-        # Find the link in this list item
+        # IMPROVEMENT 1: Primary Link Only - get ONLY the first link in each list item
+        # This ignores 'see also' links within list items
         link = li.find("a", href=True)
         if not link:
             continue
@@ -176,10 +177,10 @@ def extract_articles(post_url: str, session: requests.Session) -> List[Dict]:
         if not href or not link_text or len(link_text) < 3:
             continue
         
-        # Skip links to the main site, category pages, or author pages
+        # IMPROVEMENT 2: Domain Filter - skip any links containing ritholtz.com
+        # This avoids site navigation links and 'see also' internal links
         if "ritholtz.com" in href:
-            if any(x in href for x in ["/category/", "/tag/", "/author/", "/page/"]):
-                continue
+            continue
         
         # Skip social media, RSS, etc.
         if any(x in href.lower() for x in ["twitter", "facebook", "linkedin", "rss", "mailto", "/intent/"]):
@@ -195,7 +196,7 @@ def extract_articles(post_url: str, session: requests.Session) -> List[Dict]:
         # This ensures the subsequent split on " : " or " - " works on a clean string
         full_text = li_text.replace(link_text, "", 1).strip()
         
-        # Strip bullets and special characters once here
+        # IMPROVEMENT 3: Clean Title - strip leading bullets and extra whitespace
         # Characters to strip: bullet (unicode and standard), dots, dashes, colons, and whitespace
         chars_to_strip = " \t\n\r•·-–—:." + "\u2022"
         while full_text and full_text[0] in chars_to_strip:
@@ -242,8 +243,8 @@ def extract_articles(post_url: str, session: requests.Session) -> List[Dict]:
             "scraped_at": datetime.now().isoformat(),
         })
         
-        # Stop when we have 10 articles
-        if len(articles) >= 10:
+        # IMPROVEMENT 4: Increase limit from 10 to 12 to ensure full list is captured
+        if len(articles) >= 12:
             break
     
     # If no list items found, fall back to the original link-based approach
@@ -321,7 +322,7 @@ def extract_articles(post_url: str, session: requests.Session) -> List[Dict]:
                 "scraped_at": datetime.now().isoformat(),
             })
             
-            if len(articles) >= 10:
+            if len(articles) >= 12:
                 break
     
     print(f"    Extracted {len(articles)} articles")
