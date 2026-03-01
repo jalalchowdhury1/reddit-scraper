@@ -5,6 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Daily Reader</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Firebase SDKs -->
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,500;0,600;1,400&family=Inter:wght@300;400;500;600&display=swap');
         
@@ -63,13 +67,77 @@
         <!-- Search Input for Favorites Tab -->
         <input type="text" id="favoritesSearch" placeholder="Type to filter favorites..." style="display: none; width: 100%; padding: 10px 0; margin-bottom: 25px; background: transparent; color: #fff; border: none; border-bottom: 1px solid #333; border-radius: 0; font-size: 0.95em; outline: none; opacity: 0.6; transition: opacity 0.2s;" onfocus="this.style.opacity='1'" onblur="this.style.opacity='0.6'">
 
+        <!-- Sync Settings UI -->
+        <div id="syncUI" style="display: none; justify-content: space-between; align-items: center; margin-bottom: 15px; font-size: 0.85em; color: #888;"></div>
+
         <div id="feed" class="space-y-0"></div>
     </div>
 
     <script>
+        // --- FIREBASE CONFIG & INITIALIZATION ---
+        const firebaseConfig = {
+            apiKey: "AIzaSyCUpI5Fzax4MmiwF5ihZZAx5brEd0dOmSE",
+            authDomain: "dailyreadersync.firebaseapp.com",
+            projectId: "dailyreadersync",
+            storageBucket: "dailyreadersync.firebasestorage.app",
+            messagingSenderId: "132679444670",
+            appId: "1:132679444670:web:d6eede43f3dbb47a6616ef",
+            measurementId: "G-5CWJLL7L66"
+        };
+
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
+        const auth = firebase.auth();
+
+        let cloudFavorites = []; // Will hold our synced data locally for fast UI renders
+        let syncKey = localStorage.getItem('dailyReaderSyncKey');
+
+        // --- FIREBASE SYNC FUNCTIONS ---
+        function initSync() {
+            if (!syncKey) {
+                // Generate a random 6-character alphanumeric key
+                syncKey = Math.random().toString(36).substring(2, 8).toUpperCase();
+                localStorage.setItem('dailyReaderSyncKey', syncKey);
+            }
+            
+            auth.signInAnonymously().then(() => {
+                console.log("Connected to Cloud Sync. Key:", syncKey);
+                migrateLocalToCloud(); // Run migration once
+                listenToFavorites(); // Start real-time sync
+            }).catch(error => console.error("Sync Auth Failed:", error));
+        }
+
+        function migrateLocalToCloud() {
+            let localFavs = JSON.parse(localStorage.getItem('favorites') || '[]');
+            if (localFavs.length > 0) {
+                const batch = db.batch();
+                localFavs.forEach(item => {
+                    // Use a safe ID (hash the URL or title)
+                    const safeId = (item.url || item.title).replace(/[^a-zA-Z0-9]/g, '');
+                    const docRef = db.collection('sync_groups').doc(syncKey).collection('favorites').doc(safeId);
+                    batch.set(docRef, item);
+                });
+                batch.commit().then(() => {
+                    console.log("Migrated local favorites to cloud.");
+                    localStorage.removeItem('favorites'); // Clear local so we rely on cloud
+                });
+            }
+        }
+
+        function listenToFavorites() {
+            db.collection('sync_groups').doc(syncKey).collection('favorites')
+                .onSnapshot((snapshot) => {
+                    cloudFavorites = [];
+                    snapshot.forEach((doc) => {
+                        cloudFavorites.push(doc.data());
+                    });
+                    // Re-render feed if we are on the favorites tab, or if buttons need updating
+                    renderFeed(); 
+                });
+        }
+
         // --- 1. INITIALIZE LOCAL STATE ---
         let readPosts = new Set(JSON.parse(localStorage.getItem('reddit_dash_read')) || []);
-        let favPosts = new Set(JSON.parse(localStorage.getItem('reddit_dash_fav')) || []);
         let showRead = JSON.parse(localStorage.getItem('reddit_dash_show_read')) || false;
         let allData = { monthly: [], yearly: [], news: [], ritholtz: [] };
         let currentTab = 'monthly';
@@ -82,7 +150,6 @@
         // --- 2. SAVE STATE HELPER ---
         function saveState() {
             localStorage.setItem('reddit_dash_read', JSON.stringify([...readPosts]));
-            localStorage.setItem('reddit_dash_fav', JSON.stringify([...favPosts]));
             localStorage.setItem('reddit_dash_show_read', JSON.stringify(showRead));
         }
 
@@ -97,14 +164,36 @@
             renderFeed(); // Re-render the current tab to reflect changes
         };
 
+        // Helper to get safeId for cloud favorites
+        function getSafeId(item) {
+            return (item.url || item.title).replace(/[^a-zA-Z0-9]/g, '');
+        }
+
+        // Helper to check if item is favorited
+        function isFavorited(item) {
+            const safeId = getSafeId(item);
+            return cloudFavorites.some(fav => getSafeId(fav) === safeId);
+        }
+
         window.toggleFav = function(id) {
-            if (favPosts.has(id)) {
-                favPosts.delete(id);
-            } else {
-                favPosts.add(id);
+            // Find the item in allData
+            let item = null;
+            for (const category of Object.values(allData)) {
+                item = category.find(p => p.id === id);
+                if (item) break;
             }
-            saveState();
-            renderFeed();
+            
+            if (!item) return;
+            
+            const safeId = getSafeId(item);
+            
+            if (isFavorited(item)) {
+                // Remove from cloud
+                db.collection('sync_groups').doc(syncKey).collection('favorites').doc(safeId).delete();
+            } else {
+                // Add to cloud
+                db.collection('sync_groups').doc(syncKey).collection('favorites').doc(safeId).set(item);
+            }
         };
 
         window.toggleShowRead = function() {
@@ -144,6 +233,9 @@
                 searchInput.value = ''; // clear search when leaving tab
             }
             
+            // Update sync UI visibility
+            updateSyncUI();
+            
             window.scrollTo({ top: 0, behavior: 'smooth' });
             renderFeed();
         }
@@ -166,11 +258,8 @@
             // Determine which dataset to use based on the active tab
             let itemsToRender = [];
             if (currentTab === 'favorites') {
-                // Flatten all categories and filter only favorites
-                const allItems = [...allData.monthly, ...allData.yearly, ...allData.news, ...allData.ritholtz];
-                // Deduplicate in case a favorite exists in multiple arrays
-                const uniqueItems = Array.from(new Map(allItems.map(item => [item.id, item])).values());
-                itemsToRender = uniqueItems.filter(item => favPosts.has(item.id));
+                // Use cloudFavorites for the favorites tab
+                itemsToRender = cloudFavorites;
             } else {
                 itemsToRender = allData[currentTab] || [];
             }
@@ -194,7 +283,7 @@
 
             itemsToRender.forEach(post => {
                 const isRead = readPosts.has(post.id);
-                const isFav = favPosts.has(post.id);
+                const isFav = isFavorited(post);
 
                 // FILTER: Skip rendering if it's read and "Show Read" is false
                 if (!showRead && isRead && currentTab !== 'favorites') {
@@ -234,10 +323,30 @@
             });
         }
 
-        // --- 8. INITIALIZATION ---
+        // --- 8. SYNC UI & LINK DEVICE ---
+        function promptLinkDevice() {
+            const newKey = prompt("Enter the Sync Key from your other device:");
+            if (newKey && newKey.trim()) {
+                localStorage.setItem('dailyReaderSyncKey', newKey.trim().toUpperCase());
+                window.location.reload();
+            }
+        }
+
+        function updateSyncUI() {
+            const syncUI = document.getElementById('syncUI');
+            if (currentTab === 'favorites') {
+                syncUI.style.display = 'flex';
+                syncUI.innerHTML = `<span>Sync Key: <strong>${syncKey}</strong></span> <button onclick="promptLinkDevice()" style="background:none; border:none; color:#4a90e2; cursor:pointer;">Link Existing Device</button>`;
+            } else {
+                syncUI.style.display = 'none';
+            }
+        }
+
+        // --- 9. INITIALIZATION ---
         // Initialize checkbox state from localStorage
         document.addEventListener('DOMContentLoaded', () => {
             document.getElementById('showReadToggle').checked = showRead;
+            initSync(); // Start Firebase sync
             loadData();
         });
     </script>
