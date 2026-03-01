@@ -131,7 +131,17 @@
             renderFeed();
         }
 
-        // --- 6. RENDERING LOGIC ---
+        // --- 6. SCORE FORMATTING HELPER ---
+        function formatScore(score) {
+            const num = parseInt(score);
+            if (isNaN(num)) return "0";
+            if (num >= 1000) {
+                return (num / 1000).toFixed(1) + 'k';
+            }
+            return num.toString();
+        }
+
+        // --- 7. RENDERING LOGIC ---
         function renderFeed() {
             const container = document.getElementById('feed');
             container.innerHTML = '';
@@ -195,7 +205,7 @@
             });
         }
 
-        // --- 7. INITIALIZATION ---
+        // --- 8. INITIALIZATION ---
         // Initialize checkbox state from localStorage
         document.addEventListener('DOMContentLoaded', () => {
             document.getElementById('showReadToggle').checked = showRead;
