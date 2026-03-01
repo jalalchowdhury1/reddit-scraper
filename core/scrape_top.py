@@ -7,9 +7,9 @@ from pathlib import Path
 from bs4 import BeautifulSoup
 
 SUBREDDITS = [
-    "dataisbeautiful", "todayilearned", "sobooksoc", "Fitness", 
-    "getmotivated", "UnethicalLifeProTips", "LifeProTips", 
-    "TrueReddit", "UpliftingNews", "lifehacks", "Productivity", 
+    "dataisbeautiful", "todayilearned", "bestof",
+    "getmotivated", "UnethicalLifeProTips", "LifeProTips",
+    "TrueReddit", "UpliftingNews", "lifehacks", "Productivity",
     "PersonalFinance", "explainlikeimfive"
 ]
 
@@ -27,6 +27,22 @@ HEADERS = {
     "Upgrade-Insecure-Requests": "1"
 }
 
+# Tiered priority system for dummy upvote generation in fallback scrapers
+SUBREDDIT_TIERS = {
+    # Tier 1: The Heavyweights (Highest priority)
+    "bestof": (75000, 100000),
+    "explainlikeimfive": (75000, 100000),
+    "todayilearned": (75000, 100000),
+
+    # Tier 2: High Signal
+    "TrueReddit": (40000, 70000),
+    "dataisbeautiful": (40000, 70000),
+    "PersonalFinance": (40000, 70000),
+
+    # Tier 3: Default (Everything else)
+    "default": (15000, 35000)
+}
+
 def fetch_via_html(subreddit: str, time_filter: str) -> list:
     """SECONDARY: Scrapes the raw HTML of old.reddit.com - Better because it has SCORES."""
     print(f"    🛡️ Attempting Secondary Fallback (HTML) for r/{subreddit}...")
@@ -34,17 +50,21 @@ def fetch_via_html(subreddit: str, time_filter: str) -> list:
     try:
         response = requests.get(url, headers=HEADERS, timeout=15)
         response.raise_for_status()
-        
+
         soup = BeautifulSoup(response.text, 'html.parser')
         posts = []
-        
-        for thing in soup.find_all('div', class_='thing')[:50]:
+
+        # Determine base score range for this subreddit
+        score_range = SUBREDDIT_TIERS.get(subreddit, SUBREDDIT_TIERS["default"])
+        base_max_score = random.randint(score_range[0], score_range[1])
+
+        for i, thing in enumerate(soup.find_all('div', class_='thing')[:50]):
             title_elem = thing.find('a', class_='title')
             if not title_elem: continue
-                
+
             # Extract raw permalink
             raw_permalink = thing.get('data-permalink', '')
-            
+
             # ENSURE ABSOLUTE URL: If it starts with /r/, prepend reddit.com
             if raw_permalink.startswith('/'):
                 full_permalink = f"https://www.reddit.com{raw_permalink}"
@@ -58,15 +78,20 @@ def fetch_via_html(subreddit: str, time_filter: str) -> list:
             if score_elem and score_elem.get('title'):
                 try: score = int(score_elem.get('title'))
                 except ValueError: pass
-            
+
+            # If score is 0 (not scraped), use tiered exponential decay
+            if score == 0:
+                # Exponential decay: each post drops by roughly 12% from the previous, plus some random noise
+                score = int(base_max_score * (0.88 ** i)) + random.randint(100, 999)
+
             posts.append({
                 'id': thing.get('data-fullname', '').split('_')[-1],
                 'title': title_elem.text.strip(),
-                'selftext': "", 
+                'selftext': "",
                 'permalink': full_permalink,
                 'score': score
             })
-            
+
         return posts
     except Exception as e:
         print(f"    ❌ Secondary Fallback (HTML) also failed: {e}")
@@ -80,28 +105,33 @@ def fetch_via_rss(subreddit: str, time_filter: str) -> list:
         response = requests.get(url, headers=HEADERS, timeout=10)
         response.raise_for_status()
         root = ET.fromstring(response.content)
-        
+
         posts = []
         ns = {'atom': 'http://www.w3.org/2005/Atom'}
-        # Track index to create a descending 'dummy' score
+
+        # Determine base score range for this subreddit
+        score_range = SUBREDDIT_TIERS.get(subreddit, SUBREDDIT_TIERS["default"])
+        base_max_score = random.randint(score_range[0], score_range[1])
+
+        # Track index to create a descending 'dummy' score with exponential decay
         for i, entry in enumerate(root.findall('atom:entry', ns)):
             raw_link = entry.find('atom:link', ns).attrib.get('href', '') if entry.find('atom:link', ns) is not None else ''
-            
+
             # FIX 1: Ensure absolute URL
             full_link = raw_link
             if raw_link.startswith('/'):
                 full_link = f"https://www.reddit.com{raw_link}"
-            
-            # FIX 2: Give a descending dummy score so the dashboard sorts correctly
-            # (Higher index = older post = lower dummy score)
-            dummy_score = 50 - i 
-            
+
+            # FIX 2: Tiered exponential decay scoring for better sorting
+            # Exponential decay: each post drops by roughly 12% from the previous, plus some random noise
+            dummy_score = int(base_max_score * (0.88 ** i)) + random.randint(100, 999)
+
             posts.append({
                 'id': entry.findtext('atom:id', '', ns).split('_')[-1],
                 'title': entry.findtext('atom:title', '', ns),
-                'selftext': "", 
+                'selftext': "",
                 'permalink': full_link,
-                'score': dummy_score 
+                'score': dummy_score
             })
         return posts
     except Exception as e:
@@ -113,27 +143,27 @@ def fetch_via_json(subreddit: str, time_filter: str) -> list:
     print(f"  🔄 Attempting Primary Fetch (Stealth JSON) for r/{subreddit}...")
     # Use old.reddit.com and append .json before the query parameters
     url = f"https://old.reddit.com/r/{subreddit}/top.json?t={time_filter}&limit=50"
-    
+
     try:
         response = requests.get(url, headers=HEADERS, timeout=15)
-        
+
         # Handle strict rate limiting (429) explicitly
         if response.status_code == 429:
             print("  ⚠️ HTTP 429 Too Many Requests. Reddit is suspicious. Sleeping for 30s...")
             time.sleep(30)
             # Try one more time after a long pause
             response = requests.get(url, headers=HEADERS, timeout=15)
-            
+
         response.raise_for_status()
         data = response.json()
-        
+
         posts = []
         for item in data.get('data', {}).get('children', []):
             post = item['data']
             # Skip stickied posts/ads
             if post.get('stickied') or post.get('is_video'):
                 continue
-                
+
             posts.append({
                 'id': post.get('id', ''),
                 'title': post.get('title', ''),
@@ -145,19 +175,19 @@ def fetch_via_json(subreddit: str, time_filter: str) -> list:
     except Exception as e:
         print(f"  ❌ Primary Stealth JSON failed: {e}")
         return []
-    
+
 def fetch_reddit_posts(subreddit: str, time_filter: str) -> list:
     """PRIMARY: Fetches top posts via old.reddit.com JSON (Stealth). Falls back to HTML/RSS."""
     # Try stealth JSON first
     json_posts = fetch_via_json(subreddit, time_filter)
     if json_posts:
         return json_posts
-    
+
     # Fallback to HTML (has scores)
     html_posts = fetch_via_html(subreddit, time_filter)
     if html_posts:
         return html_posts
-    
+
     # Last resort: RSS
     return fetch_via_rss(subreddit, time_filter)
 
