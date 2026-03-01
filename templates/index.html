@@ -29,6 +29,16 @@
         
         /* Dimming for RSS/dummy scores */
         .post-meta { font-family: monospace; font-size: 0.85rem; color: #888; }
+        
+        /* Hide scrollbar for Chrome, Safari and Opera */
+        .hide-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        /* Hide scrollbar for IE, Edge and Firefox */
+        .hide-scrollbar {
+            -ms-overflow-style: none;  /* IE and Edge */
+            scrollbar-width: none;  /* Firefox */
+        }
     </style>
 
 </head>
@@ -37,17 +47,17 @@
     <div class="max-w-6xl mx-auto px-6 pt-8 pb-24 relative">
         
         <div class="sticky top-0 z-50 flex justify-between items-center border-b border-zinc-800/40 pb-3 mb-8 pt-8 -mt-8 bg-black/70 backdrop-blur-md transition-all">
-            <div class="flex space-x-8 text-[0.75rem] font-medium text-zinc-500 uppercase tracking-widest" id="tabs">
-                <button onclick="switchTab('monthly')" id="tab-monthly" class="tab-active pb-3 transition-colors hover:text-zinc-300">Monthly</button>
-                <button onclick="switchTab('yearly')" id="tab-yearly" class="pb-3 transition-colors hover:text-zinc-300">Yearly</button>
-                <button onclick="switchTab('news')" id="tab-news" class="pb-3 transition-colors hover:text-zinc-300">Google News</button>
-                <button onclick="switchTab('ritholtz')" id="tab-ritholtz" class="pb-3 transition-colors hover:text-zinc-300">AM Reads</button>
-                <button onclick="switchTab('favorites')" id="tab-favorites" class="pb-3 transition-colors hover:text-amber-600">★ Favorites</button>
+            <div class="flex space-x-6 overflow-x-auto hide-scrollbar text-[0.75rem] font-medium text-zinc-500 uppercase tracking-widest flex-1 pr-4" id="tabs">
+                <button onclick="switchTab('monthly')" id="tab-monthly" class="tab-active pb-3 flex-shrink-0 transition-colors hover:text-zinc-300">Monthly</button>
+                <button onclick="switchTab('yearly')" id="tab-yearly" class="pb-3 flex-shrink-0 transition-colors hover:text-zinc-300">Yearly</button>
+                <button onclick="switchTab('news')" id="tab-news" class="pb-3 flex-shrink-0 transition-colors hover:text-zinc-300">Google News</button>
+                <button onclick="switchTab('ritholtz')" id="tab-ritholtz" class="pb-3 flex-shrink-0 transition-colors hover:text-zinc-300">AM Reads</button>
+                <button onclick="switchTab('favorites')" id="tab-favorites" class="pb-3 flex-shrink-0 transition-colors hover:text-amber-600">★ Favorites</button>
             </div>
-            <label class="text-[0.65rem] uppercase tracking-widest text-zinc-500 flex items-center cursor-pointer hover:text-zinc-300 transition-colors">
+            
+            <label class="text-[0.65rem] flex-shrink-0 uppercase tracking-widest text-zinc-500 flex items-center cursor-pointer hover:text-zinc-300 transition-colors ml-2 pl-2 border-l border-zinc-800">
                 <input type="checkbox" id="showReadToggle" class="mr-2 accent-zinc-600" onchange="toggleShowRead()"> Show Read
             </label>
-
         </div>
 
         <div id="feed" class="space-y-0"></div>
