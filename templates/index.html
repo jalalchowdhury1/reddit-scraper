@@ -60,7 +60,7 @@
             </div>
             
             <div style="display: inline-flex; align-items: center; opacity: 0.4; margin-left: auto; padding-left: 10px;" title="Show Read Items">
-                <input type="checkbox" id="showReadToggle" style="accent-color: #555; width: 14px; height: 14px; margin: 0; cursor: pointer; filter: grayscale(100%);">
+                <input type="checkbox" id="showReadToggle" onclick="toggleShowRead()" style="accent-color: #555; width: 14px; height: 14px; margin: 0; cursor: pointer; filter: grayscale(100%);">
             </div>
         </div>
 
@@ -284,6 +284,7 @@
             itemsToRender.forEach(post => {
                 const isRead = readPosts.has(post.id);
                 const isFav = isFavorited(post);
+                const cleanMeta = (post.meta || "").split(" • ⏱️")[0];
 
                 // FILTER: Skip rendering if it's read and "Show Read" is false
                 if (!showRead && isRead && currentTab !== 'favorites') {
@@ -305,7 +306,7 @@
                             </a>
                             ${post.desc ? `<div class="text-[0.8rem] text-zinc-500 leading-relaxed line-clamp-2 mb-2 font-light">${post.desc}</div>` : ''}
                             <div class="text-[0.65rem] font-medium uppercase tracking-widest text-zinc-600 mt-1.5">
-                                ${post.meta}
+                                ${cleanMeta}
                             </div>
                         </div>
                         <div class="flex items-center space-x-5 pt-1 flex-shrink-0">
