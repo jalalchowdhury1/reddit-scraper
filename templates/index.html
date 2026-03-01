@@ -60,6 +60,9 @@
             </label>
         </div>
 
+        <!-- Search Input for Favorites Tab -->
+        <input type="text" id="favoritesSearch" placeholder="Search favorites..." style="display: none; width: 100%; padding: 10px; margin-bottom: 15px; background: #1a1a1a; color: #fff; border: 1px solid #333; border-radius: 5px;">
+
         <div id="feed" class="space-y-0"></div>
     </div>
 
@@ -70,6 +73,11 @@
         let showRead = JSON.parse(localStorage.getItem('reddit_dash_show_read')) || false;
         let allData = { monthly: [], yearly: [], news: [], ritholtz: [] };
         let currentTab = 'monthly';
+
+        // --- 1.5. SEARCH INPUT EVENT LISTENER ---
+        document.getElementById('favoritesSearch').addEventListener('input', () => {
+            renderFeed();
+        });
 
         // --- 2. SAVE STATE HELPER ---
         function saveState() {
@@ -127,6 +135,15 @@
             document.querySelectorAll('#tabs button').forEach(b => b.classList.remove('tab-active', 'text-zinc-200'));
             document.getElementById(`tab-${tab}`).classList.add('tab-active');
             
+            // Toggle search bar visibility - only show on Favorites tab
+            const searchInput = document.getElementById('favoritesSearch');
+            if (currentTab === 'favorites') {
+                searchInput.style.display = 'block';
+            } else {
+                searchInput.style.display = 'none';
+                searchInput.value = ''; // clear search when leaving tab
+            }
+            
             window.scrollTo({ top: 0, behavior: 'smooth' });
             renderFeed();
         }
@@ -156,6 +173,18 @@
                 itemsToRender = uniqueItems.filter(item => favPosts.has(item.id));
             } else {
                 itemsToRender = allData[currentTab] || [];
+            }
+
+            // Apply search filtering for favorites tab
+            if (currentTab === 'favorites') {
+                const searchQuery = document.getElementById('favoritesSearch').value.toLowerCase();
+                if (searchQuery) {
+                    itemsToRender = itemsToRender.filter(item => {
+                        const titleMatch = (item.title || "").toLowerCase().includes(searchQuery);
+                        const subMatch = (item.meta || "").toLowerCase().includes(searchQuery);
+                        return titleMatch || subMatch;
+                    });
+                }
             }
 
             if (itemsToRender.length === 0) {
