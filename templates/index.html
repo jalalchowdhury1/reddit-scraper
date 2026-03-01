@@ -59,9 +59,9 @@
                 <button onclick="switchTab('favorites')" id="tab-favorites" class="pb-3 flex-shrink-0 transition-colors hover:text-amber-600">★ Favorites</button>
             </div>
             
-            <label class="text-[0.65rem] flex-shrink-0 uppercase tracking-widest text-zinc-500 flex items-center cursor-pointer hover:text-zinc-300 transition-colors ml-2 pl-2 border-l border-zinc-800">
-                <input type="checkbox" id="showReadToggle" class="mr-2 accent-zinc-600" onchange="toggleShowRead()"> Show Read
-            </label>
+            <div style="display: inline-flex; align-items: center; opacity: 0.4; margin-left: auto; padding-left: 10px;" title="Show Read Items">
+                <input type="checkbox" id="showReadToggle" style="accent-color: #555; width: 14px; height: 14px; margin: 0; cursor: pointer; filter: grayscale(100%);">
+            </div>
         </div>
 
         <!-- Search Input for Favorites Tab -->
