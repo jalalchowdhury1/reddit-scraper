@@ -282,14 +282,16 @@
                 }
             }
 
-            // Mute Filter: Remove specific subreddits or keywords
-            const mutedKeywords = ["r/askhistorians"];
-            itemsToRender = itemsToRender.filter(item => {
-                const metaText = (item.meta || "").toLowerCase();
-                const titleText = (item.title || "").toLowerCase();
-                // If any muted keyword is found in the title or meta, drop the item
-                return !mutedKeywords.some(keyword => metaText.includes(keyword) || titleText.includes(keyword));
-            });
+            // Mute Filter: ONLY apply to the Monthly tab
+            if (currentTab === 'monthly') {
+                const mutedKeywords = ["r/askhistorians"];
+                itemsToRender = itemsToRender.filter(item => {
+                    const metaText = (item.meta || "").toLowerCase();
+                    const titleText = (item.title || "").toLowerCase();
+                    // Remove the item if it matches our blocked keywords
+                    return !mutedKeywords.some(keyword => metaText.includes(keyword) || titleText.includes(keyword));
+                });
+            }
 
             if (itemsToRender.length === 0) {
                 container.innerHTML = '<div class="text-zinc-600 text-xs py-10 text-center uppercase tracking-widest">No items found.</div>';
