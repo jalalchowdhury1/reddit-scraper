@@ -19,6 +19,14 @@ def format_score(score: int) -> str:
         return f"{score / 1000:.1f}k"
     return str(score)
 
+def calculate_reading_time(text: str) -> int:
+    """Calculate estimated reading time in minutes based on word count."""
+    if not text:
+        return 0
+    word_count = len(text.strip().split())
+    reading_time = max(1, round(word_count / 200))  # ~200 words per minute
+    return reading_time
+
 @app.get("/", response_class=HTMLResponse)
 async def read_root(request: Request):
     return templates.TemplateResponse("index.html", {"request": request})
@@ -65,12 +73,16 @@ def get_data():
                 # Safety check for double-prefixes
                 clean_url = raw_url.replace("https://www.reddit.comhttps://", "https://")
                 
+                # Calculate reading time from selftext
+                selftext = str(row.get('selftext', ''))
+                read_time = calculate_reading_time(selftext)
+                
                 item = {
                     "id": pid, 
                     "title": clean_text(row['title']), 
-                    "desc": clean_text(str(row.get('selftext', ''))[:300]),
+                    "desc": clean_text(selftext[:300]),
                     "url": clean_url,
-                    "meta": f"r/{row['subreddit']} • {row['time_filter'].upper()} • {format_score(row['score'])} pts"
+                    "meta": f"r/{row['subreddit']} • {row['time_filter'].upper()} • {format_score(row['score'])} pts • ⏱️ {read_time} min"
                 }
                 data[row['time_filter']].append(item)
 
@@ -84,13 +96,15 @@ def get_data():
                 for _, row in news_df.iterrows():
                     pid = f"gn_{row['article_id']}"
                     publisher = str(row.get('author', 'NEWS')).upper()
+                    description = str(row.get('description', ''))
+                    read_time = calculate_reading_time(description)
                     
                     data["news"].append({
                         "id": pid, 
                         "title": clean_text(row['title']), 
-                        "desc": clean_text(str(row.get('description', ''))[:300]),
+                        "desc": clean_text(description[:300]),
                         "url": str(row['url']).replace("http://", "https://"), 
-                        "meta": f"{publisher} • {row.get('category', '').upper()} • {str(row.get('pub_date', ''))[:10]}"
+                        "meta": f"{publisher} • {row.get('category', '').upper()} • {str(row.get('pub_date', ''))[:10]} • ⏱️ {read_time} min"
                     })
         except: pass
 
@@ -102,12 +116,15 @@ def get_data():
                 rith_df = rith_df.drop_duplicates(subset=["article_id"], keep="first")
                 for _, row in rith_df.iterrows():
                     pid = f"rth_{row['article_id']}"
+                    description = str(row.get('description', ''))
+                    read_time = calculate_reading_time(description)
+                    
                     data["ritholtz"].append({
                         "id": pid, 
                         "title": clean_text(row['title']), 
-                        "desc": clean_text(str(row.get('description', ''))[:300]),
+                        "desc": clean_text(description[:300]),
                         "url": row['url'], 
-                        "meta": f"AM READS • {str(row.get('pub_date', ''))[:10]}"
+                        "meta": f"AM READS • {str(row.get('pub_date', ''))[:10]} • ⏱️ {read_time} min"
                     })
         except: pass
 

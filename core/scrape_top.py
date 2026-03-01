@@ -10,7 +10,7 @@ SUBREDDITS = [
     "dataisbeautiful", "todayilearned", "bestof",
     "getmotivated", "UnethicalLifeProTips", "LifeProTips",
     "TrueReddit", "UpliftingNews", "lifehacks", "Productivity",
-    "PersonalFinance", "explainlikeimfive"
+    "PersonalFinance", "explainlikeimfive", "AskHistorians"
 ]
 
 HEADERS = {
@@ -33,6 +33,7 @@ SUBREDDIT_TIERS = {
     "bestof": (75000, 100000),
     "explainlikeimfive": (75000, 100000),
     "todayilearned": (75000, 100000),
+    "AskHistorians": (75000, 100000),
 
     # Tier 2: High Signal
     "TrueReddit": (40000, 70000),
