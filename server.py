@@ -13,6 +13,12 @@ def clean_text(text) -> str:
     if pd.isna(text) or not text: return ""
     return html.unescape(str(text))
 
+def format_score(score: int) -> str:
+    """Format large scores with 'k' suffix (e.g., 82450 -> 82.4k)"""
+    if score >= 1000:
+        return f"{score / 1000:.1f}k"
+    return str(score)
+
 @app.get("/", response_class=HTMLResponse)
 async def read_root(request: Request):
     return templates.TemplateResponse("index.html", {"request": request})
@@ -64,7 +70,7 @@ def get_data():
                     "title": clean_text(row['title']), 
                     "desc": clean_text(str(row.get('selftext', ''))[:300]),
                     "url": clean_url,
-                    "meta": f"r/{row['subreddit']} • {row['time_filter'].upper()} • {row['score']:,} pts"
+                    "meta": f"r/{row['subreddit']} • {row['time_filter'].upper()} • {format_score(row['score'])} pts"
                 }
                 data[row['time_filter']].append(item)
 
