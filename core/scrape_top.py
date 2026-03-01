@@ -1,6 +1,7 @@
 import requests
 import pandas as pd
 import time
+import random
 import xml.etree.ElementTree as ET
 from pathlib import Path
 from bs4 import BeautifulSoup
@@ -13,7 +14,17 @@ SUBREDDITS = [
 ]
 
 HEADERS = {
-    'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+    "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
+    "Accept-Language": "en-US,en;q=0.9",
+    "Sec-Ch-Ua": '"Chromium";v="122", "Not(A:Brand";v="24", "Google Chrome";v="122"',
+    "Sec-Ch-Ua-Mobile": "?0",
+    "Sec-Ch-Ua-Platform": '"macOS"',
+    "Sec-Fetch-Dest": "document",
+    "Sec-Fetch-Mode": "navigate",
+    "Sec-Fetch-Site": "none",
+    "Sec-Fetch-User": "?1",
+    "Upgrade-Insecure-Requests": "1"
 }
 
 def fetch_via_html(subreddit: str, time_filter: str) -> list:
@@ -97,37 +108,58 @@ def fetch_via_rss(subreddit: str, time_filter: str) -> list:
         print(f"  ❌ Tertiary Fallback (RSS) failed: {e}")
         return []
 
-def fetch_reddit_posts(subreddit: str, time_filter: str) -> list:
-    """PRIMARY: Fetches top posts via Public JSON."""
-    url = f"https://www.reddit.com/r/{subreddit}/top.json?t={time_filter}&limit=50"
+def fetch_via_json(subreddit: str, time_filter: str) -> list:
+    """PRIMARY: Stealth fetch via old.reddit.com JSON endpoint."""
+    print(f"  🔄 Attempting Primary Fetch (Stealth JSON) for r/{subreddit}...")
+    # Use old.reddit.com and append .json before the query parameters
+    url = f"https://old.reddit.com/r/{subreddit}/top.json?t={time_filter}&limit=50"
+    
     try:
-        response = requests.get(url, headers=HEADERS, timeout=12)
-        if response.status_code in [403, 429]:
-            raise requests.exceptions.HTTPError(f"Rate limited: {response.status_code}")
+        response = requests.get(url, headers=HEADERS, timeout=15)
+        
+        # Handle strict rate limiting (429) explicitly
+        if response.status_code == 429:
+            print("  ⚠️ HTTP 429 Too Many Requests. Reddit is suspicious. Sleeping for 30s...")
+            time.sleep(30)
+            # Try one more time after a long pause
+            response = requests.get(url, headers=HEADERS, timeout=15)
+            
         response.raise_for_status()
         data = response.json()
         
         posts = []
-        for child in data.get('data', {}).get('children', []):
-            post = child.get('data', {})
+        for item in data.get('data', {}).get('children', []):
+            post = item['data']
+            # Skip stickied posts/ads
+            if post.get('stickied') or post.get('is_video'):
+                continue
+                
             posts.append({
                 'id': post.get('id', ''),
                 'title': post.get('title', ''),
                 'selftext': post.get('selftext', ''),
-                'permalink': post.get('permalink', ''),
+                'permalink': f"https://www.reddit.com{post.get('permalink', '')}",
                 'score': post.get('score', 0)
             })
         return posts
     except Exception as e:
-        print(f"  🔄 Primary (JSON) failed ({e}). Switching to Fallbacks...")
-        
-        # Chain 1: Try HTML (Secondary) - Better because it has SCORES
-        html_posts = fetch_via_html(subreddit, time_filter)
-        if html_posts: 
-            return html_posts
-            
-        # Chain 2: Try RSS (Tertiary) - Last resort (No scores)
-        return fetch_via_rss(subreddit, time_filter)
+        print(f"  ❌ Primary Stealth JSON failed: {e}")
+        return []
+    
+def fetch_reddit_posts(subreddit: str, time_filter: str) -> list:
+    """PRIMARY: Fetches top posts via old.reddit.com JSON (Stealth). Falls back to HTML/RSS."""
+    # Try stealth JSON first
+    json_posts = fetch_via_json(subreddit, time_filter)
+    if json_posts:
+        return json_posts
+    
+    # Fallback to HTML (has scores)
+    html_posts = fetch_via_html(subreddit, time_filter)
+    if html_posts:
+        return html_posts
+    
+    # Last resort: RSS
+    return fetch_via_rss(subreddit, time_filter)
 
 def save_posts_to_csv(posts: list, subreddit: str, time_filter: str):
     if not posts: return
@@ -146,7 +178,10 @@ def main():
             print(f"📡 Processing r/{sub} ({t_filter})...")
             posts = fetch_reddit_posts(sub, t_filter)
             save_posts_to_csv(posts, sub, t_filter)
-            time.sleep(2) 
+            # Randomized human-like jitter (6.5 to 12.5 seconds)
+            jitter = random.uniform(6.5, 12.5)
+            print(f"  💤 Humanizing delay: Sleeping for {jitter:.2f} seconds...")
+            time.sleep(jitter)
 
 if __name__ == "__main__":
     main()
