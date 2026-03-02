@@ -96,6 +96,7 @@
         const auth = firebase.auth();
 
         let cloudFavorites = []; // Will hold our synced data locally for fast UI renders
+        let cloudReadPosts = new Set(); // Will hold our synced read posts locally for fast UI renders
         let syncKey = localStorage.getItem('dailyReaderSyncKey');
 
         // --- FIREBASE SYNC FUNCTIONS ---
@@ -110,6 +111,7 @@
                 console.log("Connected to Cloud Sync. Key:", syncKey);
                 migrateLocalToCloud(); // Run migration once
                 listenToFavorites(); // Start real-time sync
+                listenToReadPosts(); // Start real-time sync for read posts
             }).catch(error => console.error("Sync Auth Failed:", error));
         }
 
@@ -128,6 +130,19 @@
                     localStorage.removeItem('favorites'); // Clear local so we rely on cloud
                 });
             }
+            
+            // Migrate local read posts to cloud
+            let localRead = JSON.parse(localStorage.getItem('reddit_dash_read') || '[]');
+            if (localRead.length > 0) {
+                const readBatch = db.batch();
+                localRead.forEach(id => {
+                    const docRef = db.collection('sync_groups').doc(syncKey).collection('read_posts').doc(String(id));
+                    readBatch.set(docRef, { readAt: new Date().toISOString() });
+                });
+                readBatch.commit().then(() => {
+                    localStorage.removeItem('reddit_dash_read');
+                });
+            }
         }
 
         function listenToFavorites() {
@@ -142,8 +157,18 @@
                 });
         }
 
+        function listenToReadPosts() {
+            db.collection('sync_groups').doc(syncKey).collection('read_posts')
+                .onSnapshot((snapshot) => {
+                    cloudReadPosts.clear();
+                    snapshot.forEach((doc) => {
+                        cloudReadPosts.add(doc.id);
+                    });
+                    renderFeed();
+                });
+        }
+
         // --- 1. INITIALIZE LOCAL STATE ---
-        let readPosts = new Set(JSON.parse(localStorage.getItem('reddit_dash_read')) || []);
         let showRead = JSON.parse(localStorage.getItem('reddit_dash_show_read')) || false;
         let allData = { monthly: [], yearly: [], news: [], ritholtz: [] };
         let currentTab = 'monthly';
@@ -155,19 +180,17 @@
 
         // --- 2. SAVE STATE HELPER ---
         function saveState() {
-            localStorage.setItem('reddit_dash_read', JSON.stringify([...readPosts]));
             localStorage.setItem('reddit_dash_show_read', JSON.stringify(showRead));
         }
 
         // --- 3. TOGGLE ACTIONS ---
         window.toggleRead = function(id) {
-            if (readPosts.has(id)) {
-                readPosts.delete(id);
+            const docRef = db.collection('sync_groups').doc(syncKey).collection('read_posts').doc(String(id));
+            if (cloudReadPosts.has(String(id))) {
+                docRef.delete();
             } else {
-                readPosts.add(id);
+                docRef.set({ readAt: new Date().toISOString() });
             }
-            saveState();
-            renderFeed(); // Re-render the current tab to reflect changes
         };
 
         // Helper to get safeId for cloud favorites
@@ -299,7 +322,7 @@
             }
 
             itemsToRender.forEach(post => {
-                const isRead = readPosts.has(post.id);
+                const isRead = cloudReadPosts.has(String(post.id));
                 const isFav = isFavorited(post);
                 const cleanMeta = (post.meta || "").split(" • ⏱️")[0];
 
