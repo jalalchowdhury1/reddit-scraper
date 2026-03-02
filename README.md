@@ -167,3 +167,10 @@ docker compose up -d scraper
 ---
 
 *Built with ❤️ using Python + FastAPI + Tailwind CSS + Firebase*
+
+---
+
+## 📝 Version History
+
+- **v1.1** - Current release
+
