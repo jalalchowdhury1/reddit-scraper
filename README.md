@@ -1,177 +1,169 @@
-# Reddit Daily Dashboard 📊
+# 📂 Daily Reader (Reddit & News Aggregator)
 
-A beautiful dashboard to view and track the top posts from your favorite Reddit communities - daily updated with no duplicates!
+🤖 **LLM System Context (Read This First)**
 
-**Uses the [Reddit Universal Scraper](https://github.com/ksanjeev284/reddit-universal-scraper/) - NO API KEYS REQUIRED!**
+This is a hybrid-architecture application designed for zero-cost deployment and cross-device sync.
 
-## Features
+**Backend:** FastAPI (`server.py`) serving static CSV files from `/data`.
 
-- 🎨 **Beautiful Dashboard** - Modern, dark-themed UI with Streamlit
-- 📅 **Daily Updates** - Automatic daily scraping of top posts
-- 🚫 **No Duplicates** - Tracks seen posts to avoid showing the same content twice
-- 🗓️ **Sort by Time** - View top monthly and yearly posts separately
-- 📸 **Screenshot Capture** - Uses ScrapeServ to take screenshots of posts
-- 🔄 **13 Subreddits** - Tracks posts from diverse communities
-- 🚀 **No API Keys Needed** - Uses web scraping instead of Reddit API
+**Automation:** GitHub Actions runs scrapers in `/core` daily and commits CSVs back to the repo.
 
-## Subreddits Tracked
+**Frontend:** Single-page app (`templates/index.html`) using Tailwind CSS and Firebase.
 
-1. r/dataisbeautiful - Data Is Beautiful
-2. r/todayilearned - Today I Learned
-3. r/sobooksoc - So many books, so little time
-4. r/Fitness - Fitness
-5. r/getmotivated - Get Motivated!
-6. r/UnethicalLifeProTips - Unethical Life Pro Tips
-7. r/LifeProTips - Life Pro Tips
-8. r/TrueReddit - TrueReddit
-9. r/UpliftingNews - Uplifting News
-10. r/lifehacks - Lifehacks
-11. r/Productivity - Productivity
-12. r/PersonalFinance - Personal Finance
-13. r/explainlikeimfive - Explain Like I'm Five
+**State Management:** CRITICAL. Favorites and "Read" statuses are synced via Firebase Firestore on the client side to bypass Vercel's read-only filesystem.
 
-## Prerequisites
+---
 
-- Python 3.8+
-- Docker & Docker Compose (optional, for screenshots)
-- ffmpeg (optional, for video processing)
+## 🏗️ Architecture Map
 
-## Quick Start
+### Data Layer (`/data`)
+- CSVs for Reddit, AM Reads, and Google News
 
-### 1. Install Dependencies
+### Scraper Layer (`/core`)
+- `scrape_top.py`: Triple-redundant custom web scraper (JSON → HTML → RSS). No Reddit API Key needed.
+  - **Primary (Stealth JSON):** Hits `old.reddit.com/r/{sub}/top.json`. Requires robust macOS/Chrome `HEADERS`, handles `429` rate limits with a 30-second backoff, and skips stickied/video posts.
+  - **Secondary (HTML):** Fallback web scraping if JSON fails.
+  - **Tertiary (RSS):** Ultimate fallback hitting Reddit's RSS feeds.
+- `scrape_ritholtz.py`: Financial link aggregator (10 articles daily from the AM Reads newsletter).
+- `scrape_googlenews.py`: Filtered news aggregator for Bangladesh-specific news.
 
-```bash
-# Create virtual environment
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
+### Deployment
+- `vercel.json`: Python builder for FastAPI
+- `.github/workflows/daily_scrape.yml`: Morning CRON job (10:00 UTC / 5:00 AM EST)
 
-# Install requirements
-pip install -r requirements.txt
+---
 
-# Install Playwright browsers (required for scraping)
-playwright install
-```
+## 📊 Subreddits Tracked (14 Communities)
 
-### 2. Run Initial Scrape
+1. `r/dataisbeautiful` - Data Is Beautiful
+2. `r/todayilearned` - Today I Learned
+3. `r/sobooksoc` - So many books, so little time
+4. `r/Fitness` - Fitness
+5. `r/getmotivated` - Get Motivated!
+6. `r/UnethicalLifeProTips` - Unethical Life Pro Tips
+7. `r/LifeProTips` - Life Pro Tips
+8. `r/TrueReddit` - TrueReddit
+9. `r/UpliftingNews` - Uplifting News
+10. `r/lifehacks` - Lifehacks
+11. `r/Productivity` - Productivity
+12. `r/PersonalFinance` - Personal Finance
+13. `r/explainlikeimfive` - Explain Like I'm Five
+14. `r/bestof` - Best Of Reddit
 
-```bash
-# Scrape all subreddits (history mode - fast, no media)
-python scraper_main.py dataisbeautiful --mode history --limit 20
-python scraper_main.py todayilearned --mode history --limit 20
-# ... repeat for other subreddits
+---
 
-# Or use full mode (slower, includes media)
-python scraper_main.py dataisbeautiful --mode full --limit 20
-```
+## 🧠 Reddit Scoring Algorithm
 
-### 3. Launch Dashboard
+Because RSS and HTML fallbacks do not provide real upvote counts, we use a "Tiered Priority Exponential Decay" algorithm to simulate scores. This ensures high-signal subreddits naturally float to the top.
 
+| Tier | Base Score | Subreddits |
+|------|------------|------------|
+| Tier 1 | 75k-100k | `bestof`, `explainlikeimfive`, `todayilearned` |
+| Tier 2 | 40k-70k | `TrueReddit`, `dataisbeautiful`, `PersonalFinance` |
+| Tier 3 | 15k-35k | Default for all others |
+
+**Decay Formula:** `int(base_max_score * (0.88 ** index)) + random.randint(100, 999)`
+
+*Do NOT change this scoring math without permission.*
+
+---
+
+## 🛠️ Troubleshooting & Known Behaviors
+
+### Sync Issues
+- Check the Sync Key at the bottom of the Favorites tab
+- Ensure `cloudReadPosts` and `cloudFavorites` are pulling from the same Firebase group
+
+### GitHub Action Failures
+- The GitHub Action uses `git add -f data/` to bypass the .gitignore
+- Ensure `requirements.txt` includes `streamlit` and `pandas`
+
+### Reddit Blocks (429/403 Errors)
+- GitHub Actions uses Azure Data Center IPs, which are strictly rate-limited
+- If 429 errors occur, increase the jitter sleep delay in `scrape_top.py`
+- Always use `random.uniform(6.5, 12.5)` for delays between subreddit requests to simulate human jitter
+- Fixed delays (e.g., `time.sleep(3)`) will get the scraper banned
+
+### Frontend Behavior
+- **"Show Read" Toggle:** Acts as a strict master switch. The logic `if (!showRead && isRead && currentTab !== 'favorites') { return; }` ensures that read items are hidden from all main feeds (Monthly, Yearly, AM Reads), even if they are favorited. Favorited items are only persistently visible on the dedicated 'Favorites' tab.
+- **Score Formatting:** Uses JS helper `formatScore()` to convert large integers into clean text (e.g., `84500` becomes `84.5k pts`)
+- **State Management:** Read status and Favorites are stored in `localStorage` AND synced via Firebase Firestore for cross-device sync
+
+### Ritholtz Scraper Rules
+- Must only grab the *first* `<a>` tag within list items (`<li>`) to avoid duplicating "see also" links
+- Must strictly ignore any internal links containing `ritholtz.com`
+- Must strip leading bullets (`•`) and whitespace from titles
+- Hard limit of 12 items
+
+---
+
+## 🚀 Commands
+
+### Local Dashboard
 ```bash
 streamlit run dashboard.py
 ```
 
-The dashboard will open at http://localhost:8501
-
-## Daily Usage
+### Local Web App
+```bash
+uvicorn server:app --reload
+```
 
 ### Manual Scraping
-
 ```bash
-# Scrape a single subreddit
-python scraper_main.py python --mode history --limit 50
+# Scrape all subreddits
+python -m core.scrape_top
 
-# Full scrape with media
-python scraper_main.py python --mode full --limit 100
+# Scrape specific subreddit
+python -m core.scrape_top python --mode history --limit 50
 ```
-
-### Automated Daily Scraping
-
-Start the scheduler to automatically scrape every day:
-
-```bash
-python scheduler.py
-```
-
-This will run the scraper daily at 8:00 AM (configurable in `scheduler.py`).
-
-### Using the Built-in Dashboard
-
-The Reddit Universal Scraper has its own built-in dashboard:
-
-```bash
-python scraper_main.py --dashboard
-```
-
-This opens http://localhost:8501 with:
-- 📊 Overview - Stats & charts
-- 📈 Analytics - Sentiment & keywords
-- 🔍 Search - Query scraped data
-- 💬 Comments - Comment analysis
-- ⚙️ Scraper - Start new scrapes
-- 📋 Job History - View all jobs
-- 🔌 Integrations - API, export, plugins
-
-### REST API
-
-```bash
-python scraper_main.py --api
-```
-
-Then visit http://localhost:8000/docs for API documentation.
-
-## Project Structure
-
-```
-Reddit Scraping/
-├── config.py              # Your dashboard config
-├── database.py            # Database models
-├── dashboard.py           # Your Streamlit dashboard
-├── scheduler.py           # Daily scheduler
-├── scraper_main.py        # Reddit Universal Scraper entry point
-├── scraper/               # Scraper's core modules
-├── requirements.txt       # Python dependencies
-├── docker-compose.yml     # Docker services
-└── data/                 # Data directory
-    ├── r_subreddit/       # Scraped data (CSV/JSON)
-    └── backups/           # Database backups
-```
-
-## Docker Usage (Optional)
-
-For screenshots with ScrapeServ:
-
-```bash
-# Start ScrapeServ only
-docker compose up -d scraper
-
-# Or start the full stack with API
-docker compose up -d
-```
-
-## Troubleshooting
-
-### Playwright issues
-```bash
-playwright install chromium
-```
-
-### No data showing
-Make sure you've run the scraper first:
-```bash
-python scraper_main.py dataisbeautiful --mode history --limit 20
-```
-
-### Dashboard not loading data
-Check the data folder has CSV files:
-```bash
-ls -la data/r_dataisbeautiful/
-```
-
-## Credits
-
-- [Reddit Universal Scraper](https://github.com/ksanjeev284/reddit-universal-scraper/) - The scraper engine
-- [ScrapeServ](https://github.com/goodreasonai/ScrapeServ) - Screenshot capture
 
 ---
 
-Built with ❤️ using Python + Streamlit
+## 📁 Project Structure
+
+```
+Reddit Scraping/
+├── server.py                 # FastAPI backend
+├── dashboard.py             # Streamlit dashboard
+├── config.py                 # Configuration
+├── database.py               # Database models
+├── requirements.txt          # Python dependencies
+├── vercel.json              # Vercel deployment config
+├── .github/workflows/
+│   └── daily_scrape.yml     # Daily CRON job
+├── core/                     # Scraper modules
+│   ├── scrape_top.py        # Triple-redundant Reddit scraper
+│   ├── scrape_ritholtz.py   # Financial articles scraper
+│   └── scrape_googlenews.py # Bangladesh news scraper
+├── data/                     # CSV data storage
+│   ├── r_subreddit/         # Reddit data
+│   ├── ritholtz.csv         # AM Reads
+│   └── googlenews.csv       # Google News
+└── templates/
+    └── index.html           # Frontend SPA
+```
+
+---
+
+## ⚙️ Prerequisites
+
+- Python 3.8+
+- Firebase project (for Firestore sync)
+- Vercel account (for deployment)
+
+---
+
+## 🔧 Docker Usage (Optional)
+
+```bash
+# Start all services
+docker compose up -d
+
+# Start ScrapeServ only (for screenshots)
+docker compose up -d scraper
+```
+
+---
+
+*Built with ❤️ using Python + FastAPI + Tailwind CSS + Firebase*
