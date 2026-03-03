@@ -328,21 +328,21 @@
                 });
             }
 
-            // SORT: Prioritize unread items at the top (within each tab)
-            // Unread items first, then read items (maintaining original order within groups)
+            // 1. STRICT UNREAD-FIRST SORTING
             itemsToRender = [...itemsToRender].sort((a, b) => {
                 const aRead = cloudReadPosts.has(String(a.id));
                 const bRead = cloudReadPosts.has(String(b.id));
-                // If one is read and the other isn't, sort unread first
-                if (aRead && !bRead) return 1;
+                
+                // Priority 1: Unread always goes to the top
                 if (!aRead && bRead) return -1;
-                // Otherwise maintain existing order (both read or both unread)
+                if (aRead && !bRead) return 1;
+                
+                // Priority 2: Maintain original order if both are read or both are unread
                 return 0;
             });
-
             if (itemsToRender.length === 0) {
-                container.innerHTML = '<div class="text-zinc-600 text-xs py-10 text-center uppercase tracking-widest">No items found.</div>';
-                return;
+            container.innerHTML = 'No items found.';
+            return;
             }
 
             itemsToRender.forEach(post => {
@@ -350,19 +350,16 @@
                 const isFav = isFavorited(post);
                 const cleanMeta = (post.meta || "").split(" • ⏱️")[0];
 
-                // FILTER: Skip rendering if it's read and "Show Read" is false
-                if (!showRead && isRead && currentTab !== 'favorites') {
-                    return; 
-                }
-
-                // Determine CSS classes for active icons
+                if (!showRead && isRead && currentTab !== 'favorites') return; 
                 const favClass = isFav ? 'active-fav' : '';
                 const readClass = isRead ? 'active-read' : '';
-                
-                // Build the HTML for the post - add unread-item class for unread posts
-                const unreadClass = !isRead ? 'unread-item' : '';
+                // ADDED VISUAL CUE FOR UNREAD ITEMS
+                const unreadClass = !isRead ? 'border-l-2 border-blue-500/50 bg-blue-500/5 pl-4 -ml-4' : '';
+
                 const postElement = document.createElement('div');
                 postElement.className = `group py-4 px-5 -mx-5 relative flex flex-col justify-center rounded-2xl transition-all duration-500 hover:bg-zinc-900/20 ${isRead ? 'dimmed-read-post' : ''} ${unreadClass}`;
+
+                // 2. UNBREAKABLE FLEXBOX LAYOUT FOR TITLES
                 postElement.innerHTML = `
                     <div class="flex justify-between items-start">
                         <div class="pr-12 flex-1">
