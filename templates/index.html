@@ -31,6 +31,10 @@
         .active-read { color: #34d399 !important; /* green */ }
         .dimmed-read-post { opacity: 0.5; }
         
+        /* Unread item visual cue */
+        .unread-item { border-left: 2px solid rgba(59, 130, 246, 0.5); }
+        .unread-item:hover { background-color: rgba(30, 30, 40, 0.3); }
+        
         /* Default button states */
         .fav-btn { color: #3f3f46; }
         .fav-btn:hover { color: #a1a1aa; }
@@ -186,11 +190,19 @@
         // --- 3. TOGGLE ACTIONS ---
         window.toggleRead = function(id) {
             const docRef = db.collection('sync_groups').doc(syncKey).collection('read_posts').doc(String(id));
-            if (cloudReadPosts.has(String(id))) {
+            const idStr = String(id);
+            
+            // Update local state immediately for instant UI feedback
+            if (cloudReadPosts.has(idStr)) {
+                cloudReadPosts.delete(idStr);
                 docRef.delete();
             } else {
+                cloudReadPosts.add(idStr);
                 docRef.set({ readAt: new Date().toISOString() });
             }
+            
+            // Re-render immediately so the article "sinks" to bottom right away
+            renderFeed();
         };
 
         // Helper to get safeId for cloud favorites
@@ -316,6 +328,18 @@
                 });
             }
 
+            // SORT: Prioritize unread items at the top (within each tab)
+            // Unread items first, then read items (maintaining original order within groups)
+            itemsToRender = [...itemsToRender].sort((a, b) => {
+                const aRead = cloudReadPosts.has(String(a.id));
+                const bRead = cloudReadPosts.has(String(b.id));
+                // If one is read and the other isn't, sort unread first
+                if (aRead && !bRead) return 1;
+                if (!aRead && bRead) return -1;
+                // Otherwise maintain existing order (both read or both unread)
+                return 0;
+            });
+
             if (itemsToRender.length === 0) {
                 container.innerHTML = '<div class="text-zinc-600 text-xs py-10 text-center uppercase tracking-widest">No items found.</div>';
                 return;
@@ -335,9 +359,10 @@
                 const favClass = isFav ? 'active-fav' : '';
                 const readClass = isRead ? 'active-read' : '';
                 
-                // Build the HTML for the post
+                // Build the HTML for the post - add unread-item class for unread posts
+                const unreadClass = !isRead ? 'unread-item' : '';
                 const postElement = document.createElement('div');
-                postElement.className = `group py-4 px-5 -mx-5 relative flex flex-col justify-center rounded-2xl transition-all duration-500 hover:bg-zinc-900/20 ${isRead ? 'dimmed-read-post' : ''}`;
+                postElement.className = `group py-4 px-5 -mx-5 relative flex flex-col justify-center rounded-2xl transition-all duration-500 hover:bg-zinc-900/20 ${isRead ? 'dimmed-read-post' : ''} ${unreadClass}`;
                 postElement.innerHTML = `
                     <div class="flex justify-between items-start">
                         <div class="pr-12 flex-1">
