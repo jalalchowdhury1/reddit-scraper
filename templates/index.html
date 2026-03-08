@@ -224,6 +224,11 @@
                 if (item) break;
             }
             
+            // Fallback: If the item has aged out of allData, look for it in the local synced favorites
+            if (!item) {
+                item = cloudFavorites.find(p => p.id === id);
+            }
+            
             if (!item) return;
             
             const safeId = getSafeId(item);
