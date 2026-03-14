@@ -29,6 +29,7 @@ jobs:
           python core/scrape_top.py
           python core/scrape_ritholtz.py
           python core/scrape_googlenews.py
+          python core/scrape_trung.py
 
       - name: Commit and push changes
         run: |

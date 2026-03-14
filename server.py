@@ -1,10 +1,12 @@
 import html
+import re
 from pathlib import Path
 import pandas as pd
 from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 import glob
+import logging
 
 app = FastAPI()
 templates = Jinja2Templates(directory="templates")
@@ -128,5 +130,35 @@ def get_data():
                     })
         except: pass
 
-    for k in data: data[k] = data[k][:50]
+    # Load Read Trung (SatPost)
+    if Path("data/trung/articles.csv").exists():
+        try:
+            trung_df = pd.read_csv("data/trung/articles.csv").fillna("")
+            if not trung_df.empty and "article_id" in trung_df.columns:
+                trung_df = trung_df.drop_duplicates(subset=["article_id"], keep="first")
+                for _, row in trung_df.iterrows():
+                    pid = f"trg_{row['article_id']}"
+                    description = str(row.get('description', ''))
+                    read_time = calculate_reading_time(description)
+                    
+                    data["ritholtz"].append({
+                        "id": pid, 
+                        "title": clean_text(row['title']), 
+                        "desc": clean_text(description[:300]),
+                        "url": row['url'], 
+                        "meta": f"SATPOST • {str(row.get('pub_date', ''))[:10]} • ⏱️ {read_time} min"
+                    })
+        except: pass
+
+    # Chronological sort for the merged AM Reads tab
+    def extract_date_from_meta(item):
+        match = re.search(r'\d{4}-\d{2}-\d{2}', item.get('meta', ''))
+        return match.group(0) if match else "1970-01-01"
+        
+    if "ritholtz" in data and data["ritholtz"]:
+        data["ritholtz"].sort(key=extract_date_from_meta, reverse=True)
+
+    for k in data: 
+        data[k] = data[k][:50]
+        
     return data
