@@ -151,6 +151,7 @@ def extract_articles(post_url: str, session: requests.Session) -> List[Dict]:
     
     soup = BeautifulSoup(resp.content, "html.parser")
     articles = []
+    seen_titles = set()
     
     # Find all links in the post content
     # Usually the articles are in a list or in the post body
@@ -228,6 +229,20 @@ def extract_articles(post_url: str, session: requests.Session) -> List[Dict]:
         # Final safety cleanup for title and description
         title = title.strip().lstrip(" \t\n\r•·-–—:.")
         description = description.strip().lstrip(" \t\n\r•·-–—:.")
+        
+        # STRICT TITLE DEDUPLICATION - Skip duplicate titles
+        if not title:
+            continue
+        
+        # Normalize the title for strict mathematical comparison
+        clean_title = title.strip().lower()
+        
+        # If we have already seen this exact title in this scrape session, skip the duplicate
+        if clean_title in seen_titles:
+            continue
+        
+        # Otherwise, add it to our tracking set and proceed
+        seen_titles.add(clean_title)
         
         # Generate article ID
         article_id = make_article_id(href, title)
@@ -307,6 +322,15 @@ def extract_articles(post_url: str, session: requests.Session) -> List[Dict]:
             
             # Use the link text as author
             author = title
+            
+            # STRICT TITLE DEDUPLICATION - Skip duplicate titles (fallback section)
+            if not art_title:
+                continue
+            
+            clean_title = art_title.strip().lower()
+            if clean_title in seen_titles:
+                continue
+            seen_titles.add(clean_title)
             
             # Generate article ID
             article_id = make_article_id(href, art_title)
