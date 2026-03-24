@@ -13,13 +13,7 @@
   ],
   "functions": {
     "server.py": {
-      "includeFiles": [
-        "templates/**",
-        "data/**",
-        "server_assets/**",
-        "manifest.json",
-        "sw.js"
-      ]
+      "includeFiles": "{templates/**,data/**,server_assets/**,manifest.json,sw.js}"
     }
   }
 }
