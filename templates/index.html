@@ -66,7 +66,7 @@
                 <button onclick="switchTab('yearly')" id="tab-yearly" class="pb-3 flex-shrink-0 transition-colors hover:text-zinc-300">Yearly</button>
                 <button onclick="switchTab('news')" id="tab-news" class="pb-3 flex-shrink-0 transition-colors hover:text-zinc-300">Google News</button>
                 <button onclick="switchTab('ritholtz')" id="tab-ritholtz" class="pb-3 flex-shrink-0 transition-colors hover:text-zinc-300">AM Reads</button>
-                <button onclick="switchTab('favorites')" id="tab-favorites" class="pb-3 flex-shrink-0 transition-colors hover:text-amber-600">★ Favorites</button>
+                <button onclick="switchTab('favorites')" id="tab-favorites" class="pb-3 flex-shrink-0 transition-colors hover:text-amber-600">★ Favorites <span id="fav-count" class="ml-1 opacity-60 lowercase pointer-events-none"></span></button>
             </div>
             
             <div style="display: inline-flex; align-items: center; opacity: 0.4; margin-left: auto; padding-left: 10px;" title="Show Read Items">
@@ -157,8 +157,17 @@
                         cloudFavorites.push(doc.data());
                     });
                     // Re-render feed if we are on the favorites tab, or if buttons need updating
+                    updateFavoritesCount();
                     renderFeed(); 
                 });
+        }
+
+        function updateFavoritesCount() {
+            const countElement = document.getElementById('fav-count');
+            if (!countElement) return;
+            
+            const unreadCount = cloudFavorites.filter(item => !cloudReadPosts.has(String(item.id))).length;
+            countElement.textContent = unreadCount > 0 ? `(${unreadCount})` : '';
         }
 
         function listenToReadPosts() {
@@ -168,6 +177,7 @@
                     snapshot.forEach((doc) => {
                         cloudReadPosts.add(doc.id);
                     });
+                    updateFavoritesCount();
                     renderFeed();
                 });
         }
