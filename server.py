@@ -9,7 +9,7 @@ import glob
 import logging
 
 BASE_DIR = Path(__file__).resolve().parent
-logging.info("Vercel deployment trace...")
+logging.info("Vercel deployment trace 2...")
 
 app = FastAPI()
 templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
