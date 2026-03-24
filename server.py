@@ -33,7 +33,7 @@ def calculate_reading_time(text: str) -> int:
 
 @app.get("/", response_class=HTMLResponse)
 async def read_root(request: Request):
-    return templates.TemplateResponse("index.html", {"request": request})
+    return templates.TemplateResponse(request=request, name="index.html")
 
 @app.get("/api/data")
 def get_data():
