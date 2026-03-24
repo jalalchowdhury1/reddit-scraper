@@ -33,6 +33,30 @@ This is a hybrid-architecture application designed for zero-cost deployment and 
 
 ---
 
+## 🚨 Deployment & Vercel Limitations (CRITICAL Rules for LLMs)
+If you are an LLM assisting with this repository, **you must obey these rules** to prevent breaking the Vercel production deployment:
+
+1. **Strict Dependency Split (250MB Lambda Limit):** 
+   - AWS Python Lambdas on Vercel hard-crash if the unzipped package exceeds 250MB.
+   - **DO NOT** add heavy data science libraries (`streamlit`, `lxml`, `beautifulsoup4`) to `requirements.txt`.
+   - `requirements.txt` MUST ONLY contain the bare minimum for FastAPI (`fastapi`, `uvicorn`, `pandas`, `Jinja2`). 
+   - Put GitHub scraper dependencies in `requirements-scraper.txt`.
+   - Put local dashboard dependencies in `requirements-dev.txt`.
+2. **Legacy Vercel Configuration (`vercel.json`):** 
+   - This project correctly relies on the legacy `builds` API for `@vercel/python`. 
+   - **DO NOT** use the top-level `functions` property to configure files; it conflicts and crashes schema validation. 
+   - If you need to include static files (like templates or data), pass an array to `config.includeFiles` strictly nested inside the `builds` wrapper.
+3. **Absolute Paths Only (`server.py`):** 
+   - Vercel Serverless Functions execute in isolated, fluctuating `/var/task` directories. 
+   - **DO NOT** use relative string formats to find files. 
+   - Always derive absolute paths dynamically via `BASE_DIR = Path(__file__).resolve().parent`.
+4. **Starlette Compatibility (`TemplateResponse`):** 
+   - Vercel routinely pulls the latest minor versions of `fastapi` and `starlette` dynamically. 
+   - Newer `starlette` releases crash instantly if `TemplateResponse` receives positional arguments. 
+   - You MUST use explicit keyword arguments: `templates.TemplateResponse(request=request, name="index.html")`.
+
+---
+
 ## 📊 Subreddits Tracked (14 Communities)
 
 1. `r/dataisbeautiful` - Data Is Beautiful
