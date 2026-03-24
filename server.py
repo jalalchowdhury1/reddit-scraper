@@ -8,8 +8,10 @@ from fastapi.templating import Jinja2Templates
 import glob
 import logging
 
+BASE_DIR = Path(__file__).resolve().parent
+
 app = FastAPI()
-templates = Jinja2Templates(directory="templates")
+templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
 
 def clean_text(text) -> str:
     if pd.isna(text) or not text: return ""
@@ -38,7 +40,7 @@ def get_data():
     data = {"monthly": [], "yearly": [], "news": [], "ritholtz": []}
     
     # Load Reddit
-    posts_files = glob.glob("data/r_*/posts.csv")
+    posts_files = glob.glob(str(BASE_DIR / "data/r_*/posts.csv"))
     if posts_files:
         dfs = []
         for f in posts_files:
@@ -51,7 +53,7 @@ def get_data():
                 dfs.append(df)
             except: pass
             
-        yearly_files = glob.glob("data/r_*_yearly/posts.csv")
+        yearly_files = glob.glob(str(BASE_DIR / "data/r_*_yearly/posts.csv"))
         for f in yearly_files:
             try:
                 df = pd.read_csv(f)
@@ -89,9 +91,10 @@ def get_data():
                 data[row['time_filter']].append(item)
 
     # Load Google News
-    if Path("data/googlenews/articles.csv").exists():
+    news_csv = BASE_DIR / "data/googlenews/articles.csv"
+    if news_csv.exists():
         try:
-            news_df = pd.read_csv("data/googlenews/articles.csv").fillna("")
+            news_df = pd.read_csv(news_csv).fillna("")
             if not news_df.empty and "article_id" in news_df.columns:
                 news_df = news_df.drop_duplicates(subset=["article_id", "category"], keep="first")
                 news_df = news_df.sort_values("pub_date", ascending=False)
@@ -111,9 +114,10 @@ def get_data():
         except: pass
 
     # Load Ritholtz
-    if Path("data/ritholtz/articles.csv").exists():
+    ritholtz_csv = BASE_DIR / "data/ritholtz/articles.csv"
+    if ritholtz_csv.exists():
         try:
-            rith_df = pd.read_csv("data/ritholtz/articles.csv").fillna("")
+            rith_df = pd.read_csv(ritholtz_csv).fillna("")
             if not rith_df.empty and "article_id" in rith_df.columns:
                 rith_df = rith_df.drop_duplicates(subset=["article_id"], keep="first")
                 for _, row in rith_df.iterrows():
@@ -131,9 +135,10 @@ def get_data():
         except: pass
 
     # Load Read Trung (SatPost)
-    if Path("data/trung/articles.csv").exists():
+    trung_csv = BASE_DIR / "data/trung/articles.csv"
+    if trung_csv.exists():
         try:
-            trung_df = pd.read_csv("data/trung/articles.csv").fillna("")
+            trung_df = pd.read_csv(trung_csv).fillna("")
             if not trung_df.empty and "article_id" in trung_df.columns:
                 trung_df = trung_df.drop_duplicates(subset=["article_id"], keep="first")
                 for _, row in trung_df.iterrows():
