@@ -29,7 +29,7 @@ This is a hybrid-architecture application designed for zero-cost deployment and 
 
 ### Deployment
 - `vercel.json`: Python builder for FastAPI
-- `.github/workflows/daily_scrape.yml`: Morning CRON job (10:00 UTC / 5:00 AM EST)
+- `.github/workflows/daily_scrape.yml`: Overnight CRON job (03:00 UTC / ~11 PM ET) so data is ready before morning
 
 ---
 

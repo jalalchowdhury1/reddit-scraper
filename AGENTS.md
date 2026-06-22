@@ -18,7 +18,8 @@ plus a few news/newsletter sources into one single-page web app, and syncs the u
 **Three moving parts, glued by a git repo:**
 
 1. **Scrapers** (`core/*.py`) — run **daily by GitHub Actions** (`.github/workflows/daily_scrape.yml`,
-   cron `0 10 * * *` = 10:00 UTC), which writes the resulting CSVs into `data/` and **commits
+   cron `0 3 * * *` = 03:00 UTC ≈ 11 PM ET, so data is ready well before the user's morning;
+   scheduled early to absorb GitHub Actions' ~1–2h cron delay), which writes the resulting CSVs into `data/` and **commits
    them back to `main`** (`git add -f data/` then push). The repo's git history is therefore a
    stream of `"Automated daily data update"` commits. No Reddit API key is used.
 2. **Backend** — a tiny **FastAPI** app (`server.py`) that reads the committed CSVs from `data/`
@@ -35,7 +36,7 @@ mutable user state lives client-side in Firebase.
 ### Data flow
 
 ```
-GitHub Actions (daily 10:00 UTC)
+GitHub Actions (daily 03:00 UTC ≈ 11 PM ET)
    └─ python core/scrape_top.py        → data/r_<sub>/posts.csv  &  data/r_<sub>_yearly/posts.csv
    └─ python core/scrape_ritholtz.py   → data/ritholtz/articles.csv      (overwrite daily)
    └─ python core/scrape_googlenews.py → data/googlenews/articles.csv     (append + dedup)
