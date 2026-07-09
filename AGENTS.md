@@ -19,7 +19,8 @@ plus a few news/newsletter sources into one single-page web app, and syncs the u
 
 1. **Scrapers** (`core/*.py`) — run **daily by GitHub Actions** (`.github/workflows/daily_scrape.yml`,
    cron `0 3 * * *` = 03:00 UTC ≈ 11 PM ET, so data is ready well before the user's morning;
-   scheduled early to absorb GitHub Actions' ~1–2h cron delay), which writes the resulting CSVs into `data/` and **commits
+   scheduled early to absorb GitHub Actions' ~1–2h cron delay, plus a `0 9 * * *` retry cron
+   that no-ops if today's data already landed — see §CI), which writes the resulting CSVs into `data/` and **commits
    them back to `main`** (`git add -f data/` then push). The repo's git history is therefore a
    stream of `"Automated daily data update"` commits. No Reddit API key is used.
 2. **Backend** — a tiny **FastAPI** app (`server.py`) that reads the committed CSVs from `data/`
@@ -177,6 +178,13 @@ streamlit run dashboard.py
   runs the four `core/` scrapers, then `git add -f data/ && git commit -m "Automated daily data
   update" || exit 0 && git push`. `permissions: contents: write`. Manually triggerable via
   `workflow_dispatch`. (Actions were bumped to `actions/checkout@v6` / `actions/setup-python@v6`.)
+- **Two crons + dedupe guard (don't "simplify" away):** `0 3 * * *` is the real run; `0 9 * * *`
+  is a retry window added after 2026-07-09, when GitHub never assigned a runner to the 03:00 job
+  ("job was not acquired by Runner") and the day's data was silently lost. A guard step skips
+  *scheduled* runs when `data/` was already committed today (UTC) — so the 09:00 run is a no-op
+  on normal days — while `workflow_dispatch` always runs. Checkout uses `fetch-depth: 50` because
+  the guard needs history to find the last `data/` commit; a `concurrency: daily-scrape` group
+  (no cancel) serializes a badly delayed 03:00 cron against the 09:00 retry.
 - There is **no test/lint workflow and no test suite.**
 
 ### Dependency split (3 files — keep them split, see §5)

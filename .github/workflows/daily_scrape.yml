@@ -2,29 +2,63 @@ name: Daily Data Scraper
 on:
   schedule:
     - cron: '0 3 * * *'
+    # Retry window: no-op if the 03:00 run already landed today's data.
+    # Added after 2026-07-09, when GitHub never assigned a runner to the
+    # 03:00 job ("job was not acquired by Runner") and the day's scrape
+    # was silently lost.
+    - cron: '0 9 * * *'
   workflow_dispatch:
 
 permissions:
   contents: write
 
+# Serialize runs so a badly delayed 03:00 cron can't overlap the 09:00 retry.
+concurrency:
+  group: daily-scrape
+  cancel-in-progress: false
+
 jobs:
   scrape-and-commit:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
+        with:
+          # Guard needs enough history to find the last commit touching data/
+          # (there is one almost every day, so 50 is plenty).
+          fetch-depth: 50
+
+      - name: Skip if today's data already committed (retry-window dedupe)
+        id: guard
+        # Scheduled runs skip when data/ was already committed today (UTC),
+        # so the 09:00 retry is a no-op on normal days. Manual dispatch
+        # always runs.
+        run: |
+          LAST=$(git log -1 --format=%cs -- data/)
+          TODAY=$(date -u +%F)
+          if [ "${{ github.event_name }}" = "schedule" ] && [ "$LAST" = "$TODAY" ]; then
+            echo "data/ already updated today ($LAST) — skipping retry run"
+            echo "run=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "last data/ commit: ${LAST:-none found} — proceeding"
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Set up Python
+        if: steps.guard.outputs.run == 'true'
         uses: actions/setup-python@v6
         with:
           python-version: '3.10'
 
       - name: Install dependencies
+        if: steps.guard.outputs.run == 'true'
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements-scraper.txt
 
       - name: Run Scrapers
+        if: steps.guard.outputs.run == 'true'
         run: |
           python core/scrape_top.py
           python core/scrape_ritholtz.py
@@ -32,6 +66,7 @@ jobs:
           python core/scrape_trung.py
 
       - name: Commit and push changes
+        if: steps.guard.outputs.run == 'true'
         run: |
           git config --global user.name 'github-actions[bot]'
           git config --global user.email 'github-actions[bot]@users.noreply.github.com'
