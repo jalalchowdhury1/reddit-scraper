@@ -88,6 +88,16 @@ def icon():
     return FileResponse(BASE_DIR / "server_assets" / "icon.png", media_type="image/png",
                         headers={"Cache-Control": "public, max-age=604800"})
 
+def shown_upvotes(row) -> str:
+    """Reddit's own number, or "" (the card then shows the rank instead).
+    `upvotes` column = real (Mac browser); else `score`, only if `score_real`
+    (old JSON rows). Never the made-up tier number that orders the list."""
+    up = pd.to_numeric(row.get('upvotes', ''), errors='coerce')
+    if pd.notna(up):
+        return format_score(int(up))
+    return format_score(int(row['score'])) if row['score_real'] else ""
+
+
 @app.get("/api/data")
 def get_data():
     data = {"monthly": [], "yearly": [], "news": [], "ritholtz": []}
@@ -131,6 +141,8 @@ def get_data():
             combined['id'] = combined['id'].astype(str)
             combined = combined.drop_duplicates(subset=["id", "time_filter"], keep="first")
             combined['score'] = pd.to_numeric(combined['score'], errors='coerce').fillna(0).astype(int)
+            # Order by `score` (the tier mix). The Mac browser's CSVs carry the real
+            # number separately in `upvotes`; old JSON rows have it in `score`.
             combined = combined.sort_values("score", ascending=False)
             
             for _, row in combined.iterrows():
@@ -157,7 +169,7 @@ def get_data():
                     "rank": int(row['rank']) if str(row['rank']).isdigit() else 0,
                     "when": when,
                     # Shown only when it came from Reddit, never an invented number.
-                    "upvotes": format_score(row['score']) if row['score_real'] else "",
+                    "upvotes": shown_upvotes(row),
                 }
                 # Monthly hides r/AskHistorians (it lives in Yearly). Drop it
                 # here, before the 50 cap, so Monthly still gets 50 posts.

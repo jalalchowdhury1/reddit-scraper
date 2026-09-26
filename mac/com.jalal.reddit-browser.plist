@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- Install (after this code is on origin/main; every run resets the clone to it):
+       git clone https://github.com/jalalchowdhury1/reddit-scraper.git ~/.local/share/reddit-browser/reddit-scraper
+       cp mac/com.jalal.reddit-browser.plist ~/Library/LaunchAgents/
+       launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.jalal.reddit-browser.plist
+       launchctl kickstart gui/$(id -u)/com.jalal.reddit-browser   # first run now; watch the log
+     Runs the script from the job's own clone (it updates itself each run).
+     StartCalendarInterval, never StartInterval (StartInterval drifts and skips on the Mac mini).
+     07:35 = after the 00-07h night jobs; 19:35 = second chance the same day. -->
+<plist version="1.0">
+<dict>
+    <key>Label</key><string>com.jalal.reddit-browser</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/bash</string>
+        <string>/Users/jalalchowdhury/.local/share/reddit-browser/reddit-scraper/mac/reddit-browser.sh</string>
+    </array>
+    <key>StartCalendarInterval</key>
+    <array>
+        <dict><key>Hour</key><integer>7</integer><key>Minute</key><integer>35</integer></dict>
+        <dict><key>Hour</key><integer>19</integer><key>Minute</key><integer>35</integer></dict>
+    </array>
+    <key>StandardOutPath</key><string>/Users/jalalchowdhury/Library/Logs/reddit-browser.log</string>
+    <key>StandardErrorPath</key><string>/Users/jalalchowdhury/Library/Logs/reddit-browser.log</string>
+</dict>
+</plist>

@@ -99,16 +99,53 @@ score via the **Tiered Priority Exponential Decay** model so high-signal subs fl
 - RSS rows now carry the self-post text (from `<div class="md">`), so Monthly/Yearly cards get
   blurbs and real reading times. An RSS **429** gets one retry (Retry-After, max 60 s), with a
   480 s back-off budget per run so the 30-min job timeout is safe. `parse_rss()` is pure (tested).
-- The real long-term fix for the 403s is Reddit's official OAuth API (needs the owner's Reddit
-  app client id/secret). Not done; owner's call.
+- The official OAuth API was tried and never worked for the owner. Don't suggest it again.
+
+### `core/scrape_reddit_browser.py` — the REAL Reddit source (Mac mini, since 26 Sep 2026)
+Reddit blocks every plain request now: GitHub's IPs get 403/429, and even the owner's home IP
+gets a JavaScript challenge page on the JSON and HTML endpoints. A real headless Chromium
+(Playwright) passes that challenge by itself after one warm-up load of reddit.com. The new
+Reddit page carries each post as a `<shreddit-post>` with attributes `id`, `score`,
+`comment-count`, `post-title`, `post-type`, `permalink`; self-post text sits in
+`[slot="text-body"]`. So: real upvotes, real text, no login, no key, no AI.
+- Runs on the **Mac mini** via launchd `com.jalal.reddit-browser` (07:35 + 19:35 local,
+  `StartCalendarInterval`). Plist + wrapper live in `mac/`. The wrapper works in its own clone
+  at `~/.local/share/reddit-browser/reddit-scraper` (reset to `origin/main` each run, never the
+  PyCharm working copy), keeps a throwaway browser profile in `…/reddit-browser/profile`, runs
+  `/opt/homebrew/bin/python3` (has Playwright, no pandas: the scraper is stdlib + Playwright),
+  commits `data/r_*/posts.csv` + `data/reddit_browser.json`, pushes with a 3-try rebase loop.
+  Log `~/Library/Logs/reddit-browser.log`; success line `REDDIT PUSHED: N files`.
+- Scrolls each list like a person until 50 posts. Videos are skipped (like the old JSON path).
+  A page with fewer than 10 posts keeps its old file (challenge page = warm up again, retry
+  once; 4 failed lists in a row = stop). Human pace: 3–7 s between pages, ~6–8 min a run.
+- `data/reddit_browser.json` records when each list was saved. `scrape_top.py` on GitHub
+  **skips any list the Mac saved in the last 36 h** (`reddit_common.fresh_keys`), so RSS only
+  fills in while the Mac is down and never overwrites real upvotes with invented ones.
+- CSV columns: `id,title,selftext,permalink,score,upvotes,comments,score_real`. **`upvotes` is
+  the real number (what the site shows); `score` is the same tier ordering score the RSS
+  fallback uses** (`reddit_common.tier_score`, math unchanged). Why: real upvotes differ ~20x
+  between subs, and ordering by them made Monthly 46 of 50 r/todayilearned and Yearly 50 of 50.
+  Mac rows carry `score_real=False` (their `score` IS made up), so a reader that doesn't know
+  `upvotes` shows the rank, never the tier number. `server.shown_upvotes()` shows `upvotes`
+  when numeric, else `score` only if `score_real` (old JSON rows), else "" (rank shown). `comments` is stored, not shown yet. Row order = Reddit's own top
+  order (the site's `rank`).
+- "Page healthy" = at least 10 posts on the page, before videos are dropped (r/lifehacks is
+  mostly videos: 50 on the page can leave 6 readable rows, which are still saved).
+- `SUBREDDITS` and `SUBREDDIT_TIERS` now live in `core/reddit_common.py` (shared, stdlib only).
+- Install / reinstall: the steps are in the comment at the top of `mac/com.jalal.reddit-browser.plist`
+  (clone first, then bootstrap, then `launchctl kickstart` to test under launchd itself).
+- Each saved list is stamped in the json right away, so a run killed mid-way keeps its stamps.
+- Known, accepted race: if GitHub's run overlaps a Mac push, the rebase (`-X theirs`) can keep
+  GitHub's RSS copy of a list under the Mac's fresh stamp. It lasts until the next Mac run (≤12 h)
+  and RSS rows are honest (rank, no fake upvotes).
 
 Between subreddits it sleeps `random.uniform(6.5, 12.5)` seconds (human jitter — see §5).
 
-**Subreddit list lives in `core/scrape_top.py` (`SUBREDDITS`, 13 entries), NOT in `config.py`.**
+**Subreddit list lives in `core/reddit_common.py` (`SUBREDDITS`, 13 entries), NOT in `config.py`.**
 The CI scraper list is: `dataisbeautiful, todayilearned, bestof, getmotivated,
 UnethicalLifeProTips, LifeProTips, TrueReddit, UpliftingNews, lifehacks, Productivity,
 PersonalFinance, explainlikeimfive, AskHistorians`. To add/remove a tracked sub, edit
-`core/scrape_top.py:SUBREDDITS` (and `SUBREDDIT_TIERS` if you want a non-default base score).
+`core/reddit_common.py:SUBREDDITS` (and `SUBREDDIT_TIERS` if you want a non-default base score).
 
 ### `core/scrape_googlenews.py` — Bangladesh news, strictly filtered
 - Sweeps 3 broad Google News RSS queries (`Bangladesh Economy`, `Bangladesh India`,
@@ -223,8 +260,8 @@ streamlit run dashboard.py
   the guard needs history to find the last `data/` commit; a `concurrency: daily-scrape` group
   (no cancel) serializes a badly delayed 03:00 cron against the 09:00 retry.
 - There is **no test/lint workflow**. `tests/test_am_reads.py` covers the AM Reads dedup/cleanup
-  helpers; `tests/test_feeds.py` covers RSS parsing + honest scores, the News retry, and the
-  API's no-repeats rules (`python -m pytest tests -q`).
+  helpers; `tests/test_feeds.py` covers RSS parsing + honest scores, the News retry, the
+  API's no-repeats rules, and the Mac browser scraper (rows, CSV round trip, 36 h skip) (`python -m pytest tests -q`).
 
 ### Dependency split (3 files — keep them split, see §5)
 - `requirements.txt` — **production/Vercel minimal**: `fastapi, uvicorn, Jinja2, pydantic,
@@ -303,12 +340,12 @@ streamlit run dashboard.py
   `IMPLEMENTATION_NOTES.md`, `LLM_OPTIMIZATION_SUMMARY.md`, none of which exist in the repo.
   Consolidated into this file and deleted.
 - **README claims "14 communities" and lists `r/sobooksoc`; reality is 13 and no sobooksoc.**
-  The authoritative CI list is `core/scrape_top.py:SUBREDDITS` (13 subs, includes `AskHistorians`,
+  The authoritative CI list is `core/reddit_common.py:SUBREDDITS` (13 subs, includes `AskHistorians`,
   excludes `Fitness`). `config.py:SUBREDDITS` is a **different, 13-entry list** (includes
   `sobooksoc` and `Fitness`, excludes `bestof`/`AskHistorians`) and is **only** consumed by the
   legacy `dashboard.py` — it does **not** drive CI scraping. `data/r_sobooksoc/` does not exist;
   `data/r_Fitness*` exists only as a **leftover** from earlier runs (Fitness is NOT in
-  `core/scrape_top.py:SUBREDDITS`; its CSV last changed in old commit `e5ccb23`). **Note:**
+  `core/reddit_common.py:SUBREDDITS`; its CSV last changed in old commit `e5ccb23`). **Note:**
   `data/r_UpliftingNews*` is **NOT** a leftover — `UpliftingNews` IS one of the 13 active CI subs
   and its CSV was updated in HEAD (`bc6095c`); do not delete it.
 - **`config.py:DAILYSTAR_FEEDS` + `scrape_dailystar.py` are not wired in.** The daily workflow
@@ -367,8 +404,12 @@ streamlit run dashboard.py
   cache is only the offline fallback). `server.py` serves `/manifest.json`, `/sw.js`, `/icon.png`
   (`server_assets/icon.png`); before 2026-09-26 all three 404'd because `vercel.json` routes
   everything to FastAPI.
-- `core/scrape_top.py` — triple-redundant Reddit scraper + synthetic scoring (`SUBREDDITS`,
-  `SUBREDDIT_TIERS`, `HEADERS`). **Authoritative subreddit list.**
+- `core/reddit_common.py` — `SUBREDDITS` (**authoritative subreddit list**) + the Mac/GitHub
+  freshness handshake (`data/reddit_browser.json`, 36 h).
+- `core/scrape_reddit_browser.py` — the real Reddit source: headless browser on the Mac mini.
+- `mac/reddit-browser.sh` + `mac/com.jalal.reddit-browser.plist` — its launchd job.
+- `core/scrape_top.py` — GitHub-side Reddit fallback (JSON → HTML → RSS) + synthetic scoring
+  (`HEADERS`; tiers are in `reddit_common`); skips lists the Mac saved in the last 36 h.
 - `core/scrape_ritholtz.py` — AM Reads / Weekend Reads scraper (12-item cap, dedup rules).
 - `core/scrape_googlenews.py` — Bangladesh Google-News RSS scraper (blocklist + strict
   `\b`-regex keyword filter; `QUERIES`, `BLOCKED_SOURCES`, `STRICT_FILTERS`).

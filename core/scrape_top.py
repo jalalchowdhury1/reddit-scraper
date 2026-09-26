@@ -5,13 +5,8 @@ import random
 import xml.etree.ElementTree as ET
 from pathlib import Path
 from bs4 import BeautifulSoup
-
-SUBREDDITS = [
-    "dataisbeautiful", "todayilearned", "bestof",
-    "getmotivated", "UnethicalLifeProTips", "LifeProTips",
-    "TrueReddit", "UpliftingNews", "lifehacks", "Productivity",
-    "PersonalFinance", "explainlikeimfive", "AskHistorians"
-]
+from datetime import datetime, timezone
+from reddit_common import SUBREDDITS, SUBREDDIT_TIERS, list_key, load_meta, fresh_keys
 
 HEADERS = {
     "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
@@ -27,22 +22,6 @@ HEADERS = {
     "Upgrade-Insecure-Requests": "1"
 }
 
-# Tiered priority system for dummy upvote generation in fallback scrapers
-SUBREDDIT_TIERS = {
-    # Tier 1: The Heavyweights (Highest priority)
-    "bestof": (75000, 100000),
-    "explainlikeimfive": (75000, 100000),
-    "todayilearned": (75000, 100000),
-    "AskHistorians": (75000, 100000),
-
-    # Tier 2: High Signal
-    "TrueReddit": (40000, 70000),
-    "dataisbeautiful": (40000, 70000),
-    "PersonalFinance": (40000, 70000),
-
-    # Tier 3: Default (Everything else)
-    "default": (15000, 35000)
-}
 
 def fetch_via_html(subreddit: str, time_filter: str) -> list:
     """SECONDARY: Scrapes the raw HTML of old.reddit.com - Better because it has SCORES."""
@@ -233,8 +212,19 @@ def main():
     print("🚀 Triple-Threat Reddit Scraper (JSON -> HTML -> RSS)")
     print("="*50)
     deadline = time.monotonic() + RUN_DEADLINE_S
+    # Lists the Mac mini's real browser saved recently (real upvotes + text).
+    # Leave them alone; RSS here only fills in when the Mac has been down.
+    try:
+        fresh = fresh_keys(load_meta(), datetime.now(timezone.utc))
+    except Exception as e:  # never let a bad json stop News/AM Reads, which run after this
+        print(f"⚠️ data/reddit_browser.json unreadable ({e}); scraping every list")
+        fresh = {}
     for sub in SUBREDDITS:
         for t_filter in ["month", "year"]:
+            key = list_key(sub, t_filter)
+            if key in fresh:
+                print(f"🖥️ r/{sub} ({t_filter}): Mac browser copy is {fresh[key]:.0f}h old, keeping it")
+                continue
             if time.monotonic() > deadline:
                 print(f"⏱️ {RUN_DEADLINE_S // 60}-min Reddit limit reached: skipping r/{sub} ({t_filter}) and the rest; their old files stay.")
                 return
