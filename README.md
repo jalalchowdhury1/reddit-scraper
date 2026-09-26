@@ -29,7 +29,9 @@ headless browser → Reddit         News, AM Reads, SatPost, Reddit backup
   GitHub's RSS backup (`core/scrape_top.py`) refills it, showing each post's rank instead of
   upvotes. No Reddit API key anywhere.
 - **Tabs:** Monthly and Yearly = the top 50 of all tracked subs, mixed by a tier score so one
-  big sub can't take over. News = every story from the last 7 days. AM Reads = today's list only.
+  big sub can't take over. That mix reshuffles on every scrape, so a post you haven't read yet
+  stays at the bottom ("Still unread from earlier lists") until you read it, or 30 days after it left.
+  News = every story from the last 7 days. AM Reads = today's list only.
 - **The 13 subs** live in `core/reddit_common.py`: dataisbeautiful, todayilearned, bestof,
   getmotivated, UnethicalLifeProTips, LifeProTips, TrueReddit, UpliftingNews, lifehacks,
   Productivity, PersonalFinance, explainlikeimfive, AskHistorians.

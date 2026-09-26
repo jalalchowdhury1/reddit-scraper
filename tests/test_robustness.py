@@ -81,6 +81,13 @@ def test_dropped_sub_is_hidden_and_its_stamp_ignored(site):
     assert d["updated"]["reddit"] == "2026-09-26T11:35:00+00:00"   # newest TRACKED stamp
 
 
+def test_api_names_the_tracked_subs_so_the_page_drops_kept_posts_from_removed_ones(site):
+    # index.html keeps unread posts that fall out of the top 50; a post whose sub
+    # isn't in this list is forgotten (r/Fitness here, as after its removal).
+    subs = TestClient(server.app).get("/api/data").json()["reddit_subs"]
+    assert subs == sorted(server.TRACKED_SUBS) and "LifeProTips" in subs and "Fitness" not in subs
+
+
 def test_csv_without_a_title_column_is_skipped(site):
     put(site, "r_todayilearned/posts.csv", "id,score\n1,5\n2,4\n")
     d = server.get_data()

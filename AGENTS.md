@@ -45,7 +45,7 @@ GitHub Actions, 03:00 UTC (+ 09:00 retry)
                                   ▼  Vercel auto-deploys every push to main
 Browser ─▶ server.py (FastAPI on Vercel) ─▶ GET /api/data
               ▼
-   { monthly, yearly, news, ritholtz, totals, updated }
+   { monthly, yearly, news, ritholtz, totals, reddit_subs, updated }
               ▼
 index.html: 5 tabs (Monthly / Yearly / News / AM Reads / ★ Favorites)
    read + favorite state ↔ localStorage ↔ Firebase Firestore (cross-device)
@@ -240,7 +240,7 @@ post and extract articles.
 - `GET /manifest.json`, `/sw.js`, `/icon.png` (`server_assets/icon.png`) — the PWA files.
   `vercel.json` routes everything to FastAPI, so these need their own routes (all three 404'd
   before 26 Sep 2026).
-- `GET /api/data` → `{monthly, yearly, news, ritholtz, totals, updated}`:
+- `GET /api/data` → `{monthly, yearly, news, ritholtz, totals, reddit_subs, updated}`:
   - **Reddit** = every `data/r_*/posts.csv` whose sub is in `SUBREDDITS` (imported from
     `core/reddit_common.py`; `vercel.json` bundles `core/**` for this). Folder `_yearly` → Yearly,
     else Monthly. CSVs without `id`/`title` are skipped. Dedup on `(id, time_filter)`, sorted by
@@ -257,6 +257,8 @@ post and extract articles.
     first; full `ts` so the page can say "3h ago". `totals.news_days = 7`.
   - **ritholtz** = `data/ritholtz/articles.csv` (`rth_` ids) + the last 7 days of
     `data/trung/articles.csv` (`trg_` ids), sorted by date, newest first, capped at 50.
+  - **`reddit_subs`** = the tracked subs (sorted). The page forgets kept unread posts whose sub
+    isn't in it, so removing a sub also clears it from every device's kept list.
   - **`updated`** = `{news, ritholtz, reddit}` (UTC ISO): the newest `scraped_at` in each news
     CSV, and the newest Mac save in `data/reddit_browser.json` (tracked subs only).
   - Items carry structured fields (`upvotes`, `rank`, `when`, `mins`, `ts`, `date`, `kind`,
@@ -296,21 +298,25 @@ python3 core/scrape_reddit_browser.py --only LifeProTips --visible   # needs Pla
 ```
 
 ### Tests
-- **`.venv/bin/python -m pytest tests -q`** — 33 tests, ~10 s, no network:
+- **`.venv/bin/python -m pytest tests -q`** — 34 tests, ~10 s, no network:
   - `tests/test_am_reads.py`: AM Reads cleanup/dedup helpers.
   - `tests/test_feeds.py`: RSS parsing + honest scores, the News retry (503/404), the live API's
     honesty/no-repeats rules on the committed data, the Mac scraper's rows and CSV round trip,
     tier ordering, the 36 h skip and broken stamps.
   - `tests/test_robustness.py`: the server against a throwaway `data/` (a broken News CSV
     doesn't touch Reddit, a dropped sub is hidden, one junk number costs one row, a Reddit crash
-    still serves News, `/api/status` shape and `checked`), `page_ok` / `update_meta`, and **the
+    still serves News, `/api/status` shape and `checked`, `reddit_subs`), `page_ok` / `update_meta`, and **the
     Mac wrapper against a local bare git repo with a fake scraper**: first run, no-change vs
     failed scrape, the lock (live and dead), a push race with another job, a clone left
     mid-rebase, a stale `index.lock`, a broken clone, the log trim. It also pins the exact log
     patterns fleet-health greps for.
-- **`python3 tests/e2e_site.py [base_url]`** — 35 real-browser checks (~40 s): every tab shows
+- **`python3 tests/e2e_site.py [base_url]`** — 47 real-browser checks (~70 s): every tab shows
   all the API's posts with the right label, real upvotes on cards, opening ≠ reading, the
   "Done with X?" prompt, undo, keys, stale notices (News 36 h, Reddit 48 h), footer stamps,
+  kept unread posts (the API response is edited to drop two: both stay under their label and
+  in the counts; reading one removes it; the eye button shows it again; Undo still works after
+  a data reload; "Mark these read" clears them; one that left 30+ days ago expires; a post the
+  server moves between tabs shows once; no duplicates once back; a removed sub's posts go),
   phone layout, no JS errors. Needs Playwright (use `/opt/homebrew/bin/python3` on the Mac; the
   venv doesn't have it). Always a fresh throwaway headless browser. Run it against a local
   server before shipping UI changes, and against the live URL after.
@@ -431,7 +437,21 @@ python3 core/scrape_reddit_browser.py --only LifeProTips --visible   # needs Pla
   owner peeks without reading; only the tick / left swipe / `r` / Mark all read / the prompt's
   "Mark read" count). Opened-but-unread cards get a hollow dot + "Opened" tag (localStorage
   `dr_opened`, 21 days); coming back after 10+ s shows "Done with X? [Mark read]"; tap a blurb to
-  expand; "New" tag = first seen on this device today (`dr_first_seen`). **Warning cards:** News
+  expand; "New" tag = first seen on this device today (`dr_first_seen`). **Unread posts are kept
+  until read** (the owner's call, 26 Sep 2026): the random part of the tier score reshuffles the
+  top 50 on every scrape (measured: ~8 Monthly and ~3 Yearly posts swap out per run), so the page
+  remembers every Monthly/Yearly post it has shown (localStorage `dr_kept`, per device). One that
+  drops out while unread stays at the bottom of its tab under "Still unread from earlier lists ·
+  N" with a "Mark these read" button, and counts in the badge and label ("top 47 of 534 + 3
+  kept"). It leaves the list when read (read state syncs, so reading it on the phone clears it
+  everywhere) and behaves like any read post: the eye button shows it, the tick or Undo brings it
+  back. Storage rules (`trackKept`): an entry records `gone` = the first day it was missing;
+  deleted 30 days after that (`KEEP_DAYS`, counted from leaving, not from first seen, because
+  Yearly posts often sit in the list for a month), or 2 days after it was read
+  (`READ_GRACE_DAYS`, so a reload right after marking read can't lose it before Undo), or at once
+  when it's live in the OTHER tab (the server moves posts between Monthly and Yearly) or its sub
+  is no longer in `/api/data`'s `reddit_subs`. Kept posts only appear once the cloud read list
+  has loaded (or sync failed), so read posts never flash up as unread. **Warning cards:** News
   when `updated.news` is 36 h+ old; Monthly/Yearly when `updated.reddit` is 48 h+ old (the Mac
   stopped; lists may be older and show ranks). Footer: when AM Reads, News and Reddit last
   landed. Sync write failures show a toast + "(offline)". Firebase layout:
@@ -467,7 +487,7 @@ the Mac at 05:00 + 06:30) has three rows for this repo:
 |---|---|---|
 | `reddit-scraper (daily data)` | GitHub run of `daily_scrape.yml` | no run in 36 h, or no `DATA PUSHED` / guard line |
 | `reddit-browser (Mac 07:35/19:35 Reddit lists)` | last block of `~/Library/Logs/reddit-browser.log` | last `== … start` over 26 h old, or that block lacks `REDDIT PUSHED: N files` / `NO REDDIT CHANGES (scraper exit 0)` |
-| `reddit-browser (live site: every Reddit list fresh)` | live `/api/status` | the OLDEST `reddit_lists[].checked` is over 36 h old (fleet reads UTC stamps as local time, so really 40–41 h: the third missed run) |
+| `reddit-browser (live site: every Reddit list fresh)` | live `/api/status` | the OLDEST `reddit_lists[].checked` is over 36 h old (the third missed run in a row). Fleet converts these UTC `…Z` stamps to local time since 2026-09-26; before that they read 4–5 h too young |
 
 **Is it healthy right now?** (3 commands)
 ```bash

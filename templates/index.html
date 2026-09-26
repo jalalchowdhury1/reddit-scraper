@@ -96,6 +96,7 @@
         @media (min-width: 1000px) { #feed { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
         @media (min-width: 1700px) { #feed { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
         .section-label { font-size: .78rem; color: var(--muted); padding: 18px 4px 6px; display: flex; align-items: center; gap: 8px; }
+        .kept-label .pill-btn { height: 32px; padding: 0 12px; font-size: .78rem; margin-left: auto; color: var(--text); }
         .item { position: relative; border-radius: var(--radius); overflow: hidden; margin: 2px 0; }
         .swipe-bg { position: absolute; inset: 0; display: flex; justify-content: space-between; align-items: center; padding: 0 22px; font-size: 1.35rem; opacity: 0; }
         .swipe-bg .fav { color: var(--accent); }
@@ -239,6 +240,7 @@ function initSync() {
             cloudReadPosts = new Set();
             cloudReadAt = {};
             snap.forEach((d) => { cloudReadPosts.add(d.id); cloudReadAt[d.id] = (d.data() || {}).readAt || ''; });
+            readLoaded = true;
             syncOk();
             render();
         }, syncFailed);
@@ -347,6 +349,60 @@ function trackFirstSeen() {
 }
 const isNew = (item) => firstSeen[String(item.id)] === etDate();
 
+// "Still unread from earlier lists" (26 Sep 2026: keep unread posts until read).
+// The tier mix reshuffles the Monthly/Yearly top 50 on every scrape (~8 and ~3
+// posts swap out), so an unread post could just vanish. This device remembers
+// every Reddit post it has shown; one that drops out while still unread stays
+// at the bottom of its tab until it's read, or KEEP_DAYS after it LEFT the list
+// (`gone`). A kept post marked read stays stored READ_GRACE_DAYS more, so Undo,
+// the eye button (show read) and the tick can still bring it back.
+const KEEP_DAYS = 30, READ_GRACE_DAYS = 2;
+let kept = { monthly: {}, yearly: {} };
+let readLoaded = false;   // true once the cloud read list has arrived
+// Live ids of BOTH tabs: the server moves posts between them ("one of each").
+const liveIds = () => new Set(['monthly', 'yearly'].flatMap((k) => ((allData && allData[k]) || []).map((i) => String(i.id))));
+// False for a post whose sub the server no longer tracks (sub removed).
+function subOk(item) {
+    const subs = allData && allData.reddit_subs;
+    if (!Array.isArray(subs) || !subs.length) return true;
+    const sub = String(item.source || '').replace(/^r\//, '').toLowerCase();
+    return subs.some((s) => String(s).toLowerCase() === sub);
+}
+function trackKept() {
+    const saved = store.get('dr_kept', null);
+    const map = saved && typeof saved === 'object' ? saved : {};
+    const today = etDate(), cutoff = etDate(new Date(Date.now() - KEEP_DAYS * 864e5));
+    const live = liveIds();
+    ['monthly', 'yearly'].forEach((k) => {
+        const tab = map[k] && typeof map[k] === 'object' ? map[k] : {};
+        const here = new Set();
+        (allData[k] || []).forEach((i) => { const id = String(i.id); here.add(id); tab[id] = { item: i }; });
+        for (const id in tab) {
+            const e = tab[id];
+            if (here.has(id)) continue;
+            // Live in the other tab now, or its sub was removed: forget it here.
+            if (!e || !e.item || live.has(id) || !subOk(e.item)) { delete tab[id]; continue; }
+            if (!e.gone) e.gone = today;   // the first load without it
+            const readAt = Date.parse(cloudReadAt[id] || '');   // NaN (unknown) never prunes
+            const readLongAgo = readLoaded && cloudReadPosts.has(id) && readAt < Date.now() - READ_GRACE_DAYS * 864e5;
+            if (e.gone < cutoff || readLongAgo) delete tab[id];
+        }
+        map[k] = tab;
+    });
+    store.set('dr_kept', map);
+    kept = map;
+}
+// A tab's kept posts: gone from both live lists. Read ones only with the eye
+// button on (or in search), like read posts everywhere else. Waits for the read
+// list (or a sync failure) so already-read posts never flash up as unread.
+function carried(tab, withRead = showRead) {
+    if ((tab !== 'monthly' && tab !== 'yearly') || !allData || !(readLoaded || syncBroken)) return [];
+    const live = liveIds();
+    return Object.entries(kept[tab] || {})
+        .filter(([id, e]) => e && e.item && !live.has(id) && subOk(e.item) && (withRead || !cloudReadPosts.has(id)))
+        .map(([, e]) => ({ ...e.item, _kept: true }));
+}
+
 // ============================================================================
 // HELPERS
 // ============================================================================
@@ -414,13 +470,14 @@ function itemsFor(tab) {
     let items = allData[tab] || [];
     if (tab === 'monthly') items = items.filter((i) => !(i.meta || '').toLowerCase().includes('r/askhistorians'));
     if (tab === 'ritholtz') items = items.filter(amIsCurrent);
+    if (tab === 'monthly' || tab === 'yearly') items = [...items, ...carried(tab)];
     return items;
 }
 
 function searchAll(q) {
     q = q.toLowerCase();
     const seen = new Set(), out = [];
-    const pools = [...TABS.filter((t) => t.key !== 'favorites').map((t) => [t, (allData && allData[t.key]) || []]),
+    const pools = [...TABS.filter((t) => t.key !== 'favorites').map((t) => [t, [...((allData && allData[t.key]) || []), ...carried(t.key, true)]]),
                    [TABS[4], cloudFavorites]];
     pools.forEach(([t, list]) => list.forEach((i) => {
         const hay = `${i.title} ${i.desc} ${i.meta} ${i.source || ''} ${i.domain || ''}`.toLowerCase();
@@ -504,6 +561,8 @@ function render() {
     // AM Reads: Ritholtz's list first, SatPost after it under its own label.
     const isSat = (i) => i.kind === 'SATPOST';
     if (currentTab === 'ritholtz' && !query) shown = [...shown.filter((i) => !isSat(i)), ...shown.filter(isSat)];
+    // Kept posts go last, under their own label (and last for j/k too).
+    if (!query) shown = [...shown.filter((i) => !i._kept), ...shown.filter((i) => i._kept)];
     const shownOlder = older.filter((i) => showRead || !isRead(i));
     visibleItems = [...shown, ...shownOlder];
 
@@ -540,7 +599,12 @@ function render() {
             html += main.map(cardHTML).join('');
             if (sat.length) html += `<div class="section-label">SatPost</div>` + sat.map(cardHTML).join('');
         } else {
-            html += shown.map(cardHTML).join('');
+            const keptShown = shown.filter((i) => i._kept);
+            html += shown.filter((i) => !i._kept).map(cardHTML).join('');
+            if (keptShown.length) {
+                html += `<div class="section-label kept-label"><i class="ph ph-clock-counter-clockwise"></i>${showRead ? 'From earlier lists' : 'Still unread from earlier lists'} · ${keptShown.length}
+                         ${keptShown.some((i) => !isRead(i)) ? '<button class="pill-btn" data-act="keptread">Mark these read</button>' : ''}</div>` + keptShown.map(cardHTML).join('');
+            }
         }
     }
     // Speak up only when a feed is overdue. The nightly scrape normally lands by
@@ -578,7 +642,11 @@ function setProgress(total, unread) {
     // Say what the list is: Monthly/Yearly are a top-50 pick, News is a date window.
     const totals = (allData && allData.totals) || {};
     let scope = '';
-    if (!query && total && (currentTab === 'monthly' || currentTab === 'yearly') && totals[currentTab] > total) scope = ` · top ${total} of ${totals[currentTab]}`;
+    if (!query && total && (currentTab === 'monthly' || currentTab === 'yearly')) {
+        const nKept = carried(currentTab).length, nLive = total - nKept;
+        if (totals[currentTab] > nLive) scope = ` · top ${nLive} of ${totals[currentTab]}`;
+        if (nKept) scope += ` + ${nKept} kept`;
+    }
     if (!query && total && currentTab === 'news' && totals.news_days) scope = ` · last ${totals.news_days} days`;
     document.getElementById('progress-label').textContent = (unread ? `${unread} of ${total} left` : `All ${total} read`) + scope;
     document.getElementById('progress-bar').style.width = total ? `${(done / total) * 100}%` : '0';
@@ -646,6 +714,10 @@ function findItem(id) {
         const hit = allData && (allData[k] || []).find((i) => String(i.id) === String(id));
         if (hit) return hit;
     }
+    for (const k of ['monthly', 'yearly']) {   // kept posts, e.g. for the "Done with it?" prompt
+        const e = (kept[k] || {})[String(id)];
+        if (e && e.item) return e.item;
+    }
     return cloudFavorites.find((i) => String(i.id) === String(id));
 }
 
@@ -673,6 +745,14 @@ function switchTab(tab) {
     window.scrollTo(0, scrollPos[tab] || 0);
 }
 
+function markKeptRead() {
+    const ids = carried(currentTab, false).map((i) => i.id);
+    if (!ids.length) return;
+    setRead(ids, true);
+    buzz();
+    toast(`Marked ${ids.length} read`, () => setRead(ids, false));
+}
+
 function markAll() {
     const ids = (query ? searchAll(query) : itemsFor(currentTab)).filter((i) => !isRead(i)).map((i) => i.id);
     if (!ids.length) return;
@@ -697,6 +777,7 @@ document.getElementById('feed').addEventListener('click', (e) => {
         if (a === 'reload') { loadError = false; render(); loadData(); return; }
         if (a === 'older') { amShowOlder = true; render(); return; }
         if (a === 'showread') { setShowRead(true); return; }
+        if (a === 'keptread') { markKeptRead(); return; }
         const item = findItem(act.closest('.item').dataset.id);
         if (!item) return;
         if (a === 'fav') favItem(item);
@@ -847,6 +928,7 @@ async function loadData() {
         if (!res.ok) throw new Error(res.status);
         allData = await res.json();
         trackFirstSeen();
+        trackKept();
         lastLoad = Date.now();
         loadError = false;
     } catch (e) {

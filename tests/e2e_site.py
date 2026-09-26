@@ -191,6 +191,82 @@ async def main():
         cols = await pg.evaluate("getComputedStyle(document.getElementById('feed')).gridTemplateColumns.split(' ').length")
         check("Desktop keeps 2 columns", cols == 2, str(cols))
         check("No JS errors (desktop)", not errs2, "; ".join(errs2)[:200])
+        await ctx.close()
+
+        # ---------- kept: an unread post that drops out of the top 50 stays ----------
+        ctx = await b.new_context(viewport={"width": 390, "height": 844}, service_workers="block")
+        pg = await ctx.new_page()
+        errs3 = []
+        pg.on("pageerror", lambda e: errs3.append(str(e)))
+        await pg.goto(BASE + "/", wait_until="load"); await pg.wait_for_timeout(2500)  # 1st visit remembers the lists
+        first = await pg.evaluate("({gone: allData.monthly.slice(0, 2).map(i => String(i.id)),"
+                                  " subs: allData.monthly.slice(0, 2).map(i => i.source.slice(2)),"
+                                  " mover: String(allData.yearly[0].id)})")
+        gone, mover = first["gone"], first["mover"]
+        mode = {"drop": True, "move": False, "drop_sub": None}
+        async def reshuffle(route):
+            r = await route.fetch(); d = await r.json()
+            if mode["drop"]:
+                d["monthly"] = [i for i in d["monthly"] if str(i["id"]) not in gone]
+            if mode["move"]:   # the server moved a Yearly post into Monthly ("one of each")
+                post = next(i for i in d["yearly"] if str(i["id"]) == mover)
+                d["yearly"] = [i for i in d["yearly"] if str(i["id"]) != mover]
+                d["monthly"].append(post)
+            if mode["drop_sub"]:
+                d["reddit_subs"] = [s for s in d["reddit_subs"] if s.lower() != mode["drop_sub"].lower()]
+            await route.fulfill(response=r, body=json.dumps(d), headers={**r.headers, "content-type": "application/json"})
+        await pg.route("**/api/data", reshuffle)
+        async def load_monthly():
+            await pg.reload(wait_until="load")
+            await pg.wait_for_function("allData && (readLoaded || syncBroken)", timeout=20000)
+            await pg.click('[data-tab="monthly"]'); await pg.wait_for_timeout(400)
+        kept_ids = lambda: pg.evaluate("[...document.querySelectorAll('#feed .kept-label ~ .item')].map(e => e.dataset.id)")
+        label = lambda: pg.inner_text("#progress-label")
+        await load_monthly()
+        live_n = await pg.evaluate("allData.monthly.length")
+        check("Unread posts that drop out stay, under their own label", sorted(await kept_ids()) == sorted(gone), f"{await kept_ids()} vs {gone}")
+        check("Label counts the kept posts", f"top {live_n} of" in await label() and "+ 2 kept" in await label(), await label())
+        check("Tab badge counts the kept posts", await pg.inner_text('[data-tab="monthly"] .count') == str(live_n + 2))
+        read_id = (await kept_ids())[0]
+        await pg.click('#feed .kept-label ~ .item [data-act="read"]'); await pg.wait_for_timeout(600)
+        check("Reading a kept post removes it", await kept_ids() == [x for x in gone if x != read_id] and "+ 1 kept" in await label(), await label())
+        await pg.evaluate("setShowRead(true)"); await pg.wait_for_timeout(300)
+        check("Eye button shows a read kept post", read_id in await kept_ids(), str(await kept_ids()))
+        await pg.evaluate("setShowRead(false)"); await pg.wait_for_timeout(300)
+        # Reviewer bug: a data reload right after marking read (resume after 20 min) must not lose it.
+        await pg.evaluate("readLoaded = true; loadData()"); await pg.wait_for_timeout(1500)
+        await pg.evaluate(f"setRead([{json.dumps(read_id)}], false)"); await pg.wait_for_timeout(600)
+        check("Undo after a data reload brings a kept post back", read_id in await kept_ids(), str(await kept_ids()))
+        await pg.click('[data-act="keptread"]'); await pg.wait_for_timeout(600)
+        check("'Mark these read' clears the section", await pg.locator("#feed .kept-label").count() == 0
+              and "kept" not in await label(), await label())
+        # Expiry counts from when a post LEFT the list: unread again, one left long ago.
+        await pg.evaluate(f"setRead({json.dumps(gone)}, false)"); await pg.wait_for_timeout(800)
+        await pg.evaluate(f"""(() => {{ const m = JSON.parse(localStorage.getItem('dr_kept'));
+            m.monthly[{json.dumps(gone[0])}].gone = '2020-01-01'; localStorage.setItem('dr_kept', JSON.stringify(m)); }})()""")
+        await load_monthly()
+        check("A kept post expires 30 days after it left", await kept_ids() == [gone[1]], str(await kept_ids()))
+        # A Yearly post the server moves into Monthly shows once, not kept in Yearly too.
+        mode["move"] = True
+        await load_monthly()
+        seen_ids = await pg.evaluate("[...document.querySelectorAll('#feed .item')].map(e => e.dataset.id)")
+        await pg.click('[data-tab="yearly"]'); await pg.wait_for_timeout(400)
+        seen_ids += await pg.evaluate("[...document.querySelectorAll('#feed .item')].map(e => e.dataset.id)")
+        check("A post moved between tabs shows once", seen_ids.count(mover) == 1, f"{seen_ids.count(mover)}x")
+        # Back in the live list = shown once, in its normal place.
+        mode.update(drop=False, move=False)
+        await load_monthly()
+        cards = await pg.evaluate("[...document.querySelectorAll('#feed .item')].map(e => e.dataset.id)")
+        check("A post back in the top 50 shows once, no kept section",
+              await pg.locator("#feed .kept-label").count() == 0 and len(cards) == len(set(cards)) and gone[1] in cards, f"{len(cards)} cards")
+        # A sub the server stopped tracking: its kept posts go too.
+        mode.update(drop=True, drop_sub=first["subs"][1])
+        await load_monthly()
+        want = [g for g, s in zip(gone, first["subs"]) if s.lower() != first["subs"][1].lower()]
+        check("Kept posts from a removed sub disappear", sorted(await kept_ids()) == sorted(want), f"{await kept_ids()} vs {want}")
+        await pg.evaluate(f"setRead({json.dumps(gone)}, false)")
+        check("No JS errors (kept)", not errs3, "; ".join(errs3)[:200])
+        await ctx.close()
         await b.close()
     print(f"\n{sum(results)}/{len(results)} passed")
     sys.exit(0 if all(results) else 1)

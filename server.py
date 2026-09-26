@@ -362,6 +362,9 @@ def get_data():
     data["yearly"] = yearly_all[:50]
     # How many posts the top 50 were picked from (the site says "top 50 of 582").
     data["totals"] = {"monthly": monthly_pool, "yearly": len(yearly_all), "news_days": NEWS_DAYS}
+    # The page keeps unread posts that drop out of the top 50 (index.html
+    # trackKept). This list lets it forget posts from a sub that was removed.
+    data["reddit_subs"] = sorted(TRACKED_SUBS) if TRACKED_SUBS else []
 
     stamps = reddit_list_stamps()
     updated["reddit"] = max(stamps.values()) if stamps else ""  # last Mac-browser save
