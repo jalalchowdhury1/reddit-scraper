@@ -108,6 +108,13 @@ def test_api_is_honest_and_has_no_repeats():
     assert len(d["monthly"]) == 50
     monthly_ids = {i["id"] for i in d["monthly"]}
     assert not any(i["id"] in monthly_ids for i in d["yearly"])
+    # News = a date window, not a count cap; Reddit tabs say what they were picked from.
+    import pandas as pd
+    cutoff = pd.Timestamp.now(tz="UTC") - pd.Timedelta(days=server.NEWS_DAYS, hours=1)
+    assert all(pd.Timestamp(i["ts"]) >= cutoff for i in d["news"])
+    assert d["totals"]["monthly"] >= len(d["monthly"]) and d["totals"]["yearly"] >= len(d["yearly"])
+    assert d["totals"]["news_days"] == server.NEWS_DAYS
+    assert not glob.glob(os.path.join(ROOT, "data/r_Fitness*"))   # dropped sub: no stale leftovers
     keys = [server.title_key(i["title"]) for i in d["news"]]
     assert len(keys) == len(set(keys))
     assert d["updated"]["news"].endswith("Z")

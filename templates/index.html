@@ -569,7 +569,12 @@ function setProgress(total, unread) {
     const row = document.getElementById('progress');
     row.style.display = total ? 'flex' : 'none';
     const done = total - unread;
-    document.getElementById('progress-label').textContent = unread ? `${unread} of ${total} left` : `All ${total} read`;
+    // Say what the list is: Monthly/Yearly are a top-50 pick, News is a date window.
+    const totals = (allData && allData.totals) || {};
+    let scope = '';
+    if (!query && total && (currentTab === 'monthly' || currentTab === 'yearly') && totals[currentTab] > total) scope = ` · top ${total} of ${totals[currentTab]}`;
+    if (!query && total && currentTab === 'news' && totals.news_days) scope = ` · last ${totals.news_days} days`;
+    document.getElementById('progress-label').textContent = (unread ? `${unread} of ${total} left` : `All ${total} read`) + scope;
     document.getElementById('progress-bar').style.width = total ? `${(done / total) * 100}%` : '0';
     const btn = document.getElementById('btn-markall');
     btn.disabled = !unread;

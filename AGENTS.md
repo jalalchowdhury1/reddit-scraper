@@ -207,6 +207,10 @@ articles. Extraction rules that exist for good reasons:
 - `GET /` → renders `templates/index.html` (the SPA).
 - `GET /api/data` → reads every CSV under `data/`, merges, and returns:
   `{ "monthly": [...], "yearly": [...], "news": [...], "ritholtz": [...] }`.
+  - **Tab sizes (26 Sep 2026):** Monthly/Yearly = top 50 (tier order), and `totals` says how
+    many they were picked from (the site shows "top 50 of 534"). News = every story from the
+    last `NEWS_DAYS` (7) days, no count cap. Before, every tab was a flat `[:50]`, so all three
+    read "50", which looked fake (News had 766 stories behind its 50).
   - Reddit: monthly from `data/r_*/posts.csv` (skips `_yearly`), yearly from
     `data/r_*_yearly/posts.csv`. Dedup on `(id, time_filter)`, sort by `score` desc.
   - News from `data/googlenews/articles.csv` (dedup `(article_id, category)`, sort `pub_date` desc).

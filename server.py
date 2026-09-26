@@ -88,6 +88,9 @@ def icon():
     return FileResponse(BASE_DIR / "server_assets" / "icon.png", media_type="image/png",
                         headers={"Cache-Control": "public, max-age=604800"})
 
+NEWS_DAYS = 7
+
+
 def shown_upvotes(row) -> str:
     """Reddit's own number, or "" (the card then shows the rank instead).
     `upvotes` column = real (Mac browser); else `score`, only if `score_real`
@@ -190,6 +193,10 @@ def get_data():
                 # marked read can't come back as "new" when a later copy lands.
                 news_df = news_df.assign(_key=news_df["title"].map(title_key))
                 news_df = news_df.sort_values("pub_date").drop_duplicates(subset=["_key"], keep="first")
+                # News = every story from the last NEWS_DAYS days, no count cap, so
+                # the tab's number is the real volume (it was a flat 50 until 26 Sep 2026).
+                when = pd.to_datetime(news_df["pub_date"], utc=True, errors="coerce")
+                news_df = news_df[when >= pd.Timestamp.now(tz="UTC") - pd.Timedelta(days=NEWS_DAYS)]
                 news_df = news_df.sort_values("pub_date", ascending=False)
                 for _, row in news_df.iterrows():
                     pid = f"gn_{row['article_id']}"
@@ -282,7 +289,8 @@ def get_data():
         data["ritholtz"].sort(key=extract_date_from_meta, reverse=True)
 
     yearly_pool = list(data["yearly"])  # before the cap, so Yearly can backfill
-    for k in data:
+    monthly_pool = len(data["monthly"])
+    for k in ("monthly", "ritholtz"):   # News is capped by date instead (NEWS_DAYS)
         data[k] = data[k][:50]
 
     # One of each across tabs: a post already in Monthly's list isn't repeated
@@ -290,6 +298,8 @@ def get_data():
     monthly_ids = {i["id"] for i in data["monthly"]}
     yearly_all = [i for i in yearly_pool if i["id"] not in monthly_ids]
     data["yearly"] = yearly_all[:50]
+    # How many posts the top 50 were picked from (the site says "top 50 of 582").
+    data["totals"] = {"monthly": monthly_pool, "yearly": len(yearly_all), "news_days": NEWS_DAYS}
 
     data["updated"] = updated  # when each feed last landed (UTC ISO)
     return data
