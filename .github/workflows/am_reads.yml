@@ -1,0 +1,62 @@
+name: Morning AM Reads
+# Ritholtz publishes AM Reads / Weekend Reads at ~6:30 AM US/Eastern.
+# The nightly job (daily_scrape.yml, 03:00 UTC = 11 PM ET) therefore always
+# grabbed the PREVIOUS morning's list, so the site showed yesterday's reads
+# every morning. This job re-checks after the post goes up.
+# 11:45 UTC = 7:45 AM EDT / 6:45 AM EST; 13:30 and 15:30 UTC are retries
+# (GitHub cron often starts 1-2h late). Public repo = no Actions minutes cost.
+on:
+  schedule:
+    - cron: '45 11 * * *'
+    - cron: '30 13 * * *'
+    - cron: '30 15 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: am-reads
+  cancel-in-progress: false
+
+jobs:
+  am-reads:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.10'
+
+      - name: Install dependencies
+        timeout-minutes: 4
+        run: pip install -r requirements-scraper.txt
+
+      - name: Scrape AM Reads + SatPost
+        timeout-minutes: 3
+        run: |
+          python core/scrape_ritholtz.py
+          python core/scrape_trung.py
+
+      - name: Commit if the list changed
+        timeout-minutes: 2
+        run: |
+          git config --global user.name 'github-actions[bot]'
+          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+          git add -f data/ritholtz/ data/trung/
+          if git diff --cached --quiet; then
+            echo "NO CHANGE: AM Reads already current"
+            exit 0
+          fi
+          git commit -m "Morning AM Reads update"
+          # The nightly job may have pushed meanwhile; rebase and retry.
+          ok=0
+          for i in 1 2 3; do
+            git pull --rebase -X theirs origin main && git push && { ok=1; break; }
+            git rebase --abort 2>/dev/null || true
+            sleep 5
+          done
+          [ "$ok" = 1 ] || { echo "PUSH FAILED after 3 tries"; exit 1; }
+          echo "AM READS PUSHED: $(git rev-parse --short HEAD)"

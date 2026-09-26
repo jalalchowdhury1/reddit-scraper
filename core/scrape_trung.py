@@ -76,6 +76,13 @@ def scrape_satpost():
     if articles:
         os.makedirs(OUTPUT_DIR, exist_ok=True)
         df = pd.DataFrame(articles)
+        # Same issues as on disk -> don't rewrite (scraped_at would make a no-op commit).
+        try:
+            if list(pd.read_csv(OUTPUT_FILE)["article_id"]) == list(df["article_id"]):
+                print("SatPost unchanged, file left alone")
+                return
+        except Exception:
+            pass
         df.to_csv(OUTPUT_FILE, index=False)
         print(f"Successfully saved {len(articles)} SatPost articles to {OUTPUT_FILE}")
     else:

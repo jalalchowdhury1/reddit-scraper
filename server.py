@@ -3,7 +3,9 @@ import re
 from pathlib import Path
 import pandas as pd
 from fastapi import FastAPI, Request
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, FileResponse, Response
+from datetime import datetime, timedelta
+from urllib.parse import urlparse
 from fastapi.templating import Jinja2Templates
 import glob
 import logging
@@ -16,13 +18,25 @@ templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
 
 def clean_text(text) -> str:
     if pd.isna(text) or not text: return ""
-    return html.unescape(str(text))
+    # Ritholtz blurbs end with an empty "( )" where the source link was.
+    return re.sub(r"\s*\(\s*\)", "", html.unescape(str(text))).strip()
 
 def format_score(score: int) -> str:
     """Format large scores with 'k' suffix (e.g., 82450 -> 82.4k)"""
     if score >= 1000:
         return f"{score / 1000:.1f}k"
     return str(score)
+
+def domain_of(url: str) -> str:
+    """'https://www.wsj.com/x' -> 'wsj.com' (used for favicons + source label)."""
+    try:
+        host = urlparse(str(url)).netloc.lower()
+    except Exception:
+        return ""
+    for pre in ("www.", "m.", "amp."):
+        if host.startswith(pre):
+            host = host[len(pre):]
+    return host
 
 def calculate_reading_time(text: str) -> int:
     """Calculate estimated reading time in minutes based on word count."""
@@ -35,6 +49,22 @@ def calculate_reading_time(text: str) -> int:
 @app.get("/", response_class=HTMLResponse)
 async def read_root(request: Request):
     return templates.TemplateResponse(request=request, name="index.html")
+
+# PWA files. vercel.json routes EVERYTHING to this app, so without these the
+# manifest / service worker / icon all 404'd and "Add to Home Screen" was broken.
+@app.get("/manifest.json")
+def manifest():
+    return FileResponse(BASE_DIR / "manifest.json", media_type="application/manifest+json")
+
+@app.get("/sw.js")
+def service_worker():
+    return FileResponse(BASE_DIR / "sw.js", media_type="application/javascript",
+                        headers={"Cache-Control": "no-cache", "Service-Worker-Allowed": "/"})
+
+@app.get("/icon.png")
+def icon():
+    return FileResponse(BASE_DIR / "server_assets" / "icon.png", media_type="image/png",
+                        headers={"Cache-Control": "public, max-age=604800"})
 
 @app.get("/api/data")
 def get_data():
@@ -87,7 +117,10 @@ def get_data():
                     "title": clean_text(row['title']), 
                     "desc": clean_text(selftext[:300]),
                     "url": clean_url,
-                    "meta": f"r/{row['subreddit']} • {row['time_filter'].upper()} • {format_score(row['score'])} pts • ⏱️ {read_time} min"
+                    "meta": f"r/{row['subreddit']} • {row['time_filter'].upper()} • {format_score(row['score'])} pts • ⏱️ {read_time} min",
+                    "source": f"r/{row['subreddit']}",
+                    "domain": "reddit.com",
+                    "mins": read_time,
                 }
                 data[row['time_filter']].append(item)
 
@@ -110,7 +143,12 @@ def get_data():
                         "title": clean_text(row['title']), 
                         "desc": clean_text(description[:300]),
                         "url": str(row['url']).replace("http://", "https://"), 
-                        "meta": f"{publisher} • {row.get('category', '').upper()} • {str(row.get('pub_date', ''))[:10]} • ⏱️ {read_time} min"
+                        "meta": f"{publisher} • {row.get('category', '').upper()} • {str(row.get('pub_date', ''))[:10]} • ⏱️ {read_time} min",
+                        "source": str(row.get('author', '')) or domain_of(row.get('url', '')),
+                        "category": str(row.get('category', '')),
+                        "domain": domain_of(row.get('url', '')),
+                        "date": str(row.get('pub_date', ''))[:10],
+                        "mins": read_time,
                     })
         except: pass
 
@@ -123,6 +161,8 @@ def get_data():
                 rith_df = rith_df.drop_duplicates(subset=["article_id"], keep="first")
                 for _, row in rith_df.iterrows():
                     pid = f"rth_{row['article_id']}"
+                    post_date = str(row.get('pub_date', ''))[:10]
+                    label = "WEEKEND READS" if "weekend-reads" in str(row.get('source_post', '')) else "AM READS"
                     description = str(row.get('description', ''))
                     read_time = calculate_reading_time(description)
                     
@@ -131,7 +171,14 @@ def get_data():
                         "title": clean_text(row['title']), 
                         "desc": clean_text(description[:300]),
                         "url": row['url'], 
-                        "meta": f"AM READS • {str(row.get('pub_date', ''))[:10]} • ⏱️ {read_time} min"
+                        "meta": f"{label} • {post_date} • ⏱️ {read_time} min",
+                        "source": str(row.get('author', '')) or domain_of(row['url']),
+                        "domain": domain_of(row['url']),
+                        # date = the day Ritholtz PUBLISHED the list (US/Eastern). The
+                        # frontend shows only today's list; older ones stay hidden.
+                        "date": post_date,
+                        "kind": label,
+                        "mins": read_time,
                     })
         except: pass
 
@@ -142,6 +189,10 @@ def get_data():
             trung_df = pd.read_csv(trung_csv).fillna("")
             if not trung_df.empty and "article_id" in trung_df.columns:
                 trung_df = trung_df.drop_duplicates(subset=["article_id"], keep="first")
+                # The RSS feed holds ~20 back issues (January onward). Only the last
+                # week's issue belongs next to today's AM Reads.
+                cutoff = (datetime.utcnow() - timedelta(days=7)).strftime("%Y-%m-%d")
+                trung_df = trung_df[trung_df["pub_date"].astype(str).str[:10] >= cutoff]
                 for _, row in trung_df.iterrows():
                     pid = f"trg_{row['article_id']}"
                     description = str(row.get('description', ''))
@@ -152,7 +203,12 @@ def get_data():
                         "title": clean_text(row['title']), 
                         "desc": clean_text(description[:300]),
                         "url": row['url'], 
-                        "meta": f"SATPOST • {str(row.get('pub_date', ''))[:10]} • ⏱️ {read_time} min"
+                        "meta": f"SATPOST • {str(row.get('pub_date', ''))[:10]} • ⏱️ {read_time} min",
+                        "source": "SatPost",
+                        "domain": domain_of(row['url']),
+                        "date": str(row.get('pub_date', ''))[:10],
+                        "kind": "SATPOST",
+                        "mins": read_time,
                     })
         except: pass
 

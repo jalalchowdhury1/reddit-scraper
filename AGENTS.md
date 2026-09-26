@@ -125,6 +125,26 @@ articles. Extraction rules that exist for good reasons:
 - Strict title dedup (lowercased) within a run; **hard cap of 12 items**.
 - `article_id = md5(f"{url}_{title}")[:12]`. Falls back to a link-based pass if the `<li>` pass
   finds nothing.
+- **(2026-09-26) Only today's list, only once.** The user wants AM Reads to show *today's* list
+  only, with no repeats. Rules that enforce it, do not regress:
+  - `pub_date` = the post's real `article:published_time` in US/Eastern (it used to be the
+    scrape time, so a Friday list scraped after midnight UTC read as Saturday).
+  - Titles are cleaned of zero-width chars (`\u200b• Title` defeated the old bullet strip).
+  - In-post dedup by normalized URL **or** normalized title (`dedupe_articles`).
+  - Promo lines are dropped (`JUNK_TITLE_RE` / `JUNK_URL_RE`: "Video of the day", Masters in
+    Business plugs, "Previous Post", "To learn how these reads are assembled"...).
+  - Cross-day repeats: `data/ritholtz/seen.json` remembers every article key shown (45 days,
+    seeded from git history). An article already shown by an EARLIER post is skipped; re-running
+    the same post keeps it. `data/` is gitignored as a dir, so this file needs `git add -f`.
+  - Unchanged post -> the CSV is not rewritten (no empty commits from the morning job).
+  - **Timing:** Ritholtz posts ~6:30 AM ET, but the nightly job runs 11 PM ET, so it always
+    caught the *previous* morning's list. `.github/workflows/am_reads.yml` re-scrapes
+    ritholtz + trung at 11:45 / 13:30 / 15:30 UTC and commits only on change (public repo, so
+    no Actions-minutes cost).
+  - Frontend shows only items whose `date` is today (US/Eastern). Sunday also shows Saturday's
+    Weekend Reads. Otherwise an empty state with an opt-in "Show <day>'s list" button.
+  - SatPost (`scrape_trung.py`) keeps ~20 back issues in its CSV; `server.py` only serves the
+    last 7 days of them. Tests: `python -m pytest tests -q`.
 
 ---
 
@@ -185,7 +205,8 @@ streamlit run dashboard.py
   on normal days — while `workflow_dispatch` always runs. Checkout uses `fetch-depth: 50` because
   the guard needs history to find the last `data/` commit; a `concurrency: daily-scrape` group
   (no cancel) serializes a badly delayed 03:00 cron against the 09:00 retry.
-- There is **no test/lint workflow and no test suite.**
+- There is **no test/lint workflow**. `tests/test_am_reads.py` covers the AM Reads dedup/cleanup
+  helpers (`python -m pytest tests -q`).
 
 ### Dependency split (3 files — keep them split, see §5)
 - `requirements.txt` — **production/Vercel minimal**: `fastapi, uvicorn, Jinja2, pydantic,
@@ -308,10 +329,16 @@ streamlit run dashboard.py
 **Live production path (touch these for real changes):**
 - `server.py` — FastAPI app: `GET /` (SPA) + `GET /api/data` (merges all CSVs → JSON). Helpers
   `format_score`, `calculate_reading_time`, `clean_text`.
-- `templates/index.html` — the whole SPA: 5 tabs, Tailwind (CDN), Firebase init + Firestore sync,
-  read/favorite logic, mute filter, PWA registration.
+- `templates/index.html` — the whole SPA (rewritten 2026-09-26, plain CSS tokens, no Tailwind):
+  5 tabs with unread counts, progress bar + Mark all read (with Undo), swipe left = read /
+  right = favorite, opening a link marks it read, search across all tabs, text size + light/dark/auto,
+  j/k/o/r/f keys, remembers tab + scroll, re-fetches when resumed after 20 min. Firebase paths
+  unchanged. It is a Jinja template: never write `{{` or `{%` in its JS.
 - `server_assets/style.css` — extra styles served alongside the SPA.
-- `manifest.json` + `sw.js` — PWA manifest + offline-cache service worker (cache `daily-reader-v1`).
+- `manifest.json` + `sw.js` — PWA manifest + **network-first** service worker (cache `daily-reader-v2`;
+  cache is only the offline fallback). `server.py` serves `/manifest.json`, `/sw.js`, `/icon.png`
+  (`server_assets/icon.png`); before 2026-09-26 all three 404'd because `vercel.json` routes
+  everything to FastAPI.
 - `core/scrape_top.py` — triple-redundant Reddit scraper + synthetic scoring (`SUBREDDITS`,
   `SUBREDDIT_TIERS`, `HEADERS`). **Authoritative subreddit list.**
 - `core/scrape_ritholtz.py` — AM Reads / Weekend Reads scraper (12-item cap, dedup rules).

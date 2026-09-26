@@ -1,440 +1,702 @@
 <!DOCTYPE html>
-<html lang="en" class="bg-black text-zinc-300">
+<html lang="en" data-theme="auto" data-size="m">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>Daily Reader</title>
-    <link rel="manifest" href="manifest.json">
-    <meta name="theme-color" content="#000000">
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#111113">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="Daily Reader">
-    <link rel="apple-touch-icon" href="icon.png">
-    <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Firebase SDKs -->
+    <link rel="apple-touch-icon" href="/icon.png">
+    <link rel="icon" href="/icon.png">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,500;0,600;1,400&family=Geist:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@phosphor-icons/web@2.1.1/src/regular/style.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@phosphor-icons/web@2.1.1/src/fill/style.css">
+    <!-- Firebase SDKs (read/favorite sync across devices) -->
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,500;0,600;1,400&family=Inter:wght@300;400;500;600&display=swap');
-        
-        .font-editorial { font-family: 'Lora', serif; }
-        .font-sans { font-family: 'Inter', sans-serif; }
-        
-        body { background-color: #000000; color: #d4d4d8; }
-        .line-clamp-2 { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-        .feed-divider { background: #27272a; height: 1px; width: 100%; }
-        .tab-active { color: #f4f4f5; border-bottom: 1px solid #f4f4f5; }
-        
-        /* Active state styling */
-        .active-fav { color: #fbbf24 !important; /* gold */ }
-        .active-read { color: #34d399 !important; /* green */ }
-        .dimmed-read-post { opacity: 0.5; }
-        
-        /* Unread item visual cue */
-        .unread-item { border-left: 2px solid rgba(59, 130, 246, 0.5); }
-        .unread-item:hover { background-color: rgba(30, 30, 40, 0.3); }
-        
-        /* Default button states */
-        .fav-btn { color: #3f3f46; }
-        .fav-btn:hover { color: #a1a1aa; }
-        .read-btn { color: #71717a; }
-        .read-btn:hover { color: #d4d4d8; }
-        
-        /* Dimming for RSS/dummy scores */
-        .post-meta { font-family: monospace; font-size: 0.85rem; color: #888; }
-        
-        /* Hide scrollbar for Chrome, Safari and Opera */
-        .hide-scrollbar::-webkit-scrollbar {
-            display: none;
+        /* ---------- Tokens: one accent (amber), dark default, light + auto ---------- */
+        :root {
+            --bg: #111113; --surface: #19191c; --surface-2: #202024; --line: #2a2a2f;
+            --text: #ededef; --muted: #a1a1aa; --faint: #8b8b94;
+            --accent: #f59e0b; --accent-soft: rgba(245, 158, 11, .14); --on-accent: #1a1204;
+            --title: 1.06rem; --desc: .84rem;
+            --radius: 14px;
+            --safe-top: env(safe-area-inset-top, 0px);
+            --safe-bottom: env(safe-area-inset-bottom, 0px);
         }
-        /* Hide scrollbar for IE, Edge and Firefox */
-        .hide-scrollbar {
-            -ms-overflow-style: none;  /* IE and Edge */
-            scrollbar-width: none;  /* Firefox */
+        @media (prefers-color-scheme: light) {
+            :root[data-theme="auto"] {
+                --bg: #f6f6f7; --surface: #ffffff; --surface-2: #eeeef0; --line: #e1e1e5;
+                --text: #18181b; --muted: #52525b; --faint: #676770;
+                --accent: #b45309; --accent-soft: rgba(180, 83, 9, .10); --on-accent: #ffffff;
+            }
+        }
+        :root[data-theme="light"] {
+            --bg: #f6f6f7; --surface: #ffffff; --surface-2: #eeeef0; --line: #e1e1e5;
+            --text: #18181b; --muted: #52525b; --faint: #676770;
+            --accent: #b45309; --accent-soft: rgba(180, 83, 9, .10); --on-accent: #ffffff;
+        }
+        :root[data-size="s"] { --title: .98rem; --desc: .8rem; }
+        :root[data-size="l"] { --title: 1.2rem; --desc: .94rem; }
+
+        * { box-sizing: border-box; }
+        html, body { margin: 0; background: var(--bg); color: var(--text); }
+        body { font-family: 'Geist', system-ui, -apple-system, sans-serif; -webkit-font-smoothing: antialiased; -webkit-tap-highlight-color: transparent; }
+        button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; padding: 0; }
+        button:focus-visible, a:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 8px; }
+        .wrap { max-width: 760px; margin: 0 auto; padding: 0 16px calc(96px + var(--safe-bottom)); }
+
+        /* ---------- Header ---------- */
+        header { position: sticky; top: 0; z-index: 20; background: color-mix(in srgb, var(--bg) 88%, transparent);
+                 backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+                 padding-top: calc(12px + var(--safe-top)); margin: 0 -16px; padding-left: 16px; padding-right: 16px;
+                 border-bottom: 1px solid var(--line); }
+        .topbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+        .today { font-family: 'Lora', serif; font-size: 1.28rem; font-weight: 500; letter-spacing: -.01em; }
+        .tools { display: flex; gap: 2px; }
+        .icon-btn { width: 40px; height: 40px; border-radius: 999px; display: grid; place-items: center; color: var(--muted); font-size: 1.2rem; transition: background .2s, color .2s, transform .1s; }
+        .icon-btn:hover { background: var(--surface-2); color: var(--text); }
+        .icon-btn:active { transform: scale(.94); }
+        .icon-btn.on { color: var(--accent); }
+
+        .tabs { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; margin: 12px -16px 0; padding: 0 16px 10px; }
+        .tabs::-webkit-scrollbar { display: none; }
+        .tab { flex-shrink: 0; height: 34px; padding: 0 13px; border-radius: 999px; font-size: .86rem; font-weight: 500; color: var(--muted);
+               border: 1px solid var(--line); display: inline-flex; align-items: center; gap: 7px; transition: all .2s; }
+        .tab:hover { color: var(--text); }
+        .tab .count { font-size: .74rem; color: var(--faint); font-variant-numeric: tabular-nums; }
+        .tab.active { background: var(--text); color: var(--bg); border-color: var(--text); }
+        .tab.active .count { color: var(--bg); opacity: .65; }
+
+        .progress-row { display: flex; align-items: center; gap: 12px; padding: 2px 0 12px; font-size: .8rem; color: var(--muted); }
+        .progress-row .label { font-variant-numeric: tabular-nums; white-space: nowrap; }
+        .bar { flex: 1; height: 3px; border-radius: 999px; overflow: hidden; background: var(--line); }
+        .bar > span { display: block; height: 100%; width: 0; background: var(--accent); transition: width .5s cubic-bezier(.16,1,.3,1); }
+        .text-btn { font-size: .8rem; font-weight: 500; color: var(--accent); white-space: nowrap; padding: 6px 2px; }
+        .text-btn:disabled { color: var(--faint); cursor: default; }
+
+        .search { display: none; padding: 0 0 12px; }
+        .search.open { display: block; }
+        .search label { display: block; font-size: .74rem; color: var(--muted); margin-bottom: 6px; }
+        .search input { width: 100%; height: 42px; padding: 0 14px; border-radius: 12px; border: 1px solid var(--line); background: var(--surface); color: var(--text); font: inherit; font-size: 16px; }
+        .search input::placeholder { color: var(--faint); }
+
+        /* ---------- Feed ---------- */
+        #feed { margin-top: 10px; }
+        .section-label { font-size: .78rem; color: var(--muted); padding: 18px 4px 6px; display: flex; align-items: center; gap: 8px; }
+        .item { position: relative; border-radius: var(--radius); overflow: hidden; margin: 2px 0; }
+        .swipe-bg { position: absolute; inset: 0; display: flex; justify-content: space-between; align-items: center; padding: 0 22px; font-size: 1.35rem; opacity: 0; }
+        .swipe-bg .fav { color: var(--accent); }
+        .swipe-bg .read { color: var(--text); }
+        .item-inner { position: relative; display: flex; gap: 12px; padding: 14px 12px 14px 14px; background: var(--bg); touch-action: pan-y; transition: transform .28s cubic-bezier(.16,1,.3,1), background .2s; }
+        .item.swiping .item-inner { transition: none; }
+        .item:hover .item-inner { background: var(--surface); }
+        .item.focused .item-inner { background: var(--surface); box-shadow: inset 2px 0 0 var(--accent); }
+        .item.unread .item-inner::before { content: ""; position: absolute; left: 4px; top: 20px; width: 4px; height: 4px; border-radius: 999px; background: var(--accent); }
+        .item.read .item-main { opacity: .45; }
+        .item-main { flex: 1; min-width: 0; }
+        .src { display: flex; align-items: center; gap: 7px; font-size: .75rem; color: var(--muted); margin-bottom: 5px; min-width: 0; }
+        .src img { width: 14px; height: 14px; border-radius: 3px; flex-shrink: 0; background: var(--surface-2); }
+        .src .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500; }
+        .item-title { display: block; font-family: 'Lora', serif; font-size: var(--title); font-weight: 500; line-height: 1.38; color: var(--text); text-decoration: none; text-wrap: pretty; }
+        .item-title:visited { color: var(--text); }
+        .item-title:hover { color: var(--accent); }
+        .desc { margin: 6px 0 0; font-size: var(--desc); color: var(--muted); line-height: 1.5; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+        .meta { margin-top: 7px; font-size: .74rem; color: var(--faint); font-variant-numeric: tabular-nums; }
+        .actions { display: flex; flex-direction: column; gap: 2px; flex-shrink: 0; }
+        .actions .icon-btn { width: 38px; height: 38px; font-size: 1.15rem; color: var(--faint); }
+        .actions .icon-btn.fav-on { color: var(--accent); }
+        .actions .icon-btn.read-on { color: var(--text); }
+
+        /* ---------- States ---------- */
+        .state { text-align: left; padding: 40px 8px; }
+        .state i { font-size: 2rem; color: var(--accent); }
+        .state h2 { font-family: 'Lora', serif; font-weight: 500; font-size: 1.3rem; margin: 12px 0 6px; }
+        .state p { color: var(--muted); font-size: .9rem; line-height: 1.55; margin: 0 0 16px; max-width: 52ch; }
+        .pill-btn { height: 40px; padding: 0 16px; border-radius: 999px; border: 1px solid var(--line); background: var(--surface); font-size: .86rem; font-weight: 500; display: inline-flex; align-items: center; gap: 8px; }
+        .pill-btn:active { transform: scale(.98); }
+        .skeleton { padding: 16px 14px; }
+        .skeleton div { background: var(--surface-2); border-radius: 6px; height: 12px; margin-bottom: 9px; animation: pulse 1.4s ease-in-out infinite; }
+        @keyframes pulse { 50% { opacity: .45; } }
+
+        /* ---------- Toast ---------- */
+        .toast { position: fixed; left: 50%; bottom: calc(22px + var(--safe-bottom)); transform: translate(-50%, 20px); opacity: 0; pointer-events: none;
+                 background: var(--text); color: var(--bg); border-radius: 999px; padding: 10px 10px 10px 18px; display: flex; align-items: center; gap: 14px;
+                 font-size: .86rem; box-shadow: 0 10px 30px rgba(0,0,0,.25); transition: all .3s cubic-bezier(.16,1,.3,1); z-index: 40; max-width: calc(100vw - 32px); }
+        .toast.show { opacity: 1; transform: translate(-50%, 0); pointer-events: auto; }
+        .toast button { font-weight: 600; color: var(--bg); background: color-mix(in srgb, var(--bg) 14%, transparent); border-radius: 999px; padding: 6px 12px; }
+
+        footer { margin-top: 36px; padding-top: 16px; border-top: 1px solid var(--line); display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; font-size: .8rem; color: var(--faint); }
+        footer button { color: var(--accent); font-size: .8rem; }
+        @media (max-width: 700px) { .hide-mobile { display: none; } }
+        kbd { font-family: inherit; font-size: .72rem; border: 1px solid var(--line); border-radius: 4px; padding: 0 4px; }
+
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after { transition: none !important; animation: none !important; }
         }
     </style>
-
 </head>
-<body class="antialiased selection:bg-zinc-800 font-sans">
-
-    <div class="max-w-6xl mx-auto px-6 pt-8 pb-24 relative">
-        
-        <div class="sticky top-0 z-50 flex justify-between items-center border-b border-zinc-800/40 pb-3 mb-8 pt-8 -mt-8 bg-black/70 backdrop-blur-md transition-all">
-            <div class="flex space-x-6 overflow-x-auto hide-scrollbar text-[0.75rem] font-medium text-zinc-500 uppercase tracking-widest flex-1 pr-4" id="tabs">
-                <button onclick="switchTab('monthly')" id="tab-monthly" class="tab-active pb-3 flex-shrink-0 transition-colors hover:text-zinc-300">Monthly</button>
-                <button onclick="switchTab('yearly')" id="tab-yearly" class="pb-3 flex-shrink-0 transition-colors hover:text-zinc-300">Yearly</button>
-                <button onclick="switchTab('news')" id="tab-news" class="pb-3 flex-shrink-0 transition-colors hover:text-zinc-300">Google News</button>
-                <button onclick="switchTab('ritholtz')" id="tab-ritholtz" class="pb-3 flex-shrink-0 transition-colors hover:text-zinc-300">AM Reads</button>
-                <button onclick="switchTab('favorites')" id="tab-favorites" class="pb-3 flex-shrink-0 transition-colors hover:text-amber-600">★ Favorites <span id="fav-count" class="ml-1 opacity-60 lowercase pointer-events-none"></span></button>
-            </div>
-            
-            <div style="display: inline-flex; align-items: center; opacity: 0.4; margin-left: auto; padding-left: 10px;" title="Show Read Items">
-                <input type="checkbox" id="showReadToggle" onclick="toggleShowRead()" style="accent-color: #555; width: 14px; height: 14px; margin: 0; cursor: pointer; filter: grayscale(100%);">
+<body>
+<div class="wrap">
+    <header>
+        <div class="topbar">
+            <div class="today" id="today">Daily Reader</div>
+            <div class="tools">
+                <button class="icon-btn" id="btn-search" title="Search everything ( / )" aria-label="Search"><i class="ph ph-magnifying-glass"></i></button>
+                <button class="icon-btn" id="btn-showread" title="Show read items" aria-label="Show read items"><i class="ph ph-eye-slash"></i></button>
+                <button class="icon-btn" id="btn-size" title="Text size" aria-label="Text size"><i class="ph ph-text-aa"></i></button>
+                <button class="icon-btn" id="btn-theme" title="Theme" aria-label="Theme"><i class="ph ph-circle-half"></i></button>
             </div>
         </div>
+        <nav class="tabs" id="tabs" aria-label="Sections"></nav>
+        <div class="search" id="search">
+            <label for="searchInput">Search every tab</label>
+            <input id="searchInput" type="search" placeholder="Title, source, subreddit" autocomplete="off">
+        </div>
+        <div class="progress-row" id="progress">
+            <span class="label" id="progress-label"></span>
+            <div class="bar"><span id="progress-bar"></span></div>
+            <button class="text-btn" id="btn-markall">Mark all read</button>
+        </div>
+    </header>
 
-        <!-- Search Input for Favorites Tab -->
-        <input type="text" id="favoritesSearch" placeholder="Type to filter favorites..." style="display: none; width: 100%; padding: 10px 0; margin-bottom: 25px; background: transparent; color: #fff; border: none; border-bottom: 1px solid #333; border-radius: 0; font-size: 0.95em; outline: none; opacity: 0.6; transition: opacity 0.2s;" onfocus="this.style.opacity='1'" onblur="this.style.opacity='0.6'">
+    <main id="feed" aria-live="polite"></main>
 
-        <div id="feed" class="space-y-0"></div>
+    <footer id="footer">
+        <span>Sync key <strong id="sync-key"></strong> · <button id="btn-link">Link another device</button></span>
+        <span class="hide-mobile">Keys: <kbd>j</kbd> <kbd>k</kbd> move, <kbd>o</kbd> open, <kbd>r</kbd> read, <kbd>f</kbd> favorite</span>
+    </footer>
+</div>
+<div class="toast" id="toast" role="status"><span id="toast-msg"></span><button id="toast-undo">Undo</button></div>
 
-        <!-- Sync Settings UI (Footer) -->
-        <div id="syncUI" style="display: none; justify-content: space-between; align-items: center; margin-top: 40px; padding-top: 20px; border-top: 1px solid #27272a; font-size: 0.85em; color: #71717a;"></div>
-    </div>
+<script>
+// ============================================================================
+// FIREBASE (unchanged data layout: sync_groups/{key}/favorites + read_posts)
+// ============================================================================
+const firebaseConfig = {
+    apiKey: "AIzaSyCUpI5Fzax4MmiwF5ihZZAx5brEd0dOmSE",
+    authDomain: "dailyreadersync.firebaseapp.com",
+    projectId: "dailyreadersync",
+    storageBucket: "dailyreadersync.firebasestorage.app",
+    messagingSenderId: "132679444670",
+    appId: "1:132679444670:web:d6eede43f3dbb47a6616ef",
+    measurementId: "G-5CWJLL7L66"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+const auth = firebase.auth();
 
-    <script>
-        // --- FIREBASE CONFIG & INITIALIZATION ---
-        const firebaseConfig = {
-            apiKey: "AIzaSyCUpI5Fzax4MmiwF5ihZZAx5brEd0dOmSE",
-            authDomain: "dailyreadersync.firebaseapp.com",
-            projectId: "dailyreadersync",
-            storageBucket: "dailyreadersync.firebasestorage.app",
-            messagingSenderId: "132679444670",
-            appId: "1:132679444670:web:d6eede43f3dbb47a6616ef",
-            measurementId: "G-5CWJLL7L66"
-        };
+// localStorage can throw (private mode); never let that break the page.
+const store = {
+    get(k, d) { try { const v = localStorage.getItem(k); return v === null ? d : JSON.parse(v); } catch { return d; } },
+    set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} },
+    raw(k) { try { return localStorage.getItem(k); } catch { return null; } },
+};
 
-        firebase.initializeApp(firebaseConfig);
-        const db = firebase.firestore();
-        const auth = firebase.auth();
+let cloudFavorites = [];
+let cloudReadPosts = new Set();
+let syncKey = store.raw('dailyReaderSyncKey');
 
-        let cloudFavorites = []; // Will hold our synced data locally for fast UI renders
-        let cloudReadPosts = new Set(); // Will hold our synced read posts locally for fast UI renders
-        let syncKey = localStorage.getItem('dailyReaderSyncKey');
+const col = (name) => db.collection('sync_groups').doc(syncKey).collection(name);
 
-        // --- FIREBASE SYNC FUNCTIONS ---
-        function initSync() {
-            if (!syncKey) {
-                // Generate a random 6-character alphanumeric key
-                syncKey = Math.random().toString(36).substring(2, 8).toUpperCase();
-                localStorage.setItem('dailyReaderSyncKey', syncKey);
-            }
-            
-            auth.signInAnonymously().then(() => {
-                console.log("Connected to Cloud Sync. Key:", syncKey);
-                migrateLocalToCloud(); // Run migration once
-                listenToFavorites(); // Start real-time sync
-                listenToReadPosts(); // Start real-time sync for read posts
-            }).catch(error => console.error("Sync Auth Failed:", error));
-        }
-
-        function migrateLocalToCloud() {
-            let localFavs = JSON.parse(localStorage.getItem('favorites') || '[]');
-            if (localFavs.length > 0) {
-                const batch = db.batch();
-                localFavs.forEach(item => {
-                    // Use a safe ID (hash the URL or title)
-                    const safeId = (item.url || item.title).replace(/[^a-zA-Z0-9]/g, '');
-                    const docRef = db.collection('sync_groups').doc(syncKey).collection('favorites').doc(safeId);
-                    batch.set(docRef, item);
-                });
-                batch.commit().then(() => {
-                    console.log("Migrated local favorites to cloud.");
-                    localStorage.removeItem('favorites'); // Clear local so we rely on cloud
-                });
-            }
-            
-            // Migrate local read posts to cloud
-            let localRead = JSON.parse(localStorage.getItem('reddit_dash_read') || '[]');
-            if (localRead.length > 0) {
-                const readBatch = db.batch();
-                localRead.forEach(id => {
-                    const docRef = db.collection('sync_groups').doc(syncKey).collection('read_posts').doc(String(id));
-                    readBatch.set(docRef, { readAt: new Date().toISOString() });
-                });
-                readBatch.commit().then(() => {
-                    localStorage.removeItem('reddit_dash_read');
-                });
-            }
-        }
-
-        function listenToFavorites() {
-            db.collection('sync_groups').doc(syncKey).collection('favorites')
-                .onSnapshot((snapshot) => {
-                    cloudFavorites = [];
-                    snapshot.forEach((doc) => {
-                        cloudFavorites.push(doc.data());
-                    });
-                    // Re-render feed if we are on the favorites tab, or if buttons need updating
-                    updateFavoritesCount();
-                    renderFeed(); 
-                });
-        }
-
-        function updateFavoritesCount() {
-            const countElement = document.getElementById('fav-count');
-            if (!countElement) return;
-            
-            const unreadCount = cloudFavorites.filter(item => !cloudReadPosts.has(String(item.id))).length;
-            countElement.textContent = unreadCount > 0 ? `(${unreadCount})` : '';
-        }
-
-        function listenToReadPosts() {
-            db.collection('sync_groups').doc(syncKey).collection('read_posts')
-                .onSnapshot((snapshot) => {
-                    cloudReadPosts.clear();
-                    snapshot.forEach((doc) => {
-                        cloudReadPosts.add(doc.id);
-                    });
-                    updateFavoritesCount();
-                    renderFeed();
-                });
-        }
-
-        // --- 1. INITIALIZE LOCAL STATE ---
-        let showRead = JSON.parse(localStorage.getItem('reddit_dash_show_read')) || false;
-        let allData = { monthly: [], yearly: [], news: [], ritholtz: [] };
-        let currentTab = 'monthly';
-
-        // --- 1.5. SEARCH INPUT EVENT LISTENER ---
-        document.getElementById('favoritesSearch').addEventListener('input', () => {
-            renderFeed();
+function initSync() {
+    if (!syncKey) {
+        syncKey = Math.random().toString(36).substring(2, 8).toUpperCase();
+        try { localStorage.setItem('dailyReaderSyncKey', syncKey); } catch {}
+    }
+    document.getElementById('sync-key').textContent = syncKey;
+    auth.signInAnonymously().then(() => {
+        migrateLocalToCloud();
+        col('favorites').onSnapshot((snap) => {
+            cloudFavorites = [];
+            snap.forEach((d) => cloudFavorites.push(d.data()));
+            render();
         });
-
-        // --- 2. SAVE STATE HELPER ---
-        function saveState() {
-            localStorage.setItem('reddit_dash_show_read', JSON.stringify(showRead));
-        }
-
-        // --- 3. TOGGLE ACTIONS ---
-        window.toggleRead = function(id) {
-            const docRef = db.collection('sync_groups').doc(syncKey).collection('read_posts').doc(String(id));
-            const idStr = String(id);
-            
-            // Update local state immediately for instant UI feedback
-            if (cloudReadPosts.has(idStr)) {
-                cloudReadPosts.delete(idStr);
-                docRef.delete();
-            } else {
-                cloudReadPosts.add(idStr);
-                docRef.set({ readAt: new Date().toISOString() });
-            }
-            
-            // Re-render immediately so the article "sinks" to bottom right away
-            renderFeed();
-        };
-
-        // Helper to get safeId for cloud favorites
-        function getSafeId(item) {
-            return (item.url || item.title).replace(/[^a-zA-Z0-9]/g, '');
-        }
-
-        // Helper to check if item is favorited
-        function isFavorited(item) {
-            const safeId = getSafeId(item);
-            return cloudFavorites.some(fav => getSafeId(fav) === safeId);
-        }
-
-        window.toggleFav = function(id) {
-            // Find the item in allData
-            let item = null;
-            for (const category of Object.values(allData)) {
-                item = category.find(p => p.id === id);
-                if (item) break;
-            }
-            
-            // Fallback: If the item has aged out of allData, look for it in the local synced favorites
-            if (!item) {
-                item = cloudFavorites.find(p => p.id === id);
-            }
-            
-            if (!item) return;
-            
-            const safeId = getSafeId(item);
-            
-            if (isFavorited(item)) {
-                // Remove from cloud
-                db.collection('sync_groups').doc(syncKey).collection('favorites').doc(safeId).delete();
-            } else {
-                // Add to cloud
-                db.collection('sync_groups').doc(syncKey).collection('favorites').doc(safeId).set(item);
-            }
-        };
-
-        window.toggleShowRead = function() {
-            showRead = !showRead;
-            saveState();
-            
-            // Update the UI checkbox to match state
-            const checkbox = document.getElementById('showReadToggle');
-            if (checkbox) checkbox.checked = showRead;
-            
-            renderFeed();
-        };
-
-        // --- 4. DATA FETCHING ---
-        async function loadData() {
-            try {
-                const response = await fetch('/api/data');
-                allData = await response.json();
-                renderFeed();
-            } catch (error) {
-                console.error("Error fetching data:", error);
-            }
-        }
-
-        // --- 5. TAB SWITCHING ---
-        function switchTab(tab) {
-            currentTab = tab;
-            document.querySelectorAll('#tabs button').forEach(b => b.classList.remove('tab-active', 'text-zinc-200'));
-            document.getElementById(`tab-${tab}`).classList.add('tab-active');
-            
-            // Toggle search bar visibility - only show on Favorites tab
-            const searchInput = document.getElementById('favoritesSearch');
-            if (currentTab === 'favorites') {
-                searchInput.style.display = 'block';
-            } else {
-                searchInput.style.display = 'none';
-                searchInput.value = ''; // clear search when leaving tab
-            }
-            
-            // Update sync UI visibility
-            updateSyncUI();
-            
-            window.scrollTo({ top: 0, behavior: 'smooth' });
-            renderFeed();
-        }
-
-        // --- 6. SCORE FORMATTING HELPER ---
-        function formatScore(score) {
-            const num = parseInt(score);
-            if (isNaN(num)) return "0";
-            if (num >= 1000) {
-                return (num / 1000).toFixed(1) + 'k';
-            }
-            return num.toString();
-        }
-
-        // --- 7. RENDERING LOGIC ---
-        function renderFeed() {
-            const container = document.getElementById('feed');
-            container.innerHTML = '';
-            
-            // Determine which dataset to use based on the active tab
-            let itemsToRender = [];
-            if (currentTab === 'favorites') {
-                // Use cloudFavorites for the favorites tab
-                itemsToRender = cloudFavorites;
-            } else {
-                itemsToRender = allData[currentTab] || [];
-            }
-
-            // Apply search filtering for favorites tab
-            if (currentTab === 'favorites') {
-                const searchQuery = document.getElementById('favoritesSearch').value.toLowerCase();
-                if (searchQuery) {
-                    itemsToRender = itemsToRender.filter(item => {
-                        const titleMatch = (item.title || "").toLowerCase().includes(searchQuery);
-                        const subMatch = (item.meta || "").toLowerCase().includes(searchQuery);
-                        return titleMatch || subMatch;
-                    });
-                }
-            }
-
-            // Mute Filter: ONLY apply to the Monthly tab
-            if (currentTab === 'monthly') {
-                const mutedKeywords = ["r/askhistorians"];
-                itemsToRender = itemsToRender.filter(item => {
-                    const metaText = (item.meta || "").toLowerCase();
-                    const titleText = (item.title || "").toLowerCase();
-                    // Remove the item if it matches our blocked keywords
-                    return !mutedKeywords.some(keyword => metaText.includes(keyword) || titleText.includes(keyword));
-                });
-            }
-
-            // 1. STRICT UNREAD-FIRST SORTING
-            itemsToRender = [...itemsToRender].sort((a, b) => {
-                const aRead = cloudReadPosts.has(String(a.id));
-                const bRead = cloudReadPosts.has(String(b.id));
-                
-                // Priority 1: Unread always goes to the top
-                if (!aRead && bRead) return -1;
-                if (aRead && !bRead) return 1;
-                
-                // Priority 2: Maintain original order if both are read or both are unread
-                return 0;
-            });
-            if (itemsToRender.length === 0) {
-            container.innerHTML = 'No items found.';
-            return;
-            }
-
-            itemsToRender.forEach(post => {
-                const isRead = cloudReadPosts.has(String(post.id));
-                const isFav = isFavorited(post);
-                const cleanMeta = (post.meta || "").split(" • ⏱️")[0];
-
-                if (!showRead && isRead && currentTab !== 'favorites') return; 
-                const favClass = isFav ? 'active-fav' : '';
-                const readClass = isRead ? 'active-read' : '';
-                // ADDED VISUAL CUE FOR UNREAD ITEMS
-                const unreadClass = !isRead ? 'border-l-2 border-blue-500/50 bg-blue-500/5 pl-4 -ml-4' : '';
-
-                const postElement = document.createElement('div');
-                postElement.className = `group py-4 px-5 -mx-5 relative flex flex-col justify-center rounded-2xl transition-all duration-500 hover:bg-zinc-900/20 ${isRead ? 'dimmed-read-post' : ''} ${unreadClass}`;
-
-                // 2. UNBREAKABLE FLEXBOX LAYOUT FOR TITLES
-                postElement.innerHTML = `
-                    <div class="flex justify-between items-start">
-                        <div class="pr-12 flex-1">
-                            <a href="${post.url}" target="_blank" rel="noopener noreferrer" class="font-editorial text-[1.05rem] font-medium text-zinc-100 hover:text-zinc-400 leading-snug transition-colors block mb-1.5">
-                                ${post.title}
-                            </a>
-                            ${post.desc ? `<div class="text-[0.8rem] text-zinc-500 leading-relaxed line-clamp-2 mb-2 font-light">${post.desc}</div>` : ''}
-                            <div class="text-[0.65rem] font-medium uppercase tracking-widest text-zinc-600 mt-1.5">
-                                ${cleanMeta}
-                            </div>
-                        </div>
-                        <div class="flex items-center space-x-5 pt-1 flex-shrink-0">
-                            <button onclick="toggleFav('${post.id}')" class="fav-btn transition-all text-lg focus:outline-none ${favClass}" title="Toggle Favorite">
-                                ${isFav ? '★' : '☆'}
-                            </button>
-                            <button onclick="toggleRead('${post.id}')" class="read-btn transition-all text-lg focus:outline-none ${readClass}" title="Toggle Read">
-                                ${isRead ? '↺' : '✓'}
-                            </button>
-                        </div>
-                    </div>
-                    <div class="feed-divider mt-5 opacity-40 group-hover:opacity-100 transition-opacity duration-500"></div>
-                `;
-                container.appendChild(postElement);
-            });
-        }
-
-        // --- 8. SYNC UI & LINK DEVICE ---
-        function promptLinkDevice() {
-            const newKey = prompt("Enter the Sync Key from your other device:");
-            if (newKey && newKey.trim()) {
-                localStorage.setItem('dailyReaderSyncKey', newKey.trim().toUpperCase());
-                window.location.reload();
-            }
-        }
-
-        function updateSyncUI() {
-            const syncUI = document.getElementById('syncUI');
-            if (currentTab === 'favorites') {
-                syncUI.style.display = 'flex';
-                syncUI.innerHTML = `<span>Sync Key: <strong>${syncKey}</strong></span> <button onclick="promptLinkDevice()" style="background:none; border:none; color:#4a90e2; cursor:pointer;">Link Existing Device</button>`;
-            } else {
-                syncUI.style.display = 'none';
-            }
-        }
-
-        // --- 9. INITIALIZATION ---
-        // Initialize checkbox state from localStorage
-        document.addEventListener('DOMContentLoaded', () => {
-            document.getElementById('showReadToggle').checked = showRead;
-            initSync(); // Start Firebase sync
-            loadData();
+        col('read_posts').onSnapshot((snap) => {
+            cloudReadPosts = new Set();
+            snap.forEach((d) => cloudReadPosts.add(d.id));
+            render();
         });
-    </script>
-    <script>
-if ('serviceWorker' in navigator) {
-window.addEventListener('load', () => {
-navigator.serviceWorker.register('./sw.js')
-.then(reg => console.log('Service Worker Registered!', reg))
-.catch(err => console.error('Service Worker Registration Failed!', err));
+    }).catch((e) => console.error('Sync auth failed:', e));
+}
+
+function migrateLocalToCloud() {
+    const localFavs = store.get('favorites', []);
+    if (localFavs.length) {
+        const b = db.batch();
+        localFavs.forEach((item) => b.set(col('favorites').doc(getSafeId(item)), item));
+        b.commit().then(() => { try { localStorage.removeItem('favorites'); } catch {} });
+    }
+    const localRead = store.get('reddit_dash_read', []);
+    if (localRead.length) {
+        const b = db.batch();
+        localRead.forEach((id) => b.set(col('read_posts').doc(String(id)), { readAt: new Date().toISOString() }));
+        b.commit().then(() => { try { localStorage.removeItem('reddit_dash_read'); } catch {} });
+    }
+}
+
+function getSafeId(item) { return (item.url || item.title).replace(/[^a-zA-Z0-9]/g, ''); }
+const isRead = (item) => cloudReadPosts.has(String(item.id));
+const isFav = (item) => { const s = getSafeId(item); return cloudFavorites.some((f) => getSafeId(f) === s); };
+
+function setRead(ids, value) {
+    const b = db.batch();
+    ids.forEach((id) => {
+        const ref = col('read_posts').doc(String(id));
+        if (value) { cloudReadPosts.add(String(id)); b.set(ref, { readAt: new Date().toISOString() }); }
+        else { cloudReadPosts.delete(String(id)); b.delete(ref); }
+    });
+    b.commit();
+    render();
+}
+
+function toggleFav(item) {
+    const ref = col('favorites').doc(getSafeId(item));
+    const clean = { id: item.id, title: item.title, desc: item.desc || '', url: item.url, meta: item.meta || '',
+                    source: item.source || '', domain: item.domain || '', date: item.date || '' };
+    if (isFav(item)) { ref.delete(); return false; }
+    ref.set(clean); return true;
+}
+
+// ============================================================================
+// STATE
+// ============================================================================
+const TABS = [
+    { key: 'monthly', label: 'Monthly' },
+    { key: 'yearly', label: 'Yearly' },
+    { key: 'news', label: 'News' },
+    { key: 'ritholtz', label: 'AM Reads' },
+    { key: 'favorites', label: 'Favorites' },
+];
+let allData = null, loadError = false, lastLoad = 0;
+let currentTab = store.get('dr_tab', 'monthly');
+if (!TABS.some((t) => t.key === currentTab)) currentTab = 'monthly';
+let showRead = store.get('reddit_dash_show_read', false);
+let amShowOlder = false;
+let query = '';
+let focusIndex = -1;
+const scrollPos = store.get('dr_scroll', {});
+
+// ============================================================================
+// HELPERS
+// ============================================================================
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const safeUrl = (u) => /^https?:\/\//i.test(u || '') ? u : '#';
+const domainOf = (u) => { try { return new URL(u).hostname.replace(/^(www|m|amp)\./, ''); } catch { return ''; } };
+const etDate = (d = new Date()) => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York' }).format(d);
+const etWeekday = (iso) => new Date(iso + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'long' });
+
+// "Today" in US/Eastern, since Ritholtz publishes on Eastern time.
+function amIsCurrent(item) {
+    const today = etDate();
+    const d = item.date || '';
+    if (d === today) return true;
+    const yesterday = etDate(new Date(Date.now() - 864e5));
+    const isSunday = new Date(today + 'T12:00:00').getDay() === 0;
+    // Weekend Reads is posted Saturday and covers Sunday too.
+    if (isSunday && item.kind === 'WEEKEND READS' && d === yesterday) return true;
+    // SatPost's RSS date is UTC, so an evening issue can read as tomorrow/yesterday.
+    if (item.kind === 'SATPOST' && d >= yesterday) return true;
+    return false;
+}
+
+function metaLine(item) {
+    const parts = (item.meta || '').split(' • ').map((p) => p.trim());
+    const out = [];
+    const pts = (item.meta || '').match(/([\d.]+k?) pts/);
+    if (pts) out.push(pts[1] + ' upvotes');
+    if (item.category) out.push(item.category);
+    if (item.date && !String(item.id).startsWith('rth_')) out.push(new Date(item.date + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' }));
+    // Reading time is only real for Reddit self-posts (their text is here). For
+    // links we only have a blurb, so no fake estimate.
+    if (item.mins > 1 && (item.domain === 'reddit.com')) out.push(item.mins + ' min read');
+    return out.join(' · ');
+}
+
+function sourceOf(item) {
+    if (item.source) return item.source;
+    const first = (item.meta || '').split(' • ')[0];
+    return first || domainOf(item.url);
+}
+
+// Items for a tab AFTER filters (mute, AM date), BEFORE read-hiding.
+function itemsFor(tab) {
+    if (!allData && tab !== 'favorites') return [];
+    if (tab === 'favorites') return [...cloudFavorites].reverse();
+    let items = allData[tab] || [];
+    if (tab === 'monthly') items = items.filter((i) => !(i.meta || '').toLowerCase().includes('r/askhistorians'));
+    if (tab === 'ritholtz') items = items.filter(amIsCurrent);
+    return items;
+}
+
+function searchAll(q) {
+    q = q.toLowerCase();
+    const seen = new Set(), out = [];
+    const pools = [...TABS.filter((t) => t.key !== 'favorites').map((t) => [t, (allData && allData[t.key]) || []]),
+                   [TABS[4], cloudFavorites]];
+    pools.forEach(([t, list]) => list.forEach((i) => {
+        const hay = `${i.title} ${i.desc} ${i.meta} ${i.source || ''} ${i.domain || ''}`.toLowerCase();
+        if (hay.includes(q) && !seen.has(String(i.id))) { seen.add(String(i.id)); out.push({ ...i, _tab: t.label }); }
+    }));
+    return out;
+}
+
+// ============================================================================
+// RENDER
+// ============================================================================
+function renderTabs() {
+    const nav = document.getElementById('tabs');
+    nav.innerHTML = TABS.map((t) => {
+        const n = itemsFor(t.key).filter((i) => !isRead(i)).length;
+        const icon = t.key === 'favorites' ? '<i class="ph-fill ph-star" aria-hidden="true"></i>' : '';
+        return `<button class="tab ${t.key === currentTab ? 'active' : ''}" data-tab="${t.key}">${icon}${t.label}${n ? `<span class="count">${n}</span>` : ''}</button>`;
+    }).join('');
+    const active = nav.querySelector('.tab.active');
+    if (active) active.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+}
+
+function cardHTML(item) {
+    const read = isRead(item), fav = isFav(item);
+    const dom = item.domain || domainOf(item.url);
+    const icon = dom ? `<img src="https://www.google.com/s2/favicons?domain=${encodeURIComponent(dom)}&sz=64" alt="" loading="lazy" onerror="this.style.visibility='hidden'">` : '';
+    const src = sourceOf(item);
+    const srcLine = [src, dom && dom !== 'reddit.com' && !src.toLowerCase().includes(dom.split('.')[0]) ? dom : '', item._tab ? 'in ' + item._tab : ''].filter(Boolean).join(' · ');
+    const meta = metaLine(item);
+    return `
+    <article class="item ${read ? 'read' : 'unread'}" data-id="${esc(item.id)}">
+        <div class="swipe-bg" aria-hidden="true"><span class="fav"><i class="ph-fill ph-star"></i></span><span class="read"><i class="ph ph-check-circle"></i></span></div>
+        <div class="item-inner">
+            <div class="item-main">
+                <div class="src">${icon}<span class="name">${esc(srcLine)}</span></div>
+                <a class="item-title" href="${esc(safeUrl(item.url))}" target="_blank" rel="noopener noreferrer">${esc(item.title)}</a>
+                ${item.desc ? `<p class="desc">${esc(item.desc)}</p>` : ''}
+                ${meta ? `<div class="meta">${esc(meta)}</div>` : ''}
+            </div>
+            <div class="actions">
+                <button class="icon-btn ${fav ? 'fav-on' : ''}" data-act="fav" aria-label="${fav ? 'Remove favorite' : 'Favorite'}" title="Favorite (f)"><i class="${fav ? 'ph-fill' : 'ph'} ph-star"></i></button>
+                <button class="icon-btn ${read ? 'read-on' : ''}" data-act="read" aria-label="${read ? 'Mark unread' : 'Mark read'}" title="${read ? 'Mark unread' : 'Mark read'} (r)"><i class="ph ${read ? 'ph-arrow-counter-clockwise' : 'ph-check'}"></i></button>
+            </div>
+        </div>
+    </article>`;
+}
+
+let visibleItems = [];
+
+function render() {
+    renderTabs();
+    const feed = document.getElementById('feed');
+    const today = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric', timeZone: 'America/New_York' });
+    document.getElementById('today').textContent = today;
+    document.getElementById('btn-showread').classList.toggle('on', showRead);
+    document.getElementById('btn-showread').innerHTML = `<i class="ph ${showRead ? 'ph-eye' : 'ph-eye-slash'}"></i>`;
+    document.getElementById('btn-showread').title = showRead ? 'Hide read items' : 'Show read items';
+
+    if (!allData && currentTab !== 'favorites') {
+        feed.innerHTML = loadError
+            ? `<div class="state"><i class="ph ph-wifi-slash"></i><h2>Couldn't load the feed</h2><p>Check the connection and try again.</p><button class="pill-btn" data-act="reload"><i class="ph ph-arrow-clockwise"></i>Try again</button></div>`
+            : Array.from({ length: 6 }, () => `<div class="skeleton"><div style="width:30%"></div><div style="width:92%;height:15px"></div><div style="width:70%"></div></div>`).join('');
+        setProgress(0, 0);
+        return;
+    }
+
+    let items, older = [];
+    if (query) {
+        items = searchAll(query);
+    } else {
+        items = itemsFor(currentTab);
+        if (currentTab === 'ritholtz' && amShowOlder) older = (allData.ritholtz || []).filter((i) => !amIsCurrent(i));
+    }
+    const total = items.length;
+    const unread = items.filter((i) => !isRead(i));
+    setProgress(total, unread.length);
+
+    const sortUnreadFirst = (list) => [...list].sort((a, b) => isRead(a) - isRead(b));
+    const shown = sortUnreadFirst(items).filter((i) => showRead || !isRead(i) || currentTab === 'favorites' || query);
+    const shownOlder = older.filter((i) => showRead || !isRead(i));
+    visibleItems = [...shown, ...shownOlder];
+
+    let html = '';
+    if (query) {
+        html = shown.length ? `<div class="section-label">${shown.length} match${shown.length === 1 ? '' : 'es'} for "${esc(query)}"</div>` + shown.map(cardHTML).join('')
+                            : `<div class="state"><i class="ph ph-magnifying-glass"></i><h2>No matches</h2><p>Nothing in any tab matches "${esc(query)}".</p></div>`;
+    } else if (currentTab === 'ritholtz' && !items.some((i) => i.kind !== 'SATPOST')) {
+        const prev = (allData.ritholtz || []).filter((i) => !amIsCurrent(i) && i.kind !== 'SATPOST');
+        const prevDay = prev[0] && prev[0].date ? etWeekday(prev[0].date) : 'the last';
+        html = `<div class="state"><i class="ph ph-coffee"></i><h2>Today's AM Reads aren't out yet</h2>
+                <p>Barry Ritholtz posts around 6:30 AM Eastern. This page checks for it three times each morning.</p>
+                ${prev.length && !amShowOlder ? `<button class="pill-btn" data-act="older"><i class="ph ph-clock-counter-clockwise"></i>Show ${esc(prevDay)}'s list</button>` : ''}</div>`;
+        const sat = shown.filter((i) => i.kind === 'SATPOST');
+        if (sat.length) html += `<div class="section-label">SatPost</div>` + sat.map(cardHTML).join('');
+    } else if (total > 0 && shown.length === 0) {
+        html = `<div class="state"><i class="ph ph-check-circle"></i><h2>All caught up</h2>
+                <p>You've read all ${total} ${currentTab === 'ritholtz' ? "of today's AM Reads" : 'items in this tab'}.</p>
+                <button class="pill-btn" data-act="showread"><i class="ph ph-eye"></i>Show read items</button></div>`;
+    } else if (total === 0) {
+        html = currentTab === 'favorites'
+            ? `<div class="state"><i class="ph ph-star"></i><h2>No favorites yet</h2><p>Tap the star on any item, or swipe it right, to keep it here.</p></div>`
+            : `<div class="state"><i class="ph ph-tray"></i><h2>Nothing here today</h2><p>The next scrape runs overnight.</p></div>`;
+    } else {
+        if (currentTab === 'ritholtz' && items[0] && items[0].kind) {
+            const lead = items.find((i) => i.kind !== 'SATPOST') || items[0];
+            const kindName = { 'WEEKEND READS': 'Weekend Reads', 'AM READS': 'AM Reads', 'SATPOST': 'SatPost' }[lead.kind] || 'AM Reads';
+            html += `<div class="section-label">${esc(kindName)} · ${esc(etWeekday(lead.date))}</div>`;
+        }
+        html += shown.map(cardHTML).join('');
+    }
+    if (shownOlder.length) {
+        html += `<div class="section-label"><i class="ph ph-clock-counter-clockwise"></i>Earlier list · ${esc(etWeekday(shownOlder[0].date || etDate()))}</div>` + shownOlder.map(cardHTML).join('');
+    }
+    feed.innerHTML = html;
+    if (focusIndex >= visibleItems.length) focusIndex = visibleItems.length - 1;
+    paintFocus(false);
+}
+
+function setProgress(total, unread) {
+    const row = document.getElementById('progress');
+    row.style.display = total ? 'flex' : 'none';
+    const done = total - unread;
+    document.getElementById('progress-label').textContent = unread ? `${unread} of ${total} left` : `All ${total} read`;
+    document.getElementById('progress-bar').style.width = total ? `${(done / total) * 100}%` : '0';
+    const btn = document.getElementById('btn-markall');
+    btn.disabled = !unread;
+    btn.style.visibility = currentTab === 'favorites' && !query ? 'hidden' : 'visible';
+}
+
+// ============================================================================
+// ACTIONS
+// ============================================================================
+let toastTimer;
+function toast(msg, undo) {
+    const t = document.getElementById('toast');
+    document.getElementById('toast-msg').textContent = msg;
+    const u = document.getElementById('toast-undo');
+    u.style.display = undo ? '' : 'none';
+    u.onclick = () => { undo && undo(); t.classList.remove('show'); };
+    t.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => t.classList.remove('show'), 4500);
+}
+const buzz = () => { try { navigator.vibrate && navigator.vibrate(12); } catch {} };
+
+function findItem(id) {
+    for (const i of visibleItems) if (String(i.id) === String(id)) return i;
+    for (const k of ['monthly', 'yearly', 'news', 'ritholtz']) {
+        const hit = allData && (allData[k] || []).find((i) => String(i.id) === String(id));
+        if (hit) return hit;
+    }
+    return cloudFavorites.find((i) => String(i.id) === String(id));
+}
+
+function toggleRead(item) {
+    const now = !isRead(item);
+    setRead([item.id], now);
+    buzz();
+    toast(now ? 'Marked read' : 'Marked unread', () => setRead([item.id], !now));
+}
+
+function favItem(item) {
+    const added = toggleFav(item);
+    buzz();
+    toast(added ? 'Saved to Favorites' : 'Removed from Favorites', () => toggleFav({ ...item }));
+}
+
+function switchTab(tab) {
+    scrollPos[currentTab] = window.scrollY;
+    store.set('dr_scroll', scrollPos);
+    currentTab = tab;
+    store.set('dr_tab', tab);
+    focusIndex = -1;
+    if (query) { query = ''; document.getElementById('searchInput').value = ''; document.getElementById('search').classList.remove('open'); }
+    render();
+    window.scrollTo(0, scrollPos[tab] || 0);
+}
+
+function markAll() {
+    const ids = (query ? searchAll(query) : itemsFor(currentTab)).filter((i) => !isRead(i)).map((i) => i.id);
+    if (!ids.length) return;
+    setRead(ids, true);
+    buzz();
+    toast(`Marked ${ids.length} read`, () => setRead(ids, false));
+}
+
+// ---------- Event delegation ----------
+document.getElementById('tabs').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-tab]'); if (b) switchTab(b.dataset.tab);
 });
+
+document.getElementById('feed').addEventListener('click', (e) => {
+    const act = e.target.closest('[data-act]');
+    if (act) {
+        const a = act.dataset.act;
+        if (a === 'reload') { loadError = false; render(); loadData(); return; }
+        if (a === 'older') { amShowOlder = true; render(); return; }
+        if (a === 'showread') { setShowRead(true); return; }
+        const item = findItem(act.closest('.item').dataset.id);
+        if (!item) return;
+        if (a === 'fav') favItem(item);
+        if (a === 'read') toggleRead(item);
+        return;
+    }
+    const link = e.target.closest('a.item-title');
+    if (link) {
+        const card = link.closest('.item');
+        if (card.dataset.swiped) { e.preventDefault(); delete card.dataset.swiped; return; }
+        // Opening an article marks it read (Undo in the toast).
+        const item = findItem(card.dataset.id);
+        if (item && !isRead(item)) setTimeout(() => {
+            setRead([item.id], true);
+            toast('Opened and marked read', () => setRead([item.id], false));
+        }, 350);
+    }
+});
+
+// ---------- Swipe: left = read, right = favorite ----------
+(() => {
+    const feed = document.getElementById('feed');
+    let card = null, inner = null, bg = null, x0 = 0, y0 = 0, dx = 0, mode = null;
+    const LIMIT = 84;
+    feed.addEventListener('touchstart', (e) => {
+        card = e.target.closest('.item'); if (!card) return;
+        inner = card.querySelector('.item-inner'); bg = card.querySelector('.swipe-bg');
+        x0 = e.touches[0].clientX; y0 = e.touches[0].clientY; dx = 0; mode = null;
+    }, { passive: true });
+    feed.addEventListener('touchmove', (e) => {
+        if (!card) return;
+        const mx = e.touches[0].clientX - x0, my = e.touches[0].clientY - y0;
+        if (!mode) {
+            if (Math.abs(mx) > 12 && Math.abs(mx) > Math.abs(my) * 1.5) { mode = 'swipe'; card.classList.add('swiping'); }
+            else if (Math.abs(my) > 10) { mode = 'scroll'; }
+        }
+        if (mode !== 'swipe') return;
+        dx = mx > 0 ? Math.min(mx, 140) : Math.max(mx, -140);
+        inner.style.transform = `translateX(${dx}px)`;
+        bg.style.opacity = Math.min(1, Math.abs(dx) / LIMIT);
+        bg.style.justifyContent = dx > 0 ? 'flex-start' : 'flex-end';
+        bg.querySelector('.fav').style.display = dx > 0 ? '' : 'none';
+        bg.querySelector('.read').style.display = dx < 0 ? '' : 'none';
+    }, { passive: true });
+    const end = () => {
+        if (!card) return;
+        const c = card, i = inner;
+        c.classList.remove('swiping');
+        i.style.transform = '';
+        if (bg) bg.style.opacity = 0;
+        if (mode === 'swipe') {
+            c.dataset.swiped = '1';
+            setTimeout(() => delete c.dataset.swiped, 400);
+            const item = findItem(c.dataset.id);
+            if (item && dx <= -LIMIT) toggleRead(item);
+            if (item && dx >= LIMIT) favItem(item);
+        }
+        card = null; mode = null;
+    };
+    feed.addEventListener('touchend', end);
+    feed.addEventListener('touchcancel', end);
+})();
+
+// ---------- Header tools ----------
+function setShowRead(v) { showRead = v; store.set('reddit_dash_show_read', v); render(); }
+document.getElementById('btn-showread').onclick = () => setShowRead(!showRead);
+document.getElementById('btn-markall').onclick = markAll;
+
+const SIZES = ['s', 'm', 'l'];
+function applyPrefs() {
+    document.documentElement.dataset.size = store.get('dr_size', 'm');
+    document.documentElement.dataset.theme = store.get('dr_theme', 'auto');
+    const th = store.get('dr_theme', 'auto');
+    document.getElementById('btn-theme').innerHTML = `<i class="ph ${th === 'dark' ? 'ph-moon' : th === 'light' ? 'ph-sun' : 'ph-circle-half'}"></i>`;
+    document.getElementById('btn-theme').title = `Theme: ${th}`;
+}
+document.getElementById('btn-size').onclick = () => {
+    const next = SIZES[(SIZES.indexOf(store.get('dr_size', 'm')) + 1) % 3];
+    store.set('dr_size', next); applyPrefs();
+    const SIZE_NAMES = { s: 'small', m: 'medium', l: 'large' };
+    toast('Text size: ' + SIZE_NAMES[next]);
+};
+document.getElementById('btn-theme').onclick = () => {
+    const order = ['auto', 'dark', 'light'];
+    const next = order[(order.indexOf(store.get('dr_theme', 'auto')) + 1) % 3];
+    store.set('dr_theme', next); applyPrefs();
+    toast(`Theme: ${next === 'auto' ? 'match system' : next}`);
+};
+function openSearch() {
+    const box = document.getElementById('search');
+    box.classList.add('open');
+    document.getElementById('searchInput').focus();
+}
+document.getElementById('btn-search').onclick = () => {
+    const box = document.getElementById('search');
+    if (box.classList.contains('open')) { box.classList.remove('open'); query = ''; document.getElementById('searchInput').value = ''; render(); }
+    else openSearch();
+};
+document.getElementById('searchInput').addEventListener('input', (e) => { query = e.target.value.trim(); focusIndex = -1; render(); });
+document.getElementById('btn-link').onclick = () => {
+    const k = prompt('Enter the sync key from your other device:');
+    if (k && k.trim()) { try { localStorage.setItem('dailyReaderSyncKey', k.trim().toUpperCase()); } catch {} location.reload(); }
+};
+
+// ---------- Keyboard (desktop): j/k move, o open, r read, f favorite, / search, 1-5 tabs ----------
+function paintFocus(scroll = true) {
+    document.querySelectorAll('.item.focused').forEach((el) => el.classList.remove('focused'));
+    if (focusIndex < 0) return;
+    const el = document.querySelectorAll('#feed .item')[focusIndex];
+    if (el) { el.classList.add('focused'); if (scroll) el.scrollIntoView({ block: 'center', behavior: 'smooth' }); }
+}
+document.addEventListener('keydown', (e) => {
+    if (e.target.matches('input, textarea') ) { if (e.key === 'Escape') e.target.blur(); return; }
+    if (e.metaKey || e.ctrlKey || e.altKey) return;
+    if (e.key === 'Enter' && e.target.closest('a, button')) return;  // let the focused control handle it
+    const cur = visibleItems[focusIndex];
+    if (e.key === 'j') { focusIndex = Math.min(focusIndex + 1, visibleItems.length - 1); paintFocus(); }
+    else if (e.key === 'k') { focusIndex = Math.max(focusIndex - 1, 0); paintFocus(); }
+    else if ((e.key === 'o' || e.key === 'Enter') && cur) { window.open(safeUrl(cur.url), '_blank', 'noopener'); if (!isRead(cur)) setRead([cur.id], true); }
+    else if ((e.key === 'r' || e.key === 'e') && cur) toggleRead(cur);
+    else if ((e.key === 'f' || e.key === 's') && cur) favItem(cur);
+    else if (e.key === '/') { e.preventDefault(); openSearch(); }
+    else if (/^[1-5]$/.test(e.key)) switchTab(TABS[+e.key - 1].key);
+    else return;
+});
+
+// ============================================================================
+// DATA
+// ============================================================================
+async function loadData() {
+    try {
+        const res = await fetch('/api/data', { cache: 'no-store' });
+        if (!res.ok) throw new Error(res.status);
+        allData = await res.json();
+        lastLoad = Date.now();
+        loadError = false;
+    } catch (e) {
+        console.error('Load failed:', e);
+        loadError = !allData;
+    }
+    render();
+    if (!query && scrollPos[currentTab]) window.scrollTo(0, scrollPos[currentTab]);
+}
+
+// A home-screen app left open overnight would keep yesterday's feed. Re-fetch
+// when it comes back to the foreground after 20+ minutes (or on a new day).
+let lastDay = etDate();
+document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') { scrollPos[currentTab] = window.scrollY; store.set('dr_scroll', scrollPos); return; }
+    if (Date.now() - lastLoad > 20 * 60e3 || etDate() !== lastDay) { lastDay = etDate(); amShowOlder = false; loadData(); }
+});
+
+applyPrefs();
+render();
+initSync();
+loadData();
+
+if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js').catch((e) => console.warn('SW failed', e)));
 }
 </script>
 </body>
