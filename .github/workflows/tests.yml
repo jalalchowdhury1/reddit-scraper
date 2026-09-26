@@ -1,0 +1,26 @@
+name: Tests
+# pytest on every code push. Data-only pushes (the Mac mini twice a day, the
+# nightly scrape, AM Reads) are skipped. Public repo, so these minutes are free.
+# The browser checks (tests/e2e_site.py) are not run here: they need a server
+# and Playwright, and run from the Mac instead (see AGENTS.md).
+on:
+  push:
+    branches: [main]
+    paths-ignore: ['data/**']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  pytest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.10'   # same as the scrape workflows
+      - run: pip install -r requirements-scraper.txt pytest httpx
+      - run: python -m pytest tests -q
