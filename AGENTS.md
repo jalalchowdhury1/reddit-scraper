@@ -91,6 +91,16 @@ score via the **Tiered Priority Exponential Decay** model so high-signal subs fl
   - **Tier 3 / default** `(15k–35k)`: everything else
 - Per post at index `i`: `score = int(base_max_score * (0.88 ** i)) + random.randint(100, 999)`
 - **Do NOT change this scoring math without the owner's permission.**
+- **The synthesized score is for ORDERING ONLY, never display.** Every row carries
+  `score_real` (JSON = true; HTML = true only if the score was on the page; RSS = false).
+  `server.py` sends `upvotes` only when it is true, else the post's real `rank` in its sub's
+  top list ("#3 this month"). CSVs without the column count as not real. Why: on 26 Sep 2026
+  all 26 JSON fetches got 403 "Blocked", so every "82.4k upvotes" on the site was invented.
+- RSS rows now carry the self-post text (from `<div class="md">`), so Monthly/Yearly cards get
+  blurbs and real reading times. An RSS **429** gets one retry (Retry-After, max 60 s), with a
+  480 s back-off budget per run so the 30-min job timeout is safe. `parse_rss()` is pure (tested).
+- The real long-term fix for the 403s is Reddit's official OAuth API (needs the owner's Reddit
+  app client id/secret). Not done; owner's call.
 
 Between subreddits it sleeps `random.uniform(6.5, 12.5)` seconds (human jitter — see §5).
 
@@ -104,6 +114,10 @@ PersonalFinance, explainlikeimfive, AskHistorians`. To add/remove a tracked sub,
 - Sweeps 3 broad Google News RSS queries (`Bangladesh Economy`, `Bangladesh India`,
   `Bangladesh business`).
 - Drops any item whose source matches `BLOCKED_SOURCES` (a long blocklist of Indian outlets).
+- `fetch_with_retry()` tries each query 3 times (waits 5 s, 20 s) on 5xx/429/network errors;
+  other 4xx fail at once. Added 26 Sep 2026 after all 3 queries 503'd and News sat a day old.
+- `server.py` keeps one card per headline (`title_key`: lowercase alphanumerics, 70 chars) and
+  sends the full `ts` so the page can say "3h ago".
 - Keeps an item **only if** its `title + description` matches one of `STRICT_FILTERS`'s phrase
   lists via **`\b`-word-boundary regex** (so `fdi` won't match inside `offdir`). First matching
   category wins; `category` is stored on the row. Categories: `India–Bangladesh Relations`,
@@ -160,7 +174,8 @@ articles. Extraction rules that exist for good reasons:
     (`trg_` ids), then re-sorted by the `YYYY-MM-DD` found in each item's `meta` (desc).
   - **Every section is capped at the first 50 items.**
   - Each item is `{id, title, desc, url, meta}`; `meta` is a pre-formatted string (e.g.
-    `r/bestof • MONTHLY • 84.5k pts • ⏱️ 3 min`). The frontend parses some of this string.
+    `r/bestof • MONTHLY`). Since 26 Sep 2026 the page reads the structured fields (`upvotes`,
+    `rank`, `when`, `mins`, `ts`, `category`) and never parses scores out of `meta`.
 - Helpers: `format_score` (`82450 → 82.4k`), `calculate_reading_time` (~200 wpm),
   `clean_text` (`html.unescape`, NaN-safe). Every CSV read is wrapped in `try/except` so a bad
   file silently yields no rows rather than 500-ing.
@@ -201,12 +216,15 @@ streamlit run dashboard.py
 - **Two crons + dedupe guard (don't "simplify" away):** `0 3 * * *` is the real run; `0 9 * * *`
   is a retry window added after 2026-07-09, when GitHub never assigned a runner to the 03:00 job
   ("job was not acquired by Runner") and the day's data was silently lost. A guard step skips
-  *scheduled* runs when `data/` was already committed today (UTC) — so the 09:00 run is a no-op
+  *scheduled* runs when **`data/googlenews/`** was already committed today (UTC). It checked all
+  of `data/` until 26 Sep 2026, but `am_reads.yml` commits `data/ritholtz` every morning and
+  Reddit saves a few subs even on bad nights, so the retry never ran when News failed — so the 09:00 run is a no-op
   on normal days — while `workflow_dispatch` always runs. Checkout uses `fetch-depth: 50` because
   the guard needs history to find the last `data/` commit; a `concurrency: daily-scrape` group
   (no cancel) serializes a badly delayed 03:00 cron against the 09:00 retry.
 - There is **no test/lint workflow**. `tests/test_am_reads.py` covers the AM Reads dedup/cleanup
-  helpers (`python -m pytest tests -q`).
+  helpers; `tests/test_feeds.py` covers RSS parsing + honest scores, the News retry, and the
+  API's no-repeats rules (`python -m pytest tests -q`).
 
 ### Dependency split (3 files — keep them split, see §5)
 - `requirements.txt` — **production/Vercel minimal**: `fastapi, uvicorn, Jinja2, pydantic,
@@ -270,7 +288,9 @@ streamlit run dashboard.py
     items stay visible only on the dedicated **Favorites** tab.
 11. **Frontend mute filter is Monthly-only.** `mutedKeywords = ["r/askhistorians"]` is applied
     **only** on the Monthly tab (so AskHistorians' synthetic Tier-1 scores don't dominate the
-    monthly feed). It does not affect Yearly/News/AM Reads.
+    monthly feed). It does not affect Yearly/News/AM Reads. Since 26 Sep 2026 `server.py` also
+    drops AskHistorians from Monthly BEFORE the 50 cap (so Monthly shows 50, not ~42), and
+    Yearly skips any post already in Monthly and backfills from further down.
 12. **The Reddit `permalink` double-prefix guard.** `server.py` defends against
     `https://www.reddit.comhttps://...` by replacing it. Different tiers in `scrape_top.py` build
     permalinks differently (some already absolute), so keep that guard.
@@ -334,7 +354,14 @@ streamlit run dashboard.py
   right = favorite, search across all tabs, text size + light/dark/auto,
   j/k/o/r/f keys, remembers tab + scroll, re-fetches when resumed after 20 min. Firebase paths
   unchanged. **Opening a link must NOT mark it read** (user peeks without
-  reading; only the tick / left swipe / r / Mark all read count). It is a Jinja template: never write `{{` or `{%` in its JS.
+  reading; only the tick / left swipe / r / Mark all read / the prompt's "Mark read" count).
+  QoL batch 2 (26 Sep 2026): opened-but-unread cards get a hollow dot + "Opened" tag
+  (localStorage `dr_opened`, this device, 21 days); coming back after 10+ s away shows
+  "Done with X? [Mark read]" (ignored = nothing happens; a quick peek gets no prompt);
+  tap a blurb to expand it; News shows "3h ago"; "New" tag = first seen on this device today
+  (`dr_first_seen`, Monthly/Yearly); tap the active tab = scroll to top; `u`/`z` = undo;
+  News gets a warning card when `updated.news` is 36h+ old; sync write failures show a toast
+  + "(offline)" by the sync key; the footer shows when AM Reads and News last landed. It is a Jinja template: never write `{{` or `{%` in its JS.
 - `server_assets/style.css` — extra styles served alongside the SPA.
 - `manifest.json` + `sw.js` — PWA manifest + **network-first** service worker (cache `daily-reader-v2`;
   cache is only the offline fallback). `server.py` serves `/manifest.json`, `/sw.js`, `/icon.png`

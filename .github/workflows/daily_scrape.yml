@@ -31,11 +31,14 @@ jobs:
 
       - name: Skip if today's data already committed (retry-window dedupe)
         id: guard
-        # Scheduled runs skip when data/ was already committed today (UTC),
-        # so the 09:00 retry is a no-op on normal days. Manual dispatch
-        # always runs.
+        # Scheduled runs skip when the NEWS file was already committed today
+        # (UTC), so the 09:00 retry is a no-op on normal days. It used to check
+        # all of data/, but am_reads.yml commits data/ritholtz every morning and
+        # Reddit saves a few subs even on bad nights, so the retry never ran --
+        # e.g. 26 Sep 2026, when Google News 503'd and News stayed a day old.
+        # Manual dispatch always runs.
         run: |
-          LAST=$(git log -1 --format=%cs -- data/)
+          LAST=$(git log -1 --format=%cs -- data/googlenews/)
           TODAY=$(date -u +%F)
           if [ "${{ github.event_name }}" = "schedule" ] && [ "$LAST" = "$TODAY" ]; then
             echo "data/ already updated today ($LAST) — skipping retry run"

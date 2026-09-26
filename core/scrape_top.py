@@ -75,9 +75,12 @@ def fetch_via_html(subreddit: str, time_filter: str) -> list:
                 full_permalink = raw_permalink
 
             score = 0
+            score_real = False
             score_elem = thing.find('div', class_='score unvoted')
             if score_elem and score_elem.get('title'):
-                try: score = int(score_elem.get('title'))
+                try:
+                    score = int(score_elem.get('title'))
+                    score_real = score > 0
                 except ValueError: pass
 
             # If score is 0 (not scraped), use tiered exponential decay
@@ -90,7 +93,8 @@ def fetch_via_html(subreddit: str, time_filter: str) -> list:
                 'title': title_elem.text.strip(),
                 'selftext': "",
                 'permalink': full_permalink,
-                'score': score
+                'score': score,
+                'score_real': score_real,
             })
 
         return posts
@@ -98,43 +102,66 @@ def fetch_via_html(subreddit: str, time_filter: str) -> list:
         print(f"    ❌ Secondary Fallback (HTML) also failed: {e}")
         return []
 
+# Reddit 429s most RSS calls from GitHub's shared IPs (21 of 26 on 26 Sep 2026).
+# One polite retry per call, capped per run so the job stays well under its
+# 30-minute timeout.
+RSS_BACKOFF_BUDGET = {"seconds": 480}
+# Hard stop for the whole Reddit pass. The job is killed at 30 min, and a killed
+# job never reaches its commit step, which would lose News and AM Reads too.
+RUN_DEADLINE_S = 18 * 60
+
+def retry_after(response) -> int:
+    try:
+        return max(5, int(float(response.headers.get("Retry-After", 30))))
+    except (TypeError, ValueError):
+        return 30
+
+def rss_selftext(content_html: str) -> str:
+    """A self-post's body sits in <div class="md">; link posts have none."""
+    if not content_html:
+        return ""
+    md = BeautifulSoup(content_html, "html.parser").find("div", class_="md")
+    return md.get_text(" ", strip=True) if md else ""
+
+def parse_rss(content: bytes, subreddit: str) -> list:
+    root = ET.fromstring(content)
+    ns = {'atom': 'http://www.w3.org/2005/Atom'}
+
+    # RSS has NO scores. The made-up, decaying number below only orders the
+    # merged Monthly/Yearly list. score_real=False stops the site from showing
+    # it as upvotes (it did until 26 Sep 2026).
+    score_range = SUBREDDIT_TIERS.get(subreddit, SUBREDDIT_TIERS["default"])
+    base_max_score = random.randint(score_range[0], score_range[1])
+
+    posts = []
+    for i, entry in enumerate(root.findall('atom:entry', ns)):
+        link_el = entry.find('atom:link', ns)
+        raw_link = link_el.attrib.get('href', '') if link_el is not None else ''
+        full_link = f"https://www.reddit.com{raw_link}" if raw_link.startswith('/') else raw_link
+        posts.append({
+            'id': entry.findtext('atom:id', '', ns).split('_')[-1],
+            'title': entry.findtext('atom:title', '', ns),
+            'selftext': rss_selftext(entry.findtext('atom:content', '', ns)),
+            'permalink': full_link,
+            'score': int(base_max_score * (0.88 ** i)) + random.randint(100, 999),
+            'score_real': False,
+        })
+    return posts
+
 def fetch_via_rss(subreddit: str, time_filter: str) -> list:
-    """TERTIARY (LAST RESORT): Fetches posts via RSS - Fixed for Absolute URLs and Sorting."""
+    """TERTIARY (LAST RESORT): top posts via RSS. Real order and text, no scores."""
     print(f"  ⚠️ Attempting Tertiary Fallback (RSS) for r/{subreddit}...")
     url = f"https://www.reddit.com/r/{subreddit}/top/.rss?t={time_filter}&limit=50"
     try:
         response = requests.get(url, headers=HEADERS, timeout=10)
+        if response.status_code == 429 and RSS_BACKOFF_BUDGET["seconds"] > 0:
+            wait = min(retry_after(response), 60, RSS_BACKOFF_BUDGET["seconds"])
+            RSS_BACKOFF_BUDGET["seconds"] -= wait
+            print(f"  ⏳ RSS 429: waiting {wait}s, then one more try...")
+            time.sleep(wait)
+            response = requests.get(url, headers=HEADERS, timeout=10)
         response.raise_for_status()
-        root = ET.fromstring(response.content)
-
-        posts = []
-        ns = {'atom': 'http://www.w3.org/2005/Atom'}
-
-        # Determine base score range for this subreddit
-        score_range = SUBREDDIT_TIERS.get(subreddit, SUBREDDIT_TIERS["default"])
-        base_max_score = random.randint(score_range[0], score_range[1])
-
-        # Track index to create a descending 'dummy' score with exponential decay
-        for i, entry in enumerate(root.findall('atom:entry', ns)):
-            raw_link = entry.find('atom:link', ns).attrib.get('href', '') if entry.find('atom:link', ns) is not None else ''
-
-            # FIX 1: Ensure absolute URL
-            full_link = raw_link
-            if raw_link.startswith('/'):
-                full_link = f"https://www.reddit.com{raw_link}"
-
-            # FIX 2: Tiered exponential decay scoring for better sorting
-            # Exponential decay: each post drops by roughly 12% from the previous, plus some random noise
-            dummy_score = int(base_max_score * (0.88 ** i)) + random.randint(100, 999)
-
-            posts.append({
-                'id': entry.findtext('atom:id', '', ns).split('_')[-1],
-                'title': entry.findtext('atom:title', '', ns),
-                'selftext': "",
-                'permalink': full_link,
-                'score': dummy_score
-            })
-        return posts
+        return parse_rss(response.content, subreddit)
     except Exception as e:
         print(f"  ❌ Tertiary Fallback (RSS) failed: {e}")
         return []
@@ -170,7 +197,8 @@ def fetch_via_json(subreddit: str, time_filter: str) -> list:
                 'title': post.get('title', ''),
                 'selftext': post.get('selftext', ''),
                 'permalink': f"https://www.reddit.com{post.get('permalink', '')}",
-                'score': post.get('score', 0)
+                'score': post.get('score', 0),
+                'score_real': True,
             })
         return posts
     except Exception as e:
@@ -204,8 +232,12 @@ def main():
     print("="*50)
     print("🚀 Triple-Threat Reddit Scraper (JSON -> HTML -> RSS)")
     print("="*50)
+    deadline = time.monotonic() + RUN_DEADLINE_S
     for sub in SUBREDDITS:
         for t_filter in ["month", "year"]:
+            if time.monotonic() > deadline:
+                print(f"⏱️ {RUN_DEADLINE_S // 60}-min Reddit limit reached: skipping r/{sub} ({t_filter}) and the rest; their old files stay.")
+                return
             print(f"📡 Processing r/{sub} ({t_filter})...")
             posts = fetch_reddit_posts(sub, t_filter)
             save_posts_to_csv(posts, sub, t_filter)

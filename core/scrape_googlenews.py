@@ -56,6 +56,27 @@ def get_category_for_article(title: str, description: str) -> str:
                 return category
     return None
 
+# Google News answers 503 now and then. On 26 Sep 2026 all three queries failed
+# once and the News tab sat a day old. Try each query 3 times before giving up.
+RETRY_WAITS = (5, 20)
+
+def fetch_with_retry(session, url, waits=RETRY_WAITS, sleep=time.sleep):
+    err = ""
+    for i in range(len(waits) + 1):
+        try:
+            resp = session.get(url, timeout=15)
+        except requests.RequestException as e:
+            err = str(e)
+        else:
+            if resp.status_code < 500 and resp.status_code != 429:
+                resp.raise_for_status()  # other 4xx = a real error, no retry
+                return resp
+            err = f"HTTP {resp.status_code}"
+        if i < len(waits):
+            print(f"   ⏳ {err}: retrying in {waits[i]}s...")
+            sleep(waits[i])
+    raise RuntimeError(f"gave up after {len(waits) + 1} tries: {err}")
+
 def scrape_google_news() -> List[Dict]:
     print("="*50)
     print("🌐 Google News Aggregator (Strictly Filtered)")
@@ -71,8 +92,7 @@ def scrape_google_news() -> List[Dict]:
         print(f"📡 Sweeping broad query: '{query_str}'...")
         
         try:
-            resp = session.get(url, timeout=15)
-            resp.raise_for_status()
+            resp = fetch_with_retry(session, url)
             root = ET.fromstring(resp.content)
             
             channel = root.find("channel")

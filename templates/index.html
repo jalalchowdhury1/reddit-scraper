@@ -105,7 +105,13 @@
         .item:hover .item-inner { background: var(--surface); }
         .item.focused .item-inner { background: var(--surface); box-shadow: inset 2px 0 0 var(--accent); }
         .item.unread .item-inner::before { content: ""; position: absolute; left: 4px; top: 20px; width: 4px; height: 4px; border-radius: 999px; background: var(--accent); }
+        /* Opened but not marked read: hollow ring instead of the solid dot. */
+        .item.unread.opened .item-inner::before { background: transparent; box-shadow: inset 0 0 0 1.5px var(--accent); width: 6px; height: 6px; left: 3px; top: 19px; }
         .item.read .item-main { opacity: .45; }
+        .tag { color: var(--accent); font-weight: 500; white-space: nowrap; }
+        .tag i { vertical-align: -1px; }
+        .notice { grid-column: 1 / -1; margin: 12px 0 4px; padding: 10px 12px; border-radius: 12px; background: var(--accent-soft); font-size: .82rem; line-height: 1.45; display: flex; gap: 8px; align-items: flex-start; }
+        .notice i { color: var(--accent); font-size: 1rem; margin-top: 1px; }
         .item-main { flex: 1; min-width: 0; }
         .src { display: flex; align-items: center; gap: 7px; font-size: .75rem; color: var(--muted); margin-bottom: 5px; min-width: 0; }
         .src img { width: 14px; height: 14px; border-radius: 3px; flex-shrink: 0; background: var(--surface-2); }
@@ -113,7 +119,8 @@
         .item-title { display: block; font-family: 'Lora', serif; font-size: var(--title); font-weight: 500; line-height: 1.38; color: var(--text); text-decoration: none; text-wrap: pretty; }
         .item-title:visited { color: var(--text); }
         .item-title:hover { color: var(--accent); }
-        .desc { margin: 6px 0 0; font-size: var(--desc); color: var(--muted); line-height: 1.5; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+        .desc { margin: 6px 0 0; font-size: var(--desc); color: var(--muted); line-height: 1.5; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; cursor: pointer; }
+        .desc.open { display: block; -webkit-line-clamp: unset; overflow: visible; }
         .meta { margin-top: 7px; font-size: .74rem; color: var(--faint); font-variant-numeric: tabular-nums; }
         .actions { display: flex; flex-direction: column; gap: 2px; flex-shrink: 0; }
         .actions .icon-btn { width: 38px; height: 38px; font-size: 1.15rem; color: var(--faint); }
@@ -135,7 +142,8 @@
         .toast { position: fixed; left: 50%; bottom: calc(22px + var(--safe-bottom)); transform: translate(-50%, 20px); opacity: 0; pointer-events: none;
                  background: var(--text); color: var(--bg); border-radius: 999px; padding: 10px 10px 10px 18px; display: flex; align-items: center; gap: 14px;
                  font-size: .86rem; box-shadow: 0 10px 30px rgba(0,0,0,.25); transition: all .3s cubic-bezier(.16,1,.3,1); z-index: 40; max-width: calc(100vw - 32px); }
-        .toast.show { opacity: 1; transform: translate(-50%, 0); pointer-events: auto; }
+        .toast { visibility: hidden; }
+        .toast.show { opacity: 1; transform: translate(-50%, 0); pointer-events: auto; visibility: visible; }
         .toast button { font-weight: 600; color: var(--bg); background: color-mix(in srgb, var(--bg) 14%, transparent); border-radius: 999px; padding: 6px 12px; }
 
         footer { margin-top: 36px; padding-top: 16px; border-top: 1px solid var(--line); display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; font-size: .8rem; color: var(--faint); }
@@ -175,8 +183,9 @@
     <main id="feed" aria-live="polite"></main>
 
     <footer id="footer">
-        <span>Sync key <strong id="sync-key"></strong> · <button id="btn-link">Link another device</button></span>
-        <span class="hide-mobile">Keys: <kbd>j</kbd> <kbd>k</kbd> move, <kbd>o</kbd> open, <kbd>r</kbd> read, <kbd>f</kbd> favorite</span>
+        <span>Sync key <strong id="sync-key"></strong><span id="sync-state"></span> · <button id="btn-link">Link another device</button></span>
+        <span id="updated"></span>
+        <span class="hide-mobile">Keys: <kbd>j</kbd> <kbd>k</kbd> move, <kbd>o</kbd> open, <kbd>r</kbd> read, <kbd>f</kbd> favorite, <kbd>u</kbd> undo</span>
     </footer>
 </div>
 <div class="toast" id="toast" role="status"><span id="toast-msg"></span><button id="toast-undo">Undo</button></div>
@@ -207,6 +216,7 @@ const store = {
 
 let cloudFavorites = [];
 let cloudReadPosts = new Set();
+let cloudReadAt = {};   // id -> ISO time it was marked read
 let syncKey = store.raw('dailyReaderSyncKey');
 
 const col = (name) => db.collection('sync_groups').doc(syncKey).collection(name);
@@ -222,15 +232,28 @@ function initSync() {
         col('favorites').onSnapshot((snap) => {
             cloudFavorites = [];
             snap.forEach((d) => cloudFavorites.push(d.data()));
+            syncOk();
             render();
-        });
+        }, syncFailed);
         col('read_posts').onSnapshot((snap) => {
             cloudReadPosts = new Set();
-            snap.forEach((d) => cloudReadPosts.add(d.id));
+            cloudReadAt = {};
+            snap.forEach((d) => { cloudReadPosts.add(d.id); cloudReadAt[d.id] = (d.data() || {}).readAt || ''; });
+            syncOk();
             render();
-        });
-    }).catch((e) => console.error('Sync auth failed:', e));
+        }, syncFailed);
+    }).catch(syncFailed);
 }
+
+// Say so when ticks can't reach the cloud, instead of letting them vanish on reload.
+let syncBroken = false;
+function syncFailed(e) {
+    console.error('Sync failed:', e);
+    document.getElementById('sync-state').textContent = ' (offline: ticks may not save)';
+    if (!syncBroken) toast("Sync isn't working. Read ticks may not save.");
+    syncBroken = true;
+}
+function syncOk() { if (syncBroken) { syncBroken = false; document.getElementById('sync-state').textContent = ''; } }
 
 function migrateLocalToCloud() {
     const localFavs = store.get('favorites', []);
@@ -258,7 +281,7 @@ function setRead(ids, value) {
         if (value) { cloudReadPosts.add(String(id)); b.set(ref, { readAt: new Date().toISOString() }); }
         else { cloudReadPosts.delete(String(id)); b.delete(ref); }
     });
-    b.commit();
+    b.commit().catch(syncFailed);
     render();
 }
 
@@ -266,8 +289,8 @@ function toggleFav(item) {
     const ref = col('favorites').doc(getSafeId(item));
     const clean = { id: item.id, title: item.title, desc: item.desc || '', url: item.url, meta: item.meta || '',
                     source: item.source || '', domain: item.domain || '', date: item.date || '' };
-    if (isFav(item)) { ref.delete(); return false; }
-    ref.set(clean); return true;
+    if (isFav(item)) { ref.delete().catch(syncFailed); return false; }
+    ref.set(clean).catch(syncFailed); return true;
 }
 
 // ============================================================================
@@ -287,7 +310,42 @@ let showRead = store.get('reddit_dash_show_read', false);
 let amShowOlder = false;
 let query = '';
 let focusIndex = -1;
+let focusId = null;   // the focused item's id; render() re-finds it so a list change can't shift focus
 const scrollPos = store.get('dr_scroll', {});
+
+// Opening is NOT reading, but it's worth remembering (this device only):
+// opened-but-unread cards get a hollow dot and an "Opened" tag, and coming back
+// to the page offers a one-tap "Mark read" for what you just opened.
+const opened = store.get('dr_opened', {});        // id -> ms opened
+let pendingOpened = [];                            // ids opened since the last "done?" prompt
+const wasOpened = (item) => String(item.id) in opened;
+function noteOpened(item) {
+    const id = String(item.id);
+    opened[id] = Date.now();
+    const cutoff = Date.now() - 21 * 864e5;
+    for (const k in opened) if (opened[k] < cutoff) delete opened[k];
+    store.set('dr_opened', opened);
+    if (!pendingOpened.includes(id)) pendingOpened.push(id);
+    const idx = visibleItems.findIndex((i) => String(i.id) === id);
+    if (idx >= 0) { focusIndex = idx; focusId = id; }   // so r / f act on it when you come back
+    setTimeout(render, 250);          // after the browser has followed the link
+}
+
+// "New" = first seen on this device today (Monthly/Yearly only; News shows "3h ago").
+let firstSeen = {};
+function trackFirstSeen() {
+    const saved = store.get('dr_first_seen', null);
+    const firstVisit = saved === null;   // nothing is "new" on a device's first visit
+    const map = saved || {}, live = new Set(), today = etDate();
+    ['monthly', 'yearly'].forEach((k) => (allData[k] || []).forEach((i) => {
+        const id = String(i.id); live.add(id);
+        if (!(id in map)) map[id] = firstVisit ? 'old' : today;
+    }));
+    for (const id in map) if (!live.has(id)) delete map[id];
+    store.set('dr_first_seen', map);
+    firstSeen = map;
+}
+const isNew = (item) => firstSeen[String(item.id)] === etDate();
 
 // ============================================================================
 // HELPERS
@@ -312,17 +370,35 @@ function amIsCurrent(item) {
     return false;
 }
 
-function metaLine(item) {
-    const parts = (item.meta || '').split(' • ').map((p) => p.trim());
-    const out = [];
-    const pts = (item.meta || '').match(/([\d.]+k?) pts/);
-    if (pts) out.push(pts[1] + ' upvotes');
+const shortDate = (iso) => new Date(iso + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+function ago(ts) {
+    const t = Date.parse(ts);
+    if (!t) return '';
+    const m = Math.round((Date.now() - t) / 60000);
+    if (m < 60) return m <= 1 ? 'just now' : `${m}m ago`;
+    const h = Math.round(m / 60);
+    if (h < 24) return `${h}h ago`;
+    if (h < 48) return 'yesterday';
+    if (h < 24 * 7) return `${Math.round(h / 24)} days ago`;
+    return new Date(t).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
+const clock = (ts) => new Date(ts).toLocaleString('en-US', { weekday: 'short', hour: 'numeric', minute: '2-digit' });
+
+// Returns escaped HTML. Upvotes appear only when Reddit itself supplied them;
+// when Reddit blocks the scraper there is no score, so we show the post's real
+// place in its subreddit's top list instead of an invented number.
+function metaHTML(item) {
+    const tags = [], out = [];
+    if (!isRead(item) && isNew(item)) tags.push('<span class="tag">New</span>');
+    if (!isRead(item) && wasOpened(item)) tags.push('<span class="tag"><i class="ph ph-eye" aria-hidden="true"></i> Opened</span>');
+    if (item.upvotes) out.push(item.upvotes + ' upvotes');
+    else if (item.rank && item.when) out.push(`#${item.rank} this ${item.when}`);
     if (item.category) out.push(item.category);
-    if (item.date && !String(item.id).startsWith('rth_')) out.push(new Date(item.date + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' }));
-    // Reading time is only real for Reddit self-posts (their text is here). For
-    // links we only have a blurb, so no fake estimate.
-    if (item.mins > 1 && (item.domain === 'reddit.com')) out.push(item.mins + ' min read');
-    return out.join(' · ');
+    if (item.ts) out.push(ago(item.ts));
+    else if (item.date && !String(item.id).startsWith('rth_')) out.push(shortDate(item.date));
+    // Reading time is only real for Reddit self-posts (their text is here).
+    if (item.mins > 1 && item.domain === 'reddit.com') out.push(item.mins + ' min read');
+    return [...tags, ...out.filter(Boolean).map(esc)].join(' · ');
 }
 
 function sourceOf(item) {
@@ -373,16 +449,16 @@ function cardHTML(item) {
     const icon = dom ? `<img src="https://www.google.com/s2/favicons?domain=${encodeURIComponent(dom)}&sz=64" alt="" loading="lazy" onerror="this.style.visibility='hidden'">` : '';
     const src = sourceOf(item);
     const srcLine = [src, dom && dom !== 'reddit.com' && !src.toLowerCase().includes(dom.split('.')[0]) ? dom : '', item._tab ? 'in ' + item._tab : ''].filter(Boolean).join(' · ');
-    const meta = metaLine(item);
+    const meta = metaHTML(item);
     return `
-    <article class="item ${read ? 'read' : 'unread'}" data-id="${esc(item.id)}">
+    <article class="item ${read ? 'read' : 'unread'}${wasOpened(item) ? ' opened' : ''}" data-id="${esc(item.id)}">
         <div class="swipe-bg" aria-hidden="true"><span class="fav"><i class="ph-fill ph-star"></i></span><span class="read"><i class="ph ph-check-circle"></i></span></div>
         <div class="item-inner">
             <div class="item-main">
                 <div class="src">${icon}<span class="name">${esc(srcLine)}</span></div>
                 <a class="item-title" href="${esc(safeUrl(item.url))}" target="_blank" rel="noopener noreferrer">${esc(item.title)}</a>
-                ${item.desc ? `<p class="desc">${esc(item.desc)}</p>` : ''}
-                ${meta ? `<div class="meta">${esc(meta)}</div>` : ''}
+                ${item.desc ? `<p class="desc${expanded.has(String(item.id)) ? ' open' : ''}">${esc(item.desc)}</p>` : ''}
+                ${meta ? `<div class="meta">${meta}</div>` : ''}
             </div>
             <div class="actions">
                 <button class="icon-btn ${fav ? 'fav-on' : ''}" data-act="fav" aria-label="${fav ? 'Remove favorite' : 'Favorite'}" title="Favorite (f)"><i class="${fav ? 'ph-fill' : 'ph'} ph-star"></i></button>
@@ -393,6 +469,7 @@ function cardHTML(item) {
 }
 
 let visibleItems = [];
+const expanded = new Set();   // ids whose blurb is tapped open
 
 function render() {
     renderTabs();
@@ -423,7 +500,10 @@ function render() {
     setProgress(total, unread.length);
 
     const sortUnreadFirst = (list) => [...list].sort((a, b) => isRead(a) - isRead(b));
-    const shown = sortUnreadFirst(items).filter((i) => showRead || !isRead(i) || currentTab === 'favorites' || query);
+    let shown = sortUnreadFirst(items).filter((i) => showRead || !isRead(i) || currentTab === 'favorites' || query);
+    // AM Reads: Ritholtz's list first, SatPost after it under its own label.
+    const isSat = (i) => i.kind === 'SATPOST';
+    if (currentTab === 'ritholtz' && !query) shown = [...shown.filter((i) => !isSat(i)), ...shown.filter(isSat)];
     const shownOlder = older.filter((i) => showRead || !isRead(i));
     visibleItems = [...shown, ...shownOlder];
 
@@ -440,8 +520,10 @@ function render() {
         const sat = shown.filter((i) => i.kind === 'SATPOST');
         if (sat.length) html += `<div class="section-label">SatPost</div>` + sat.map(cardHTML).join('');
     } else if (total > 0 && shown.length === 0) {
+        const today = etDate();
+        const doneToday = Object.values(cloudReadAt).filter((t) => t && etDate(new Date(t)) === today).length;
         html = `<div class="state"><i class="ph ph-check-circle"></i><h2>All caught up</h2>
-                <p>You've read all ${total} ${currentTab === 'ritholtz' ? "of today's AM Reads" : 'items in this tab'}.</p>
+                <p>You've read all ${total} ${currentTab === 'ritholtz' ? "of today's AM Reads" : 'items in this tab'}.${doneToday > 1 ? ` ${doneToday} items cleared today across every tab.` : ''}</p>
                 <button class="pill-btn" data-act="showread"><i class="ph ph-eye"></i>Show read items</button></div>`;
     } else if (total === 0) {
         html = currentTab === 'favorites'
@@ -453,12 +535,32 @@ function render() {
             const kindName = { 'WEEKEND READS': 'Weekend Reads', 'AM READS': 'AM Reads', 'SATPOST': 'SatPost' }[lead.kind] || 'AM Reads';
             html += `<div class="section-label">${esc(kindName)} · ${esc(etWeekday(lead.date))}</div>`;
         }
-        html += shown.map(cardHTML).join('');
+        if (currentTab === 'ritholtz') {
+            const main = shown.filter((i) => !isSat(i)), sat = shown.filter(isSat);
+            html += main.map(cardHTML).join('');
+            if (sat.length) html += `<div class="section-label">SatPost</div>` + sat.map(cardHTML).join('');
+        } else {
+            html += shown.map(cardHTML).join('');
+        }
+    }
+    // Speak up only when a feed is overdue. The nightly scrape normally lands by
+    // ~9 AM Eastern; 36h without new News means it has missed at least one day.
+    const newsAt = allData && allData.updated && allData.updated.news;
+    if (!query && currentTab === 'news' && newsAt && Date.now() - Date.parse(newsAt) > 36 * 3600e3) {
+        html = `<div class="notice"><i class="ph ph-warning"></i><span>No new News since ${esc(clock(newsAt))}. The nightly update has missed at least one day, so this list is older than usual.</span></div>` + html;
     }
     if (shownOlder.length) {
         html += `<div class="section-label"><i class="ph ph-clock-counter-clockwise"></i>Earlier list · ${esc(etWeekday(shownOlder[0].date || etDate()))}</div>` + shownOlder.map(cardHTML).join('');
     }
     feed.innerHTML = html;
+    const up = allData && allData.updated;
+    document.getElementById('updated').textContent = up && (up.news || up.ritholtz)
+        ? 'Updated: ' + [up.ritholtz && 'AM Reads ' + clock(up.ritholtz), up.news && 'News ' + clock(up.news)].filter(Boolean).join(' · ')
+        : '';
+    // Keep focus on the same item. If that item left the list (marked read), stay
+    // at the same position, i.e. the next card, like Gmail.
+    const at = focusId === null ? -1 : visibleItems.findIndex((i) => String(i.id) === focusId);
+    if (at >= 0) focusIndex = at;
     if (focusIndex >= visibleItems.length) focusIndex = visibleItems.length - 1;
     paintFocus(false);
 }
@@ -477,17 +579,54 @@ function setProgress(total, unread) {
 // ============================================================================
 // ACTIONS
 // ============================================================================
-let toastTimer;
-function toast(msg, undo) {
+// toast(msg, undoFn) shows an Undo button; toast(msg, fn, 'Mark read', 8000) any action.
+let toastTimer, lastUndo = null, lastUndoAt = 0;
+function toast(msg, fn, label = 'Undo', ms = 4500) {
     const t = document.getElementById('toast');
     document.getElementById('toast-msg').textContent = msg;
     const u = document.getElementById('toast-undo');
-    u.style.display = undo ? '' : 'none';
-    u.onclick = () => { undo && undo(); t.classList.remove('show'); };
+    u.textContent = label;
+    u.style.display = fn ? '' : 'none';
+    u.onclick = () => { hideToast(); if (label === 'Undo') lastUndo = null; fn && fn(); };
+    if (fn && label === 'Undo') { lastUndo = fn; lastUndoAt = Date.now(); }
     t.classList.add('show');
     clearTimeout(toastTimer);
-    toastTimer = setTimeout(() => t.classList.remove('show'), 4500);
+    toastTimer = setTimeout(hideToast, ms);
 }
+// A hidden toast must be dead: no handler, no focus. Otherwise Enter (meant to
+// open a card) could press a faded "Mark read" button and mark an article read.
+function hideToast() {
+    const u = document.getElementById('toast-undo');
+    document.getElementById('toast').classList.remove('show');
+    u.onclick = null;
+    if (document.activeElement === u) u.blur();
+}
+function undoLast() {   // the u key: undo the last action for 10 seconds
+    if (!lastUndo || Date.now() - lastUndoAt > 10000) return;
+    const fn = lastUndo; lastUndo = null;
+    hideToast();
+    fn();
+}
+
+// Back from an article? Offer a one-tap "Mark read". Nothing is marked on its
+// own: a quick peek (under 10s away) gets no prompt, and ignoring it does nothing.
+let awayAt = 0;
+function leftPage() { if (!awayAt) awayAt = Date.now(); }
+function backOnPage() {
+    if (!awayAt) return;                 // focus + visibilitychange both fire; handle once
+    const away = Date.now() - awayAt;
+    awayAt = 0;
+    const ids = pendingOpened.filter((id) => !cloudReadPosts.has(id));
+    pendingOpened = [];                  // a peek is forgotten, not asked about later
+    if (away < 10000 || !ids.length) return;
+    const item = ids.length === 1 ? findItem(ids[0]) : null;
+    const name = item ? `“${item.title.length > 48 ? item.title.slice(0, 46).trimEnd() + '…' : item.title}”` : '';
+    const markThem = () => { setRead(ids, true); buzz(); toast(ids.length === 1 ? 'Marked read' : `Marked ${ids.length} read`, () => setRead(ids, false)); };
+    toast(ids.length === 1 ? `Done with ${name}?` : `Done with the ${ids.length} you opened?`,
+          markThem, ids.length === 1 ? 'Mark read' : `Mark ${ids.length} read`, 9000);
+}
+window.addEventListener('blur', leftPage);
+window.addEventListener('focus', backOnPage);
 const buzz = () => { try { navigator.vibrate && navigator.vibrate(12); } catch {} };
 
 function findItem(id) {
@@ -517,7 +656,7 @@ function switchTab(tab) {
     store.set('dr_scroll', scrollPos);
     currentTab = tab;
     store.set('dr_tab', tab);
-    focusIndex = -1;
+    focusIndex = -1; focusId = null;
     if (query) { query = ''; document.getElementById('searchInput').value = ''; document.getElementById('search').classList.remove('open'); }
     render();
     window.scrollTo(0, scrollPos[tab] || 0);
@@ -533,7 +672,11 @@ function markAll() {
 
 // ---------- Event delegation ----------
 document.getElementById('tabs').addEventListener('click', (e) => {
-    const b = e.target.closest('[data-tab]'); if (b) switchTab(b.dataset.tab);
+    const b = e.target.closest('[data-tab]');
+    if (!b) return;
+    // Tapping the tab you're already on jumps back to the top.
+    if (b.dataset.tab === currentTab && !query) { window.scrollTo({ top: 0, behavior: 'smooth' }); focusIndex = -1; focusId = null; paintFocus(false); return; }
+    switchTab(b.dataset.tab);
 });
 
 document.getElementById('feed').addEventListener('click', (e) => {
@@ -549,13 +692,30 @@ document.getElementById('feed').addEventListener('click', (e) => {
         if (a === 'read') toggleRead(item);
         return;
     }
+    const card = e.target.closest('.item');
+    if (card && card.dataset.swiped) { e.preventDefault(); delete card.dataset.swiped; return; }
     const link = e.target.closest('a.item-title');
     if (link) {
-        const card = link.closest('.item');
-        if (card.dataset.swiped) { e.preventDefault(); delete card.dataset.swiped; return; }
         // Opening an article does NOT mark it read. Jalal often peeks without
-        // reading; only the tick, a left swipe, r, or Mark all read count.
+        // reading; only the tick, a left swipe, r, Mark all read, or the
+        // "Done with it? Mark read" prompt count. We only remember it was opened.
+        const item = findItem(card.dataset.id);
+        if (item) noteOpened(item);
+        return;
     }
+    // Tap the blurb to read all of it without leaving the list.
+    const desc = e.target.closest('.desc');
+    if (desc && !window.getSelection().toString()) {
+        const id = card.dataset.id;
+        expanded.has(id) ? expanded.delete(id) : expanded.add(id);   // survives re-renders
+        desc.classList.toggle('open', expanded.has(id));
+    }
+});
+// Middle-click opens a background tab without a 'click' event.
+document.getElementById('feed').addEventListener('auxclick', (e) => {
+    const link = e.button === 1 && e.target.closest('a.item-title');
+    const item = link && findItem(link.closest('.item').dataset.id);
+    if (item) noteOpened(item);
 });
 
 // ---------- Swipe: left = read, right = favorite ----------
@@ -637,7 +797,7 @@ document.getElementById('btn-search').onclick = () => {
     if (box.classList.contains('open')) { box.classList.remove('open'); query = ''; document.getElementById('searchInput').value = ''; render(); }
     else openSearch();
 };
-document.getElementById('searchInput').addEventListener('input', (e) => { query = e.target.value.trim(); focusIndex = -1; render(); });
+document.getElementById('searchInput').addEventListener('input', (e) => { query = e.target.value.trim(); focusIndex = -1; focusId = null; render(); });
 document.getElementById('btn-link').onclick = () => {
     const k = prompt('Enter the sync key from your other device:');
     if (k && k.trim()) { try { localStorage.setItem('dailyReaderSyncKey', k.trim().toUpperCase()); } catch {} location.reload(); }
@@ -646,6 +806,7 @@ document.getElementById('btn-link').onclick = () => {
 // ---------- Keyboard (desktop): j/k move, o open, r read, f favorite, / search, 1-5 tabs ----------
 function paintFocus(scroll = true) {
     document.querySelectorAll('.item.focused').forEach((el) => el.classList.remove('focused'));
+    focusId = focusIndex >= 0 && visibleItems[focusIndex] ? String(visibleItems[focusIndex].id) : null;
     if (focusIndex < 0) return;
     const el = document.querySelectorAll('#feed .item')[focusIndex];
     if (el) { el.classList.add('focused'); if (scroll) el.scrollIntoView({ block: 'center', behavior: 'smooth' }); }
@@ -657,7 +818,8 @@ document.addEventListener('keydown', (e) => {
     const cur = visibleItems[focusIndex];
     if (e.key === 'j') { focusIndex = Math.min(focusIndex + 1, visibleItems.length - 1); paintFocus(); }
     else if (e.key === 'k') { focusIndex = Math.max(focusIndex - 1, 0); paintFocus(); }
-    else if ((e.key === 'o' || e.key === 'Enter') && cur) window.open(safeUrl(cur.url), '_blank', 'noopener');
+    else if ((e.key === 'o' || e.key === 'Enter') && cur) { noteOpened(cur); window.open(safeUrl(cur.url), '_blank', 'noopener'); }
+    else if (e.key === 'u' || e.key === 'z') undoLast();
     else if ((e.key === 'r' || e.key === 'e') && cur) toggleRead(cur);
     else if ((e.key === 'f' || e.key === 's') && cur) favItem(cur);
     else if (e.key === '/') { e.preventDefault(); openSearch(); }
@@ -673,6 +835,7 @@ async function loadData() {
         const res = await fetch('/api/data', { cache: 'no-store' });
         if (!res.ok) throw new Error(res.status);
         allData = await res.json();
+        trackFirstSeen();
         lastLoad = Date.now();
         loadError = false;
     } catch (e) {
@@ -687,7 +850,8 @@ async function loadData() {
 // when it comes back to the foreground after 20+ minutes (or on a new day).
 let lastDay = etDate();
 document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'hidden') { scrollPos[currentTab] = window.scrollY; store.set('dr_scroll', scrollPos); return; }
+    if (document.visibilityState === 'hidden') { leftPage(); scrollPos[currentTab] = window.scrollY; store.set('dr_scroll', scrollPos); return; }
+    backOnPage();
     if (Date.now() - lastLoad > 20 * 60e3 || etDate() !== lastDay) { lastDay = etDate(); amShowOlder = false; loadData(); }
 });
 

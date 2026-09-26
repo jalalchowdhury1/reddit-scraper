@@ -19,7 +19,11 @@ templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
 def clean_text(text) -> str:
     if pd.isna(text) or not text: return ""
     # Ritholtz blurbs end with an empty "( )" where the source link was.
-    return re.sub(r"\s*\(\s*\)", "", html.unescape(str(text))).strip()
+    t = re.sub(r"\s*\(\s*\)", "", html.unescape(str(text)))
+    # Scraped text nodes get joined with spaces: "eudaemonia , which means “ good spirit .”"
+    t = re.sub(r"\s+([,.;:!?”)])", r"\1", t)
+    t = re.sub(r"([“(])\s+", r"\1", t)
+    return t.strip()
 
 def format_score(score: int) -> str:
     """Format large scores with 'k' suffix (e.g., 82450 -> 82.4k)"""
@@ -37,6 +41,24 @@ def domain_of(url: str) -> str:
         if host.startswith(pre):
             host = host[len(pre):]
     return host
+
+def short_text(text, limit: int = 500) -> str:
+    """Trim to ~limit chars at a word boundary (the card can expand to show it all)."""
+    t = clean_text(text)
+    if len(t) <= limit:
+        return t
+    return t[:limit].rsplit(" ", 1)[0].rstrip(" ,.;:") + "…"
+
+def title_key(title) -> str:
+    """Same headline from two outlets -> same key ("PM's" == "PMs")."""
+    return re.sub(r"[^a-z0-9]", "", clean_text(title).lower())[:70]
+
+def newest_scrape(df) -> str:
+    """Latest scraped_at in a CSV (UTC on the GitHub runner), as ISO with Z."""
+    if "scraped_at" not in df.columns:
+        return ""
+    vals = [v for v in df["scraped_at"].astype(str) if v[:2] == "20"]
+    return (max(vals)[:19] + "Z") if vals else ""
 
 def calculate_reading_time(text: str) -> int:
     """Calculate estimated reading time in minutes based on word count."""
@@ -69,6 +91,7 @@ def icon():
 @app.get("/api/data")
 def get_data():
     data = {"monthly": [], "yearly": [], "news": [], "ritholtz": []}
+    updated = {"news": "", "ritholtz": ""}
     
     # Load Reddit
     posts_files = glob.glob(str(BASE_DIR / "data/r_*/posts.csv"))
@@ -81,6 +104,7 @@ def get_data():
                 if df.empty or "id" not in df.columns: continue
                 df['subreddit'] = Path(f).parent.name.replace('r_', '')
                 df['time_filter'] = 'monthly'
+                df['rank'] = range(1, len(df) + 1)  # position in r/sub's own top list
                 dfs.append(df)
             except: pass
             
@@ -91,11 +115,19 @@ def get_data():
                 if df.empty or "id" not in df.columns: continue
                 df['subreddit'] = Path(f).parent.name.replace('r_', '').replace('_yearly', '')
                 df['time_filter'] = 'yearly'
+                df['rank'] = range(1, len(df) + 1)
                 dfs.append(df)
             except: pass
 
         if dfs:
-            combined = pd.concat(dfs, ignore_index=True).fillna("")
+            combined = pd.concat(dfs, ignore_index=True)
+            # Only scores read from Reddit itself are real. The RSS/HTML fallbacks
+            # invent a decaying number just for ordering (older CSVs have no flag,
+            # and every save since at least Sep 2026 came from RSS) -> not real.
+            if 'score_real' not in combined.columns:
+                combined['score_real'] = False
+            combined['score_real'] = combined['score_real'].astype(str).str.lower().isin(['true', '1'])
+            combined = combined.fillna("")
             combined['id'] = combined['id'].astype(str)
             combined = combined.drop_duplicates(subset=["id", "time_filter"], keep="first")
             combined['score'] = pd.to_numeric(combined['score'], errors='coerce').fillna(0).astype(int)
@@ -112,16 +144,25 @@ def get_data():
                 selftext = str(row.get('selftext', ''))
                 read_time = calculate_reading_time(selftext)
                 
+                when = "month" if row['time_filter'] == 'monthly' else "year"
                 item = {
-                    "id": pid, 
-                    "title": clean_text(row['title']), 
-                    "desc": clean_text(selftext[:300]),
+                    "id": pid,
+                    "title": clean_text(row['title']),
+                    "desc": short_text(selftext),
                     "url": clean_url,
-                    "meta": f"r/{row['subreddit']} • {row['time_filter'].upper()} • {format_score(row['score'])} pts • ⏱️ {read_time} min",
+                    "meta": f"r/{row['subreddit']} • {row['time_filter'].upper()}",
                     "source": f"r/{row['subreddit']}",
                     "domain": "reddit.com",
-                    "mins": read_time,
+                    "mins": read_time if selftext.strip() else 0,
+                    "rank": int(row['rank']) if str(row['rank']).isdigit() else 0,
+                    "when": when,
+                    # Shown only when it came from Reddit, never an invented number.
+                    "upvotes": format_score(row['score']) if row['score_real'] else "",
                 }
+                # Monthly hides r/AskHistorians (it lives in Yearly). Drop it
+                # here, before the 50 cap, so Monthly still gets 50 posts.
+                if row['time_filter'] == 'monthly' and row['subreddit'].lower() == 'askhistorians':
+                    continue
                 data[row['time_filter']].append(item)
 
     # Load Google News
@@ -131,6 +172,12 @@ def get_data():
             news_df = pd.read_csv(news_csv).fillna("")
             if not news_df.empty and "article_id" in news_df.columns:
                 news_df = news_df.drop_duplicates(subset=["article_id", "category"], keep="first")
+                updated["news"] = newest_scrape(news_df)
+                # Google News often lists one story from 2-3 outlets, days apart.
+                # Keep the EARLIEST copy: its id never changes, so a story already
+                # marked read can't come back as "new" when a later copy lands.
+                news_df = news_df.assign(_key=news_df["title"].map(title_key))
+                news_df = news_df.sort_values("pub_date").drop_duplicates(subset=["_key"], keep="first")
                 news_df = news_df.sort_values("pub_date", ascending=False)
                 for _, row in news_df.iterrows():
                     pid = f"gn_{row['article_id']}"
@@ -148,6 +195,7 @@ def get_data():
                         "category": str(row.get('category', '')),
                         "domain": domain_of(row.get('url', '')),
                         "date": str(row.get('pub_date', ''))[:10],
+                        "ts": str(row.get('pub_date', '')),
                         "mins": read_time,
                     })
         except: pass
@@ -158,6 +206,7 @@ def get_data():
         try:
             rith_df = pd.read_csv(ritholtz_csv).fillna("")
             if not rith_df.empty and "article_id" in rith_df.columns:
+                updated["ritholtz"] = newest_scrape(rith_df)
                 rith_df = rith_df.drop_duplicates(subset=["article_id"], keep="first")
                 for _, row in rith_df.iterrows():
                     pid = f"rth_{row['article_id']}"
@@ -220,7 +269,15 @@ def get_data():
     if "ritholtz" in data and data["ritholtz"]:
         data["ritholtz"].sort(key=extract_date_from_meta, reverse=True)
 
-    for k in data: 
+    yearly_pool = list(data["yearly"])  # before the cap, so Yearly can backfill
+    for k in data:
         data[k] = data[k][:50]
-        
+
+    # One of each across tabs: a post already in Monthly's list isn't repeated
+    # in Yearly (Yearly backfills from further down instead).
+    monthly_ids = {i["id"] for i in data["monthly"]}
+    yearly_all = [i for i in yearly_pool if i["id"] not in monthly_ids]
+    data["yearly"] = yearly_all[:50]
+
+    data["updated"] = updated  # when each feed last landed (UTC ISO)
     return data
