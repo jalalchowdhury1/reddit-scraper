@@ -553,12 +553,8 @@ document.getElementById('feed').addEventListener('click', (e) => {
     if (link) {
         const card = link.closest('.item');
         if (card.dataset.swiped) { e.preventDefault(); delete card.dataset.swiped; return; }
-        // Opening an article marks it read (Undo in the toast).
-        const item = findItem(card.dataset.id);
-        if (item && !isRead(item)) setTimeout(() => {
-            setRead([item.id], true);
-            toast('Opened and marked read', () => setRead([item.id], false));
-        }, 350);
+        // Opening an article does NOT mark it read. Jalal often peeks without
+        // reading; only the tick, a left swipe, r, or Mark all read count.
     }
 });
 
@@ -661,7 +657,7 @@ document.addEventListener('keydown', (e) => {
     const cur = visibleItems[focusIndex];
     if (e.key === 'j') { focusIndex = Math.min(focusIndex + 1, visibleItems.length - 1); paintFocus(); }
     else if (e.key === 'k') { focusIndex = Math.max(focusIndex - 1, 0); paintFocus(); }
-    else if ((e.key === 'o' || e.key === 'Enter') && cur) { window.open(safeUrl(cur.url), '_blank', 'noopener'); if (!isRead(cur)) setRead([cur.id], true); }
+    else if ((e.key === 'o' || e.key === 'Enter') && cur) window.open(safeUrl(cur.url), '_blank', 'noopener');
     else if ((e.key === 'r' || e.key === 'e') && cur) toggleRead(cur);
     else if ((e.key === 'f' || e.key === 's') && cur) favItem(cur);
     else if (e.key === '/') { e.preventDefault(); openSearch(); }

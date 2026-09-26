@@ -331,9 +331,10 @@ streamlit run dashboard.py
   `format_score`, `calculate_reading_time`, `clean_text`.
 - `templates/index.html` — the whole SPA (rewritten 2026-09-26, plain CSS tokens, no Tailwind):
   5 tabs with unread counts, progress bar + Mark all read (with Undo), swipe left = read /
-  right = favorite, opening a link marks it read, search across all tabs, text size + light/dark/auto,
+  right = favorite, search across all tabs, text size + light/dark/auto,
   j/k/o/r/f keys, remembers tab + scroll, re-fetches when resumed after 20 min. Firebase paths
-  unchanged. It is a Jinja template: never write `{{` or `{%` in its JS.
+  unchanged. **Opening a link must NOT mark it read** (user peeks without
+  reading; only the tick / left swipe / r / Mark all read count). It is a Jinja template: never write `{{` or `{%` in its JS.
 - `server_assets/style.css` — extra styles served alongside the SPA.
 - `manifest.json` + `sw.js` — PWA manifest + **network-first** service worker (cache `daily-reader-v2`;
   cache is only the offline fallback). `server.py` serves `/manifest.json`, `/sw.js`, `/icon.png`
