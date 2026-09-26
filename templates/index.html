@@ -51,7 +51,7 @@
         body { font-family: 'Geist', system-ui, -apple-system, sans-serif; -webkit-font-smoothing: antialiased; -webkit-tap-highlight-color: transparent; }
         button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; padding: 0; }
         button:focus-visible, a:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 8px; }
-        .wrap { max-width: 760px; margin: 0 auto; padding: 0 16px calc(96px + var(--safe-bottom)); }
+        .wrap { max-width: 1440px; margin: 0 auto; padding: 0 16px calc(96px + var(--safe-bottom)); }
 
         /* ---------- Header ---------- */
         header { position: sticky; top: 0; z-index: 20; background: color-mix(in srgb, var(--bg) 88%, transparent);
@@ -89,7 +89,12 @@
         .search input::placeholder { color: var(--faint); }
 
         /* ---------- Feed ---------- */
-        #feed { margin-top: 10px; }
+        /* Wide screens: articles flow into 2 (then 3) columns so more fit per screen.
+           Labels and empty states span the full width. Phones stay one column. */
+        #feed { margin-top: 10px; display: grid; grid-template-columns: minmax(0, 1fr); column-gap: 28px; align-items: start; }
+        #feed > .section-label, #feed > .state { grid-column: 1 / -1; }
+        @media (min-width: 1000px) { #feed { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+        @media (min-width: 1700px) { #feed { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
         .section-label { font-size: .78rem; color: var(--muted); padding: 18px 4px 6px; display: flex; align-items: center; gap: 8px; }
         .item { position: relative; border-radius: var(--radius); overflow: hidden; margin: 2px 0; }
         .swipe-bg { position: absolute; inset: 0; display: flex; justify-content: space-between; align-items: center; padding: 0 22px; font-size: 1.35rem; opacity: 0; }
