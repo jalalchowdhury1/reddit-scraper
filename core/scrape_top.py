@@ -1,3 +1,5 @@
+import argparse
+import json
 import requests
 import pandas as pd
 import time
@@ -7,6 +9,8 @@ from pathlib import Path
 from bs4 import BeautifulSoup
 from datetime import datetime, timezone
 from reddit_common import SUBREDDITS, SUBREDDIT_TIERS, list_key, load_meta, fresh_keys
+# The Mac's checks for "is this really r/sub's top list?" (stdlib only, no browser needed)
+from scrape_reddit_browser import list_problem, raw_from_json, raw_from_rss
 
 HEADERS = {
     "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
@@ -23,71 +27,13 @@ HEADERS = {
 }
 
 
-def fetch_via_html(subreddit: str, time_filter: str) -> list:
-    """SECONDARY: Scrapes the raw HTML of old.reddit.com - Better because it has SCORES."""
-    print(f"    🛡️ Attempting Secondary Fallback (HTML) for r/{subreddit}...")
-    url = f"https://old.reddit.com/r/{subreddit}/top/?sort=top&t={time_filter}"
-    try:
-        response = requests.get(url, headers=HEADERS, timeout=15)
-        response.raise_for_status()
-
-        soup = BeautifulSoup(response.text, 'html.parser')
-        posts = []
-
-        # Determine base score range for this subreddit
-        score_range = SUBREDDIT_TIERS.get(subreddit, SUBREDDIT_TIERS["default"])
-        base_max_score = random.randint(score_range[0], score_range[1])
-
-        for i, thing in enumerate(soup.find_all('div', class_='thing')[:50]):
-            title_elem = thing.find('a', class_='title')
-            if not title_elem: continue
-
-            # Extract raw permalink
-            raw_permalink = thing.get('data-permalink', '')
-
-            # ENSURE ABSOLUTE URL: If it starts with /r/, prepend reddit.com
-            if raw_permalink.startswith('/'):
-                full_permalink = f"https://www.reddit.com{raw_permalink}"
-            elif not raw_permalink.startswith('http'):
-                full_permalink = f"https://www.reddit.com/{raw_permalink.lstrip('/')}"
-            else:
-                full_permalink = raw_permalink
-
-            score = 0
-            score_real = False
-            score_elem = thing.find('div', class_='score unvoted')
-            if score_elem and score_elem.get('title'):
-                try:
-                    score = int(score_elem.get('title'))
-                    score_real = score > 0
-                except ValueError: pass
-
-            # If score is 0 (not scraped), use tiered exponential decay
-            if score == 0:
-                # Exponential decay: each post drops by roughly 12% from the previous, plus some random noise
-                score = int(base_max_score * (0.88 ** i)) + random.randint(100, 999)
-
-            posts.append({
-                'id': thing.get('data-fullname', '').split('_')[-1],
-                'title': title_elem.text.strip(),
-                'selftext': "",
-                'permalink': full_permalink,
-                'score': score,
-                'score_real': score_real,
-            })
-
-        return posts
-    except Exception as e:
-        print(f"    ❌ Secondary Fallback (HTML) also failed: {e}")
-        return []
-
 # Reddit 429s most RSS calls from GitHub's shared IPs (21 of 26 on 26 Sep 2026).
 # One polite retry per call, capped per run so the job stays well under its
-# 30-minute timeout.
+# 20-minute timeout.
 RSS_BACKOFF_BUDGET = {"seconds": 480}
-# Hard stop for the whole Reddit pass. The job is killed at 30 min, and a killed
-# job never reaches its commit step, which would lose News and AM Reads too.
-RUN_DEADLINE_S = 18 * 60
+# Hard stop for the whole Reddit pass: reddit_backup.yml kills the job at 20 min,
+# and a killed job never reaches its commit step.
+RUN_DEADLINE_S = 12 * 60
 
 def retry_after(response) -> int:
     try:
@@ -140,6 +86,11 @@ def fetch_via_rss(subreddit: str, time_filter: str) -> list:
             time.sleep(wait)
             response = requests.get(url, headers=HEADERS, timeout=10)
         response.raise_for_status()
+        problem = list_problem(raw_from_rss(response.content), subreddit, time_filter,
+                               response.url, upvotes=False)
+        if problem:  # a login page, another sub, an older list, a near-empty feed
+            print(f"  ❌ RSS for r/{subreddit}: {problem}; not saved")
+            return []
         return parse_rss(response.content, subreddit)
     except Exception as e:
         print(f"  ❌ Tertiary Fallback (RSS) failed: {e}")
@@ -163,6 +114,11 @@ def fetch_via_json(subreddit: str, time_filter: str) -> list:
 
         response.raise_for_status()
         data = response.json()
+        raw, complete = raw_from_json(data)
+        problem = list_problem(raw, subreddit, time_filter, response.url, complete=complete)
+        if problem:
+            print(f"  ❌ JSON for r/{subreddit}: {problem}; not saved")
+            return []
 
         posts = []
         for item in data.get('data', {}).get('children', []):
@@ -185,19 +141,12 @@ def fetch_via_json(subreddit: str, time_filter: str) -> list:
         return []
 
 def fetch_reddit_posts(subreddit: str, time_filter: str) -> list:
-    """PRIMARY: Fetches top posts via old.reddit.com JSON (Stealth). Falls back to HTML/RSS."""
-    # Try stealth JSON first
-    json_posts = fetch_via_json(subreddit, time_filter)
-    if json_posts:
-        return json_posts
+    """RSS first: from GitHub's IPs it is the only way in (checked 26 Sep 2026: JSON
+    403, old.reddit 403 or a login page, a real browser "blocked by network
+    security"; RSS 200 until rate-limited). JSON stays as a second try in case
+    Reddit ever lets GitHub back in, because it carries real upvotes."""
+    return fetch_via_rss(subreddit, time_filter) or fetch_via_json(subreddit, time_filter)
 
-    # Fallback to HTML (has scores)
-    html_posts = fetch_via_html(subreddit, time_filter)
-    if html_posts:
-        return html_posts
-
-    # Last resort: RSS
-    return fetch_via_rss(subreddit, time_filter)
 
 def save_posts_to_csv(posts: list, subreddit: str, time_filter: str):
     if not posts: return
@@ -207,34 +156,87 @@ def save_posts_to_csv(posts: list, subreddit: str, time_filter: str):
     pd.DataFrame(posts).to_csv(folder_path / "posts.csv", index=False)
     print(f"  ✅ Saved {len(posts)} posts to {subreddit}")
 
+# When THIS backup last refreshed each list. Its own file, so it never collides with
+# the Mac's reddit_browser.json. A list it refreshed recently waits, so each run's
+# small batch moves on to the next stalest lists instead of redoing the same ones.
+GITHUB_META = Path("data/reddit_github.json")
+GITHUB_REFRESH_HOURS = 12
+
+
+def load_github_meta(path: Path = GITHUB_META) -> dict:
+    try:
+        lists = json.loads(path.read_text()).get("lists", {})
+    except (OSError, ValueError, AttributeError):
+        return {}
+    return lists if isinstance(lists, dict) else {}
+
+
+def stamp_github_meta(key: str, path: Path = GITHUB_META):
+    lists = load_github_meta(path)
+    lists[key] = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps({"note": "When GitHub's RSS backup (core/scrape_top.py) last refreshed "
+                                        "each Reddit list the Mac had left stale.",
+                                "lists": dict(sorted(lists.items()))}, indent=1) + "\n")
+
+
+def stale_lists(mac: dict, github: dict, now: datetime) -> list:
+    """(sub, time_filter) for every list the Mac hasn't saved in 36 h and this backup
+    hasn't refreshed in 12 h, stalest first (never saved = first)."""
+    mac_fresh = fresh_keys(mac, now)
+    gh_fresh = fresh_keys(github, now, GITHUB_REFRESH_HOURS)
+    todo = [(sub, t) for sub in SUBREDDITS for t in ("month", "year")
+            if list_key(sub, t) not in mac_fresh and list_key(sub, t) not in gh_fresh]
+
+    def last(x):
+        k = list_key(*x)
+        return max(str(mac.get(k, "")), str(github.get(k, "")))
+    return sorted(todo, key=last)
+
+
 def main():
+    ap = argparse.ArgumentParser(description="GitHub's Reddit backup: RSS for lists the Mac left stale.")
+    ap.add_argument("--max-lists", type=int, default=0, help="refresh at most N stale lists (0 = all)")
+    a = ap.parse_args()
     print("="*50)
-    print("🚀 Triple-Threat Reddit Scraper (JSON -> HTML -> RSS)")
+    print("🚀 Reddit backup (RSS -> JSON) for lists the Mac left stale")
     print("="*50)
     deadline = time.monotonic() + RUN_DEADLINE_S
     # Lists the Mac mini's real browser saved recently (real upvotes + text).
     # Leave them alone; RSS here only fills in when the Mac has been down.
+    now = datetime.now(timezone.utc)
     try:
-        fresh = fresh_keys(load_meta(), datetime.now(timezone.utc))
-    except Exception as e:  # never let a bad json stop News/AM Reads, which run after this
-        print(f"⚠️ data/reddit_browser.json unreadable ({e}); scraping every list")
-        fresh = {}
-    for sub in SUBREDDITS:
-        for t_filter in ["month", "year"]:
-            key = list_key(sub, t_filter)
-            if key in fresh:
-                print(f"🖥️ r/{sub} ({t_filter}): Mac browser copy is {fresh[key]:.0f}h old, keeping it")
-                continue
-            if time.monotonic() > deadline:
-                print(f"⏱️ {RUN_DEADLINE_S // 60}-min Reddit limit reached: skipping r/{sub} ({t_filter}) and the rest; their old files stay.")
-                return
-            print(f"📡 Processing r/{sub} ({t_filter})...")
-            posts = fetch_reddit_posts(sub, t_filter)
-            save_posts_to_csv(posts, sub, t_filter)
-            # Randomized human-like jitter (6.5 to 12.5 seconds)
-            jitter = random.uniform(6.5, 12.5)
-            print(f"  💤 Humanizing delay: Sleeping for {jitter:.2f} seconds...")
-            time.sleep(jitter)
+        mac, github = load_meta(), load_github_meta()
+        todo, n_fresh = stale_lists(mac, github, now), len(fresh_keys(mac, now))
+    except Exception as e:  # a bad json must never crash the run
+        print(f"⚠️ reddit_browser.json / reddit_github.json unreadable ({e}); scraping every list")
+        todo, n_fresh = [(sub, t) for sub in SUBREDDITS for t in ("month", "year")], 0
+    print(f"🖥️ {n_fresh} lists fresh from the Mac, {len(todo)} need a refresh here")
+    batch = todo[:a.max_lists] if a.max_lists > 0 else todo
+    done = 0
+    for sub, t_filter in batch:
+        if time.monotonic() > deadline:
+            print(f"⏱️ {RUN_DEADLINE_S // 60}-min Reddit limit reached: the rest wait for the next run.")
+            break
+        print(f"📡 Processing r/{sub} ({t_filter})...")
+        posts = fetch_reddit_posts(sub, t_filter)
+        save_posts_to_csv(posts, sub, t_filter)
+        if posts:
+            stamp_github_meta(list_key(sub, t_filter))
+            done += 1
+        # Randomized human-like jitter (6.5 to 12.5 seconds)
+        jitter = random.uniform(6.5, 12.5)
+        print(f"  💤 Humanizing delay: Sleeping for {jitter:.2f} seconds...")
+        time.sleep(jitter)
+    print(f"REDDIT BACKUP: refreshed {done} of {len(todo)} lists that needed it (tried {len(batch)})")
+    if not batch:
+        # Nothing to do (the Mac is fine): still prove RSS reaches Reddit from here,
+        # so a dead backup shows up on the fleet board before the day it's needed.
+        # One read, nothing written; the sub rotates every 3 hours.
+        sub = SUBREDDITS[(datetime.now(timezone.utc).hour // 3) % len(SUBREDDITS)]
+        posts = fetch_via_rss(sub, "month")
+        print(f"GITHUB REDDIT CHECK: rss {'ok' if posts else 'FAILED'} (r/{sub}: {len(posts)} posts)")
+
 
 if __name__ == "__main__":
     main()

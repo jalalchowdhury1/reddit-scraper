@@ -8,7 +8,8 @@
 #
 # Log: ~/Library/Logs/reddit-browser.log. Each run starts with
 # "== YYYY-MM-DD HH:MM:SS start" and ends well with "REDDIT PUSHED: N files"
-# (or "NO REDDIT CHANGES (scraper exit 0)"). fleet-health checks exactly that.
+# (or "NO REDDIT CHANGES (scraper exit 0)"). fleet-health checks exactly that,
+# plus the scraper's "METHOD CHECK: page ok · json ok · rss ok" (backups alive).
 #
 # The REDDIT_BROWSER_* variables exist for tests/test_robustness.py only.
 
@@ -59,6 +60,16 @@ main() {
     echo "clone looks broken: cloning it again"
     cd "$BASE" && rm -rf "$clone"
   done
+
+  # A brew Python upgrade (3.14 -> 3.15) leaves Playwright behind in the old
+  # version's packages and every run would fail: reinstall it for this python3.
+  # (The scraper itself re-downloads Chromium if that is what's missing.)
+  local need="${REDDIT_BROWSER_NEED_MODULE:-playwright}"
+  if ! "$py" -c "import $need" >/dev/null 2>&1; then
+    echo "🔧 $need missing for $("$py" --version 2>&1): installing it"
+    timeout 600 "$py" -m pip install -q --break-system-packages "$need" 2>&1 | tail -3
+    "$py" -c "import $need" >/dev/null 2>&1 && echo "🔧 $need installed" || echo "🔧 $need INSTALL FAILED"
+  fi
 
   # -u: unbuffered, so a run killed by `timeout` still leaves its lines in the log.
   timeout 1200 "$py" -u core/scrape_reddit_browser.py --profile "$BASE/profile"

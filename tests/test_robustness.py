@@ -22,7 +22,7 @@ sys.path.insert(0, str(ROOT))
 import server
 from fastapi.testclient import TestClient
 from reddit_common import SUBREDDITS
-from scrape_reddit_browser import MIN_POSTS, page_ok, rows_from_page, update_meta, write_list
+from scrape_reddit_browser import MIN_POSTS, list_problem, rows_from_page, update_meta, write_list
 
 
 # ---------- server: one bad file costs one tab, never the others ----------
@@ -58,6 +58,7 @@ def site(tmp_path, monkeypatch):
     }}))
     monkeypatch.setattr(server, "BASE_DIR", tmp_path)
     monkeypatch.setattr(server, "BROWSER_META", data / "reddit_browser.json")
+    monkeypatch.setattr(server, "GITHUB_META", data / "reddit_github.json")
     return data
 
 
@@ -116,7 +117,7 @@ def test_status_endpoint_lists_oldest_first_and_names_missing_lists(site):
     s = TestClient(server.app).get("/api/status").json()
     assert [r["list"] for r in s["reddit_lists"]] == ["r_LifeProTips_yearly", "r_LifeProTips"]
     assert s["reddit_lists"][0] == {"list": "r_LifeProTips_yearly", "saved": "2026-09-25T23:35:00+00:00",
-                                    "checked": ""}          # old json: no `checked` yet
+                                    "checked": "", "via": ""}   # old json: no `checked`/`via` yet
     assert s["reddit_oldest"] == "2026-09-25T23:35:00+00:00"
     assert s["tracked_subs"] == len(SUBREDDITS)
     assert len(s["reddit_missing"]) == 2 * len(SUBREDDITS) - 2
@@ -125,13 +126,22 @@ def test_status_endpoint_lists_oldest_first_and_names_missing_lists(site):
 
 
 def test_status_grades_checked_so_a_short_list_is_not_stale(site):
-    # r/lifehacks can have < MIN_POSTS posts: the Mac reaches it but doesn't save it.
-    update_meta({"r_LifeProTips": "2026-09-26T11:35:00+00:00"}, site / "reddit_browser.json")
+    # r/lifehacks can have < MIN_POSTS posts: the Mac may reach it but not save it.
+    update_meta({"r_LifeProTips": "2026-09-26T11:35:00+00:00"}, site / "reddit_browser.json", via={"r_LifeProTips": "json"})
     update_meta({}, site / "reddit_browser.json", checked={"r_lifehacks": "2026-09-26T11:36:00+00:00"})
     rows = {r["list"]: r for r in server.status()["reddit_lists"]}
-    assert rows["r_lifehacks"] == {"list": "r_lifehacks", "saved": "", "checked": "2026-09-26T11:36:00+00:00"}
+    assert rows["r_lifehacks"] == {"list": "r_lifehacks", "saved": "", "checked": "2026-09-26T11:36:00+00:00", "via": ""}
+    assert rows["r_LifeProTips"]["via"] == "json"                                # which backup saved it
     assert rows["r_LifeProTips"]["checked"] == rows["r_LifeProTips"]["saved"]   # saved implies reached
     assert "r_lifehacks" in server.status()["reddit_missing"]                   # still never saved
+
+
+def test_status_says_when_github_refilled_a_list_after_the_mac(site):
+    (site / "reddit_github.json").write_text(json.dumps({"lists": {
+        "r_LifeProTips_yearly": "2026-09-27T09:17:00Z",     # after the Mac's 25 Sep save: GitHub's RSS is live
+        "r_LifeProTips": "2026-09-25T09:17:00Z"}}))          # before the Mac's 26 Sep save: the Mac's is live
+    rows = {r["list"]: r for r in server.status()["reddit_lists"]}
+    assert rows["r_LifeProTips_yearly"]["via"] == "github rss" and rows["r_LifeProTips"]["via"] == ""
 
 
 def test_broken_browser_json_means_no_stamps_not_a_crash(site):
@@ -144,13 +154,13 @@ def test_broken_browser_json_means_no_stamps_not_a_crash(site):
 
 # ---------- Mac scraper: what counts as a real page ----------
 
-def test_page_ok_accepts_small_real_lists_and_rejects_broken_pages():
-    small = [{"id": f"t3_s{i}", "title": f"t{i}", "type": "text"} for i in range(MIN_POSTS)]
-    assert page_ok(small, rows_from_page(small, "lifehacks"))         # r/lifehacks: 7 posts in Sep 2026
+def test_short_list_is_saved_only_when_reddit_says_that_is_all():
+    small = [{"id": f"t3_s{i}", "title": f"t{i}", "type": "text", "score": "9"} for i in range(MIN_POSTS)]
+    assert list_problem(small, "lifehacks", "month") == ""                        # enough posts
     few = small[:MIN_POSTS - 1]
-    assert not page_ok(few, rows_from_page(few, "lifehacks"))         # a challenge/error page
-    videos = [dict(p, type="video") for p in small * 10]
-    assert not page_ok(videos, rows_from_page(videos, "lifehacks"))   # nothing readable
+    assert list_problem(few, "lifehacks", "month").startswith("too short")        # a challenge/error page?
+    assert list_problem(few, "lifehacks", "month", complete=True) == ""          # JSON said no next page
+    assert list_problem([], "lifehacks", "month", complete=True) == "no posts"
 
 
 def test_update_meta_merges_and_survives_a_broken_file(tmp_path):
@@ -219,7 +229,8 @@ def mac(tmp_path):
     git("clone", "-q", "--bare", str(seed), str(bare), env=env)
     base, log = tmp_path / "base", tmp_path / "logs" / "reddit-browser.log"
     env.update(REDDIT_BROWSER_BASE=str(base), REDDIT_BROWSER_LOG=str(log), REDDIT_BROWSER_REMOTE=str(bare),
-               REDDIT_BROWSER_PY=sys.executable, REDDIT_BROWSER_RETRY_SLEEP="0")
+               REDDIT_BROWSER_PY=sys.executable, REDDIT_BROWSER_RETRY_SLEEP="0",
+               REDDIT_BROWSER_NEED_MODULE="json")   # the test python has no Playwright; see the self-heal test
 
     class Mac:
         def run(self, **extra):
@@ -330,3 +341,32 @@ def test_wrapper_trims_a_big_log_in_place(mac):
     rc, text = mac.run()
     assert rc == 0
     assert len(text.splitlines()) < 3100 and "REDDIT PUSHED" in mac.last_block()
+
+
+FAKE_PYTHON = """#!/bin/bash
+# Stands in for a brew python3 whose upgrade left Playwright behind.
+echo "$*" >> "$FAKE_PY_CALLS"
+case "$*" in
+  "-c import playwright") [ -f "$FAKE_PY_CALLS.installed" ] && exit 0 || exit 1 ;;
+  "-m pip install -q --break-system-packages playwright") touch "$FAKE_PY_CALLS.installed"; exit 0 ;;
+  "--version") echo "Python 3.15.0"; exit 0 ;;
+esac
+exec "$REAL_PY" "$@"
+"""
+
+
+@needs_tools
+def test_wrapper_reinstalls_playwright_after_a_python_upgrade(mac, tmp_path):
+    fake, calls = tmp_path / "python3", tmp_path / "py-calls.txt"
+    fake.write_text(FAKE_PYTHON)
+    fake.chmod(0o755)
+    rc, _ = mac.run(REDDIT_BROWSER_PY=str(fake), REDDIT_BROWSER_NEED_MODULE="playwright",
+                    FAKE_PY_CALLS=str(calls), REAL_PY=sys.executable)
+    block = mac.last_block()
+    assert rc == 0, block
+    assert "playwright missing for Python 3.15.0: installing it" in block and "playwright installed" in block
+    assert "-m pip install -q --break-system-packages playwright" in calls.read_text()
+    assert re.search(FLEET_SUCCESS_RE, block)                  # and the run itself still went through
+    mac.run(REDDIT_BROWSER_PY=str(fake), REDDIT_BROWSER_NEED_MODULE="playwright",
+            FAKE_PY_CALLS=str(calls), REAL_PY=sys.executable)
+    assert "missing" not in mac.last_block()                   # installed once, not every run

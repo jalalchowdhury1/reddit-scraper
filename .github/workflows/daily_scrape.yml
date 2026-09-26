@@ -61,9 +61,10 @@ jobs:
           pip install -r requirements-scraper.txt
 
       - name: Run Scrapers
+        # Reddit is not here: the Mac mini scrapes it, and reddit_backup.yml refills
+        # stale lists every 3 hours, so News and AM Reads never wait on Reddit.
         if: steps.guard.outputs.run == 'true'
         run: |
-          python core/scrape_top.py
           python core/scrape_ritholtz.py
           python core/scrape_googlenews.py
           python core/scrape_trung.py

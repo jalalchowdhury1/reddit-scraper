@@ -26,7 +26,8 @@ lives in the browser and in Firebase.
 | Robot | When | Writes |
 |---|---|---|
 | **Mac mini** launchd `com.jalal.reddit-browser` → `mac/reddit-browser.sh` → `core/scrape_reddit_browser.py` | 07:35 + 19:35 local | `data/r_<sub>[_yearly]/posts.csv` with **real upvotes**, `data/reddit_browser.json` |
-| GitHub `.github/workflows/daily_scrape.yml` | 03:00 UTC, retry 09:00 UTC | News, AM Reads, SatPost, and Reddit **only for lists the Mac hasn't saved in 36 h** |
+| GitHub `.github/workflows/reddit_backup.yml` | every 3 h (`:17`) | Reddit **only for lists the Mac hasn't saved in 36 h** (RSS, 6 per run, stalest first), `data/reddit_github.json` |
+| GitHub `.github/workflows/daily_scrape.yml` | 03:00 UTC, retry 09:00 UTC | News, AM Reads, SatPost (no Reddit since 26 Sep 2026) |
 | GitHub `.github/workflows/am_reads.yml` | 11:45 / 13:30 / 15:30 UTC | AM Reads + SatPost again (Ritholtz posts ~6:30 AM ET) |
 
 ### Data flow
@@ -35,8 +36,9 @@ lives in the browser and in Firebase.
 Mac mini, 07:35 + 19:35 (real headless browser; Reddit blocks GitHub's IPs)
    └─ core/scrape_reddit_browser.py → data/r_<sub>[_yearly]/posts.csv + data/reddit_browser.json
    └─ git add -f … && commit && push           (its own clone, 3-try rebase loop)
+GitHub Actions, every 3 h (reddit_backup.yml)
+   └─ core/scrape_top.py --max-lists 6 → Reddit backup: lists the Mac missed for 36 h (RSS, no upvotes)
 GitHub Actions, 03:00 UTC (+ 09:00 retry)
-   └─ core/scrape_top.py        → Reddit backup: only lists the Mac missed for 36 h (RSS, no upvotes)
    └─ core/scrape_ritholtz.py   → data/ritholtz/articles.csv   (only today's list, no repeats)
    └─ core/scrape_googlenews.py → data/googlenews/articles.csv (append + dedup)
    └─ core/scrape_trung.py      → data/trung/articles.csv      (overwrite)
@@ -60,8 +62,8 @@ the **AM Reads** tab (`AM READS` / `WEEKEND READS` vs `SATPOST` in each item's m
 
 | Script | Runs on | Source | Output | Write mode |
 |---|---|---|---|---|
-| `core/scrape_reddit_browser.py` | **Mac mini** (launchd) | reddit.com top pages in headless Chromium | `data/r_<sub>/posts.csv`, `data/r_<sub>_yearly/posts.csv`, `data/reddit_browser.json` | **overwrite** per list, only when the page loaded |
-| `core/scrape_top.py` | GitHub (daily) | Reddit JSON → HTML → RSS | same Reddit files | **overwrite**, skips lists the Mac saved in 36 h |
+| `core/scrape_reddit_browser.py` | **Mac mini** (launchd) | headless Chromium: top page → top.json → RSS | `data/r_<sub>/posts.csv`, `data/r_<sub>_yearly/posts.csv`, `data/reddit_browser.json` | **overwrite** per list, only when a method passed every check |
+| `core/scrape_top.py` | GitHub (every 3 h) | Reddit RSS → JSON | same Reddit files, `data/reddit_github.json` | **overwrite**, only lists the Mac left stale for 36 h |
 | `core/scrape_ritholtz.py` | GitHub (daily + am_reads) | ritholtz.com AM Reads / Weekend Reads | `data/ritholtz/articles.csv` (+ `seen.json`) | **overwrite**, only when the post changed |
 | `core/scrape_googlenews.py` | GitHub (daily) | Google News RSS (Bangladesh) | `data/googlenews/articles.csv` | **append + dedup** on `(article_id, category)` |
 | `core/scrape_trung.py` | GitHub (daily + am_reads) | readtrung.com Substack RSS (SatPost) | `data/trung/articles.csv` | **overwrite** |
@@ -74,33 +76,78 @@ Nothing in `diagnostics/` or `scraper/` runs anywhere (see §6).
 ### 2a. `core/scrape_reddit_browser.py` — the real Reddit source (Mac mini, since 26 Sep 2026)
 
 **Why a browser:** Reddit blocks every plain request now. GitHub's IPs get 403/429, and even the
-owner's home IP gets a JavaScript challenge page on the JSON and HTML endpoints. A real headless
-Chromium (Playwright) passes that challenge by itself after one warm-up load of reddit.com. The
-new Reddit page carries each post as a `<shreddit-post>` with attributes `id`, `score`,
-`comment-count`, `post-title`, `post-type`, `permalink`; self-post text sits in
-`[slot="text-body"]` (ads are a separate `shreddit-ad-post`). So: real upvotes, real text, no
-login, no key, no AI. **The official OAuth API was tried and never worked for the owner. Don't
-suggest it again.**
+owner's home IP gets a JavaScript bot check on the JSON and HTML endpoints. A real headless
+Chromium (Playwright) passes that check by itself on the first subreddit page it opens (the URL
+gets `js_challenge=1`; the home-page warm-up alone does not trigger it). The new Reddit page
+carries each post as a `<shreddit-post>` with attributes `id`, `score`, `comment-count`,
+`post-title`, `post-type`, `permalink`, `created-timestamp`, `subreddit-name`; self-post text
+sits in `[slot="text-body"]` (ads are a separate `shreddit-ad-post`). So: real upvotes, real
+text, no login, no key, no AI. **The official OAuth API was tried and never worked for the
+owner. Don't suggest it again.**
+
+**The backup ladder** (each rung checked live on 26 Sep 2026). Per list, first one that passes wins:
+
+| # | Method | Where | Gives | Covers |
+|---|---|---|---|---|
+| 1 | `page`: the new-Reddit top page (`via_page`) | Mac | real upvotes + text | normal days |
+| 2 | `json`: `top.json?raw_json=1` through the same browser (`via_json`) | Mac | real upvotes + text | a page layout change (no `shreddit-post`, no `score`) |
+| 3 | `rss`: `top/.rss` through the same browser (`via_rss`) | Mac | text, **no upvotes** (site shows the rank) | JSON gone too |
+| 4 | a fresh throwaway profile | Mac | retries 1-3 | a profile that won't open, or one Reddit blocks (4 page misses in a row) |
+| 5 | GitHub RSS (`reddit_backup.yml`) | GitHub | text, no upvotes | the Mac down, or its IP blocked, for 36 h+ |
+
+Rungs 1-3 share the Mac's IP: they fix page/layout trouble, not an IP block (a burst of test runs
+on 26 Sep got JSON 403 and RSS 429 for a while). Rung 5 is on another IP for that case.
+`old.reddit.com` is no longer a rung: it sends logged-out visitors to a login page (and 403s
+GitHub). JSON needs the cookies from Reddit's bot check; on a 403 `via_json` loads the list page
+once and asks again (proven: home page = 2 cookies + 403, after one list page = 14 cookies + 200).
+
+**What every method's result must pass** (`list_problem()`, else it isn't saved): still on
+`/r/<sub>/top` with `t=<month|year>` after redirects (catches a login wall or a bounce to the
+sub's front page); at most 1 in 5 posts from another sub; at most 1 in 5 older than 40 days
+(month) / 400 days (year) (catches an all-time list); at least half the posts show upvotes on
+`page`/`json` (catches a layout change that drops them); at least `MIN_POSTS = 5` posts, unless
+the method proves the list is complete (JSON `after: null`; or RSS returning fewer than the 50
+asked for, trusted only when the page or JSON also saw that list short, because a broken feed
+looks the same). That last rule is how r/lifehacks (6-8 posts in Sep 2026) now gets saved.
 
 What one run does (~5–6 min):
 - Warm-up load of reddit.com, then for each of the 13 subs × `month`/`year`: open
   `/r/<sub>/top/?t=<month|year>`, scroll like a person until 50 posts (max 10 scrolls, stops after
   3 scrolls with nothing new), read the attributes. Videos are skipped (it's a reading list).
-- **Saves a list only if the page really loaded:** at least `MIN_POSTS = 5` posts on the page
-  (counted *before* videos are dropped) and at least one readable row. Otherwise the old file
-  stays. 5, not more, because real lists can be short: r/lifehacks had 7 posts for Sep 2026.
-- A bad page gets one retry after a fresh warm-up. **4 failed lists in a row = stop** (Reddit is
-  blocking this browser; hammering makes it worse). Hard stop at 15 min (`RUN_DEADLINE_S`).
-- Human pace: 3–7 s between pages.
-- `data/reddit_browser.json` gets two stamps per list, written **right away** (a run killed
-  midway keeps what it did): `lists` = last **saved** (GitHub's backup keys off this), and
-  `checked` = last time Reddit served the list's real page, saved or not (a challenge page has
-  no posts; a quiet sub can be too short to save). fleet-health grades `checked`.
+- The page gets one retry after a fresh warm-up (not when it was merely short, and not once it
+  has missed 2 lists in a row: the retry would only eat the backups' time), then `json`,
+  then `rss` (the ladder above). A backup that saves prints `↪ <list>: page: <why>` first and
+  `✅ … via json|rss`. All fail → `⚠️ <list>: old file kept. page: …; json: …; rss: …`.
+- **4 page misses in a row** (no real list at all) → one switch to a fresh throwaway profile,
+  which retries the lists that failed or only got RSS. **4 lists in a row failing every method**
+  after that = stop (hammering makes a block worse). If the page misses 4 more lists in a row on
+  the fresh profile, the rest of the run skips it (`⏭️ … json, rss only`): a layout change costs
+  ~50 s a list in page timeouts, which would push the last lists past the deadline. No new list
+  starts after 12 min (`RUN_DEADLINE_S`; one slow list can take ~6 min and the wrapper kills the
+  run at 20). Each JSON/RSS request times out at 20 s.
+- Human pace: 3–7 s between pages. JSON/RSS answer a 429 by waiting (Retry-After, max 20 s) once.
+- `data/reddit_browser.json` gets three maps per list, written **right away** (a run killed
+  midway keeps what it did): `lists` = last **saved** (GitHub's backup keys off this),
+  `checked` = last time Reddit served the list's real list, saved or not (a challenge page has no
+  posts), and `via` = which method saved it (`page`/`json`/`rss`). `/api/status` shows `via`,
+  or `github rss` when GitHub's backup refilled the list after the Mac's last save.
+  fleet-health grades `checked`.
+- Profile trouble: if `~/.local/share/reddit-browser/profile` won't open, it deletes Chromium's
+  `Singleton*` lock links (left by a killed run) and tries again, then falls back to a fresh
+  throwaway profile (`🆕 using a fresh throwaway profile`), deleted at the end.
 - If Playwright was upgraded and its browser is missing ("Executable doesn't exist"), it runs
   `python3 -m playwright install chromium` once and carries on.
+- **Ends with the backup check:** fetches the first sub's monthly list via `json` and `rss`
+  (nothing written) and prints `METHOD CHECK: page ok · json ok · rss ok  (page saved N of M
+  lists)`, or names what failed (`page FAILING` = the page saved under half the lists). fleet-health
+  greps this line, so a dead backup shows up before the day it's needed.
 - Prints `BROWSER SAVED: N of M lists` (+ which kept their old file). Exit 1 if it saved none.
 - Stdlib + Playwright only: the Mac's `/opt/homebrew/bin/python3` has Playwright but no pandas.
-- Manual run: `python3 core/scrape_reddit_browser.py [--only sub1,sub2] [--visible] [--profile DIR]`.
+- Manual runs (write into `./data/` of the current folder, so run them from a scratch folder
+  unless you mean it): `python3 core/scrape_reddit_browser.py [--only sub1,sub2] [--visible]
+  [--profile DIR | --fresh-profile] [--method page|json|rss]`.
+  **`--probe`** tries every method on each `--only` list (default LifeProTips), prints what each
+  got, writes nothing, exit 1 if any failed: the first thing to run when Reddit looks broken.
 
 **CSV columns:** `id,title,selftext,permalink,score,upvotes,comments,score_real`.
 - **`upvotes` = Reddit's real number (what the site shows).**
@@ -128,12 +175,15 @@ the file mid-run. Each run:
    `git reset --hard origin/main`. If that still fails, the clone is broken: it deletes it and
    clones once more (`clone looks broken: cloning it again`; the clone is ~6 MB). Network git
    calls have timeouts (fetch/clone/pull 300 s, push 120 s), so a hung GitHub can't hold the lock.
-4. Runs the scraper under `timeout 1200` with `python3 -u` (unbuffered: a killed run still leaves
+4. Checks `python3` can `import playwright`. A brew Python upgrade (3.14 → 3.15) leaves it behind,
+   so it runs `pip install --break-system-packages playwright` once (`🔧 playwright missing for
+   Python X: installing it` → `🔧 playwright installed` / `INSTALL FAILED`).
+5. Runs the scraper under `timeout 1200` with `python3 -u` (unbuffered: a killed run still leaves
    its lines in the log), profile `~/.local/share/reddit-browser/profile` (a throwaway profile
    just for this job; it keeps Reddit's cookie).
-5. `git add -f data/r_*/posts.csv` (+ the json if present). Nothing changed →
+6. `git add -f data/r_*/posts.csv` (+ the json if present). Nothing changed →
    `NO REDDIT CHANGES (scraper exit N)` and exits with the scraper's code.
-6. Commits, then pushes with a 3-try loop (`git pull --rebase -X theirs` between tries, because
+7. Commits, then pushes with a 3-try loop (`git pull --rebase -X theirs` between tries, because
    GitHub's jobs push to the same branch). Success line:
    `REDDIT PUSHED: N files in <sha> (scraper exit N)`, then `== … done`.
 
@@ -141,7 +191,7 @@ Failure lines: `LOCK FAILED`, `CLONE FAILED`, `GIT SYNC FAILED`, `COMMIT FAILED`
 `PUSH FAILED after 3 tries`.
 Log: `~/Library/Logs/reddit-browser.log`. The wrapper trims it in place (past ~500 KB, keeps the
 last 3000 lines). `REDDIT_BROWSER_*` env vars exist only so the tests can point it at a local
-git repo.
+git repo and a fake python.
 
 **Install / reinstall** (after the code is on `origin/main`; also in the plist's top comment):
 ```bash
@@ -152,23 +202,34 @@ launchctl kickstart gui/$(id -u)/com.jalal.reddit-browser     # run now, under l
 tail -f ~/Library/Logs/reddit-browser.log
 ```
 
-**Known, accepted race:** if GitHub's run overlaps a Mac push, the rebase (`-X theirs`) can keep
-GitHub's RSS copy of a list under the Mac's fresh stamp. It lasts until the next Mac run (≤12 h),
-and RSS rows are honest (rank, no fake upvotes).
+**Known, accepted race:** if GitHub's backup run overlaps a Mac push, the rebase (`-X theirs`)
+can keep GitHub's RSS copy of a list under the Mac's fresh stamp. It lasts until the next Mac run
+(≤12 h), and RSS rows are honest (rank, no fake upvotes).
 
-### 2c. `core/scrape_top.py` — GitHub's Reddit backup
+### 2c. `core/scrape_top.py` — GitHub's Reddit backup (`reddit_backup.yml`, every 3 h)
 
-`main()` first reads `data/reddit_browser.json` and **skips every list the Mac saved in the last
-36 h** (`reddit_common.fresh_keys`; a broken json means "nothing is fresh", never a crash). For
-the rest, per sub × `month`/`year`, it tries three tiers and keeps the first that yields posts:
-1. **JSON:** `old.reddit.com/r/{sub}/top.json?t={filter}&limit=50` with a macOS/Chrome `HEADERS`
-   block; on 429 sleeps 30 s and retries once; skips stickied and video posts. Real scores
-   (`score_real=True`), but GitHub's IPs get 403 "Blocked" here now.
-2. **HTML:** `old.reddit.com/r/{sub}/top/?sort=top&t={filter}` via BeautifulSoup; real score only
-   if the page shows it.
-3. **RSS:** `www.reddit.com/r/{sub}/top/.rss?t={filter}&limit=50`. No scores. Carries self-post
-   text (from `<div class="md">`). A 429 gets one retry (Retry-After, max 60 s) within a 480 s
-   back-off budget per run, so the 30-min job timeout is safe. `parse_rss()` is pure (tested).
+What reaches Reddit from GitHub's IPs (tested from a runner on 26 Sep 2026): **RSS only**, and
+only until rate-limited (first call 200, later ones 429). JSON is 403 (plain or via a browser),
+a real browser gets "You've been blocked by network security", old.reddit is 403. So:
+- `main()` reads the Mac's `data/reddit_browser.json` and its own `data/reddit_github.json`
+  (a broken json = "nothing is fresh", never a crash). A list needs a refresh when the Mac hasn't
+  saved it in 36 h **and** this backup hasn't refreshed it in 12 h (`GITHUB_REFRESH_HOURS`).
+  `stale_lists()` sorts them stalest first (never saved = first). `--max-lists 6` per run: small
+  batches stay under the rate limit, and 8 runs a day still cover all 26 lists within a day.
+  Its own stamps are what make the batches move on instead of redoing the same six.
+- Per list: **RSS** `www.reddit.com/r/{sub}/top/.rss?t={filter}&limit=50` (no scores; self-post
+  text from `<div class="md">`; a 429 gets one retry, Retry-After max 60 s, within a 480 s
+  budget), then **JSON** `old.reddit.com/r/{sub}/top.json` as a second try in case Reddit ever
+  lets GitHub back in (real scores, `score_real=True`). Both answers must pass the Mac's
+  `list_problem()` (imported from `scrape_reddit_browser.py`, stdlib only) with no short-list
+  proof, so under 5 posts is never saved here. `parse_rss()` is pure (tested). The old.reddit
+  HTML tier was removed on 26 Sep 2026 (login wall).
+- Prints `REDDIT BACKUP: refreshed N of M lists that needed it (tried K)`. With nothing to do it
+  reads one list's RSS (the sub rotates every 3 h), writes nothing, and prints
+  `GITHUB REDDIT CHECK: rss ok (r/<sub>: 50 posts)` / `rss FAILED`. fleet-health greps these.
+- Hard stop at 12 min (`RUN_DEADLINE_S`; the job's timeout is 20). The workflow commits
+  `data/r_*/posts.csv` + `data/reddit_github.json` with the same 3-try rebase loop and prints
+  `REDDIT BACKUP PUSHED: N files` (or `NO REDDIT BACKUP CHANGES`).
 
 When there's no real score it **synthesizes one for ORDERING ONLY** ("Tiered Priority
 Exponential Decay"), so high-signal subs float up:
@@ -264,7 +325,7 @@ post and extract articles.
   - Items carry structured fields (`upvotes`, `rank`, `when`, `mins`, `ts`, `date`, `kind`,
     `category`, `source`, `domain`); `meta` is a legacy display string the page doesn't parse.
 - `GET /api/status` → the health page for fleet-health and humans:
-  `reddit_lists` (each `{list, saved, checked}`, **oldest `checked` first**; `""` = no stamp
+  `reddit_lists` (each `{list, saved, checked, via}`, **oldest `checked` first**; `""` = no stamp
   yet), `reddit_oldest` (oldest save), `reddit_missing` (tracked lists the Mac has never saved:
   an oldest-stamp check can't see those),
   `tracked_subs` (13; `null` means the `core` import failed on Vercel), `updated`, `counts`.
@@ -298,18 +359,28 @@ python3 core/scrape_reddit_browser.py --only LifeProTips --visible   # needs Pla
 ```
 
 ### Tests
-- **`.venv/bin/python -m pytest tests -q`** — 34 tests, ~10 s, no network:
+- **`.venv/bin/python -m pytest tests -q`** — 67 tests, under a minute, no network:
   - `tests/test_am_reads.py`: AM Reads cleanup/dedup helpers.
   - `tests/test_feeds.py`: RSS parsing + honest scores, the News retry (503/404), the live API's
     honesty/no-repeats rules on the committed data, the Mac scraper's rows and CSV round trip,
     tier ordering, the 36 h skip and broken stamps.
   - `tests/test_robustness.py`: the server against a throwaway `data/` (a broken News CSV
     doesn't touch Reddit, a dropped sub is hidden, one junk number costs one row, a Reddit crash
-    still serves News, `/api/status` shape and `checked`, `reddit_subs`), `page_ok` / `update_meta`, and **the
-    Mac wrapper against a local bare git repo with a fake scraper**: first run, no-change vs
-    failed scrape, the lock (live and dead), a push race with another job, a clone left
-    mid-rebase, a stale `index.lock`, a broken clone, the log trim. It also pins the exact log
+    still serves News, `/api/status` shape, `checked` and `via`, `reddit_subs`), the short-list
+    rule, `update_meta`, and **the Mac wrapper against a local bare git repo with a fake
+    scraper**: first run, no-change vs failed scrape, the lock (live and dead), a push race with
+    another job, a clone left mid-rebase, a stale `index.lock`, a broken clone, the log trim, and
+    the Playwright reinstall after a Python upgrade (fake `python3`). It also pins the exact log
     patterns fleet-health greps for.
+  - `tests/test_reddit_backups.py`: the backup ladder with canned replies. `list_problem()`
+    (redirect/login wall, other subs, an older list, lost upvotes, the short-list proof), the
+    JSON and RSS parsers, every ladder path (page ok; blocked → json; layout change → rss; short
+    → json without a retry; all fail; all videos; `--method`; a short RSS list trusted only after
+    the page saw it short; no page retry once it keeps failing), a whole `run()` with the browser
+    stubbed (layout change → page skipped, no double count after the fresh-profile retry, the
+    deadline and block messages once), the stuck-profile fallback, the
+    `METHOD CHECK` line, and GitHub's side (stalest first, own stamps, the RSS check line, only
+    a real top list saved, and that `python core/scrape_top.py` really runs `main()`).
 - **`python3 tests/e2e_site.py [base_url]`** — 47 real-browser checks (~70 s): every tab shows
   all the API's posts with the right label, real upvotes on cards, opening ≠ reading, the
   "Done with X?" prompt, undo, keys, stale notices (News 36 h, Reddit 48 h), footer stamps,
@@ -332,8 +403,11 @@ python3 core/scrape_reddit_browser.py --only LifeProTips --visible   # needs Pla
   `"tracked_subs": 13`, then run `tests/e2e_site.py` against the live URL.
 
 ### CI: the scrape workflows
-- `daily_scrape.yml`: Python 3.10, `pip install -r requirements-scraper.txt`, runs the four
-  GitHub-side scrapers, `git add -f data/`, commits "Automated daily data update", pushes with a
+- `reddit_backup.yml` (every 3 h at :17): §2c. Python 3.10, `concurrency: reddit-backup`,
+  timeout 20 min. Public repo, so the minutes are free.
+- `daily_scrape.yml`: Python 3.10, `pip install -r requirements-scraper.txt`, runs the three
+  GitHub-side feed scrapers (Reddit moved to `reddit_backup.yml` on 26 Sep 2026, so News never
+  waits on Reddit), `git add -f data/`, commits "Automated daily data update", pushes with a
   3-try rebase loop, then prints `DATA PUSHED: N data files` (fleet-health greps it). Nothing new
   → `NO DATA CHANGES`. `workflow_dispatch` always runs.
 - **Two crons + dedupe guard (don't "simplify" away):** `0 3 * * *` is the real run; `0 9 * * *`
@@ -374,7 +448,7 @@ python3 core/scrape_reddit_browser.py --only LifeProTips --visible   # needs Pla
    name="index.html")`. Newer Starlette crashes on positional args.
 5. **`index.html` is a Jinja template:** never write `{{`, `{%` or `{#` in its JS or CSS.
 6. **Reddit from GitHub: never fixed sleeps.** Keep `random.uniform(6.5, 12.5)` between subs in
-   `scrape_top.py`; if 429s grow, *widen* it.
+   `scrape_top.py`; if 429s grow, *widen* it or lower `--max-lists`, never raise it.
 7. **The scoring math is load-bearing — don't touch it** (§2c). Change only with permission.
 8. **Never show an invented number.** Displayed upvotes come only from Reddit (`upvotes`, or
    `score` when `score_real`). Otherwise show the rank.
@@ -393,8 +467,12 @@ python3 core/scrape_reddit_browser.py --only LifeProTips --visible   # needs Pla
     Editing `mac/reddit-browser.sh` in PyCharm changes nothing until it's pushed. The plist is
     the exception: after changing it, `cp` it to `~/Library/LaunchAgents/`, then `launchctl
     bootout` + `bootstrap`.
-15. **Don't change the wrapper's log lines without updating fleet-health** (§8) and
-    `tests/test_robustness.py` (which pins them).
+15. **Don't change the wrapper's log lines, `METHOD CHECK`, `REDDIT BACKUP` or `GITHUB REDDIT
+    CHECK` without updating fleet-health** (§8) and the tests that pin them
+    (`tests/test_robustness.py`, `tests/test_reddit_backups.py`).
+16. **Every Reddit method must pass `list_problem()`** before anything is written. A new method
+    goes into the ladder behind the same checks, never around them: a fetch that "works" but
+    returns the wrong list is worse than keeping yesterday's file.
 
 ---
 
@@ -462,10 +540,11 @@ python3 core/scrape_reddit_browser.py --only LifeProTips --visible   # needs Pla
 - `core/reddit_common.py` — `SUBREDDITS`, tiers, freshness handshake (shared, stdlib only).
 - `core/scrape_reddit_browser.py` — the real Reddit source (Mac mini).
 - `mac/reddit-browser.sh` + `mac/com.jalal.reddit-browser.plist` — its launchd job.
-- `core/scrape_top.py` — GitHub's Reddit backup (JSON → HTML → RSS).
+- `core/scrape_top.py` — GitHub's Reddit backup (RSS → JSON, batched, every 3 h).
 - `core/scrape_ritholtz.py`, `core/scrape_googlenews.py`, `core/scrape_trung.py` — the other feeds.
 - `vercel.json` — deploy config.
-- `.github/workflows/daily_scrape.yml`, `am_reads.yml` — scrape + commit; `tests.yml` — pytest.
+- `.github/workflows/reddit_backup.yml`, `daily_scrape.yml`, `am_reads.yml` — scrape + commit;
+  `tests.yml` — pytest.
 - `tests/` — §4.
 - `data/**` — committed scrape output (the "database").
 
@@ -481,18 +560,20 @@ python3 core/scrape_reddit_browser.py --only LifeProTips --visible   # needs Pla
 ## 8. Health checks and runbook
 
 **Who watches it:** fleet-health (`~/PycharmProjects/github-notion-sync/fleet_health.py`, runs on
-the Mac at 05:00 + 06:30) has three rows for this repo:
+the Mac at 05:00 + 06:30) has five rows for this repo:
 
 | Row | Probe | Red when |
 |---|---|---|
 | `reddit-scraper (daily data)` | GitHub run of `daily_scrape.yml` | no run in 36 h, or no `DATA PUSHED` / guard line |
 | `reddit-browser (Mac 07:35/19:35 Reddit lists)` | last block of `~/Library/Logs/reddit-browser.log` | last `== … start` over 26 h old, or that block lacks `REDDIT PUSHED: N files` / `NO REDDIT CHANGES (scraper exit 0)` |
 | `reddit-browser (live site: every Reddit list fresh)` | live `/api/status` | the OLDEST `reddit_lists[].checked` is over 36 h old (the third missed run in a row). Fleet converts these UTC `…Z` stamps to local time since 2026-09-26; before that they read 4–5 h too young |
+| `reddit-browser (backup methods: page, json, rss all work)` | last block of the same log | the block lacks `METHOD CHECK: page ok · json ok · rss ok`: the Mac is running on a backup, or a backup stopped working. The rows above stay green in both cases |
+| `reddit-backup (GitHub RSS every 3 h)` | GitHub run of `reddit_backup.yml` | no run in 8 h, or neither `GITHUB REDDIT CHECK: rss ok` nor `REDDIT BACKUP: refreshed <1+>` |
 
 **Is it healthy right now?** (3 commands)
 ```bash
 curl -s https://reddit-scraper-lyart.vercel.app/api/status | python3 -m json.tool | head -30
-grep -E '^== |BROWSER SAVED|REDDIT PUSHED|NO REDDIT|FAILED|ACTIVE' ~/Library/Logs/reddit-browser.log | tail -8
+grep -E '^== |BROWSER SAVED|METHOD CHECK|REDDIT PUSHED|NO REDDIT|FAILED|ACTIVE' ~/Library/Logs/reddit-browser.log | tail -8
 launchctl print gui/$(id -u)/com.jalal.reddit-browser | grep -E 'state|last exit'
 ```
 
@@ -500,20 +581,37 @@ launchctl print gui/$(id -u)/com.jalal.reddit-browser | grep -E 'state|last exit
 - **Mac job didn't run** (no new `== … start`): the Mac was asleep/off at 07:35 or 19:35, or the
   job isn't loaded. `launchctl print …` (above); reload per §2b. Run it now with
   `launchctl kickstart gui/$(id -u)/com.jalal.reddit-browser`.
-- **`4 lists in a row failed` / `page showed 0 posts`**: Reddit is blocking the browser. Wait for
-  the next run (the profile keeps its cookie; the warm-up usually passes). To look yourself:
-  `python3 core/scrape_reddit_browser.py --only LifeProTips --visible` from the job clone. Never
-  point it at a personal Chrome profile.
+- **First step for anything Reddit:** from a scratch folder,
+  `python3 ~/.local/share/reddit-browser/reddit-scraper/core/scrape_reddit_browser.py --probe --fresh-profile`
+  shows which methods work right now (writes nothing). Don't run it in a loop: a burst of runs
+  gets the Mac's IP rate-limited for a while (JSON 403, RSS 429), which looks like a block.
+- **`METHOD CHECK: page FAILING`** with lists saved `via json`: the page layout changed. The site
+  still has real upvotes; fix `READ_POSTS_JS` / `via_page` (compare with `--probe`).
+  **`json FAILED`** / **`rss FAILED`**: that backup broke; the site is fine today, fix it before
+  the day it's needed. Every list `via rss` = both page and JSON are down: ranks, no upvotes.
+- **`the page failed 4 lists in a row` / `failed every method`**: Reddit is blocking this Mac
+  (after the fresh profile too). Wait for the next run; GitHub's RSS backup (another IP) takes
+  over lists that go 36 h stale. To look yourself add `--visible` to the probe. Never point it at
+  a personal Chrome profile.
+- **`profile won't open` / `fresh throwaway profile`** every run: the job's profile is damaged.
+  `mv ~/.local/share/reddit-browser/profile ~/.local/share/reddit-browser/profile.bad`; the next
+  run makes a new one (it only holds Reddit's cookie).
+- **`playwright INSTALL FAILED`**: `/opt/homebrew/bin/python3 -m pip install --break-system-packages playwright`
+  by hand and read its error.
+- **`GITHUB REDDIT CHECK: rss FAILED`** (fleet row `reddit-backup`): GitHub's IPs lost RSS too.
+  The Mac is unaffected; if it recurs for days, GitHub has no way into Reddit left, and the
+  only cover for a dead Mac is the stale warning on the site.
 - **`browser missing`**: handled automatically (it installs Chromium). If the install fails:
   `/opt/homebrew/bin/python3 -m playwright install chromium`.
 - **`ANOTHER RUN IS ACTIVE`** on every run: a lock from a crashed run is taken over after 40 min
   automatically. If it persists: `ls -la ~/.local/share/reddit-browser/run.lock`.
 - **`PUSH FAILED after 3 tries`**: GitHub was down or rejected the push. The next run redoes the
   whole list from a fresh reset; nothing to clean up.
-- **Site shows "#3 this month" instead of upvotes on some cards**: those lists came from GitHub's
-  RSS backup (the Mac hasn't saved them in 36 h). `/api/status` → `reddit_missing` and the oldest
-  `saved` stamps say which. `checked` newer than `saved` = the Mac reaches the page but the list
-  is too short (under 5 posts) or all videos: nothing is broken.
+- **Site shows "#3 this month" instead of upvotes on some cards**: those lists came from an RSS
+  rung: the Mac's (`/api/status` → `via: rss`) or GitHub's (the Mac hasn't saved them in 36 h;
+  `reddit_missing` and the oldest `saved` stamps say which). `checked` newer than `saved` = the
+  Mac reaches the list but it is all videos, or short with no method proving it complete:
+  nothing is broken.
 - **`GIT SYNC FAILED` / `CLONE FAILED`**: GitHub unreachable (the next run retries; a deleted
   clone is re-cloned automatically).
 - **A tab is suddenly empty**: check Vercel's runtime logs for `daily-reader` warnings (a broken

@@ -25,9 +25,11 @@ headless browser → Reddit         News, AM Reads, SatPost, Reddit backup
 
 - **Reddit** comes from a real headless browser on the owner's Mac mini
   (`core/scrape_reddit_browser.py`, run by launchd via `mac/reddit-browser.sh`), because Reddit
-  blocks GitHub's servers. It saves real upvotes. If the Mac misses a list for 36 hours,
-  GitHub's RSS backup (`core/scrape_top.py`) refills it, showing each post's rank instead of
-  upvotes. No Reddit API key anywhere.
+  blocks GitHub's servers. It saves real upvotes. Each list has backups on the Mac: the page,
+  then Reddit's JSON through the same browser, then its RSS feed, then a fresh browser profile.
+  Every run ends with a `METHOD CHECK` line saying whether each backup still works. If the Mac
+  misses a list for 36 hours, GitHub's RSS backup (`core/scrape_top.py`, every 3 hours) refills
+  it, showing each post's rank instead of upvotes. No Reddit API key anywhere.
 - **Tabs:** Monthly and Yearly = the top 50 of all tracked subs, mixed by a tier score so one
   big sub can't take over. That mix reshuffles on every scrape, so a post you haven't read yet
   stays at the bottom ("Still unread from earlier lists") until you read it, or 30 days after it left.

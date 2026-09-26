@@ -27,6 +27,7 @@ except Exception as e:  # pragma: no cover - only on a broken deploy
     log.warning("core.reddit_common not importable (%s); showing every data/r_* list", e)
     TRACKED_SUBS = None
 BROWSER_META = BASE_DIR / "data/reddit_browser.json"
+GITHUB_META = BASE_DIR / "data/reddit_github.json"  # GitHub's RSS backup (core/scrape_top.py)
 
 app = FastAPI()
 templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
@@ -120,12 +121,13 @@ def read_csv_safe(path):
     return None if df.empty else df
 
 
-def reddit_list_stamps(field: str = "lists") -> dict:
-    """{list folder: ISO time} from data/reddit_browser.json, tracked subs only.
+def reddit_list_stamps(field: str = "lists", path: Path = None) -> dict:
+    """{list folder: value} from data/reddit_browser.json, tracked subs only.
     The Mac mini's real-browser scrape writes, per list, when it last SAVED it
-    ("lists") and when it last REACHED its real page, saved or not ("checked")."""
+    ("lists"), when it last REACHED its real page, saved or not ("checked"), and
+    which method read it ("via": page, json or rss)."""
     try:
-        lists = json.loads(BROWSER_META.read_text()).get(field, {})
+        lists = json.loads((path or BROWSER_META).read_text()).get(field, {})
     except Exception:
         return {}
     if not isinstance(lists, dict):
@@ -377,9 +379,15 @@ def status():
     """Health page for fleet-health and humans: when each Reddit list was last
     saved by the Mac mini (oldest first), and when each feed last landed."""
     saved, checked = reddit_list_stamps("lists"), reddit_list_stamps("checked")
+    via = reddit_list_stamps("via")  # page, json or rss: which of the Mac's methods saved it
+    # GitHub's RSS backup refilled a list after the Mac last saved it: that's what's live.
+    for k, stamp in reddit_list_stamps("lists", GITHUB_META).items():
+        if stamp > saved.get(k, ""):
+            via[k] = "github rss"
     # checked = the Mac reached the list's real page (saved or, if too short, not);
     # fleet-health grades the oldest `checked`, so a quiet sub doesn't page.
-    lists = sorted(({"list": k, "saved": saved.get(k, ""), "checked": checked.get(k, "")}
+    lists = sorted(({"list": k, "saved": saved.get(k, ""), "checked": checked.get(k, ""),
+                     "via": via.get(k, "")}
                     for k in saved.keys() | checked.keys()),
                    key=lambda r: r["checked"] or r["saved"])
     # Lists the Mac has never saved (GitHub's RSS backup is all they get). Named
