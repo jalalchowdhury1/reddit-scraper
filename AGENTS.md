@@ -132,6 +132,9 @@ Reddit page carries each post as a `<shreddit-post>` with attributes `id`, `scor
 - "Page healthy" = at least 10 posts on the page, before videos are dropped (r/lifehacks is
   mostly videos: 50 on the page can leave 6 readable rows, which are still saved).
 - `SUBREDDITS` and `SUBREDDIT_TIERS` now live in `core/reddit_common.py` (shared, stdlib only).
+- **Removing a sub? Also `git rm -r data/r_<sub> data/r_<sub>_yearly`.** `server.py` loads every
+  `data/r_*/posts.csv`, so a dropped sub's old file keeps showing. r/Fitness was dropped long ago
+  and its 1 Mar 2026 files fed Monthly/Yearly until 26 Sep 2026.
 - Install / reinstall: the steps are in the comment at the top of `mac/com.jalal.reddit-browser.plist`
   (clone first, then bootstrap, then `launchctl kickstart` to test under launchd itself).
 - Each saved list is stamped in the json right away, so a run killed mid-way keeps its stamps.
