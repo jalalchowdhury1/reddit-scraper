@@ -549,14 +549,20 @@ function render() {
     if (!query && currentTab === 'news' && newsAt && Date.now() - Date.parse(newsAt) > 36 * 3600e3) {
         html = `<div class="notice"><i class="ph ph-warning"></i><span>No new News since ${esc(clock(newsAt))}. The nightly update has missed at least one day, so this list is older than usual.</span></div>` + html;
     }
+    // Reddit comes from the Mac mini's browser twice a day. Past 48h it has missed
+    // several runs; GitHub's backup feed then refills lists, with ranks, not upvotes.
+    const redditAt = allData && allData.updated && allData.updated.reddit;
+    if (!query && (currentTab === 'monthly' || currentTab === 'yearly') && redditAt && Date.now() - Date.parse(redditAt) > 48 * 3600e3) {
+        html = `<div class="notice"><i class="ph ph-warning"></i><span>The Mac mini last refreshed Reddit ${esc(clock(redditAt))}. Until it catches up, lists may be older and show each post's rank instead of upvotes.</span></div>` + html;
+    }
     if (shownOlder.length) {
         html += `<div class="section-label"><i class="ph ph-clock-counter-clockwise"></i>Earlier list · ${esc(etWeekday(shownOlder[0].date || etDate()))}</div>` + shownOlder.map(cardHTML).join('');
     }
     feed.innerHTML = html;
     const up = allData && allData.updated;
-    document.getElementById('updated').textContent = up && (up.news || up.ritholtz)
-        ? 'Updated: ' + [up.ritholtz && 'AM Reads ' + clock(up.ritholtz), up.news && 'News ' + clock(up.news)].filter(Boolean).join(' · ')
-        : '';
+    const stamps = up ? [up.ritholtz && 'AM Reads ' + clock(up.ritholtz), up.news && 'News ' + clock(up.news),
+                         up.reddit && 'Reddit ' + clock(up.reddit)].filter(Boolean) : [];
+    document.getElementById('updated').textContent = stamps.length ? 'Updated: ' + stamps.join(' · ') : '';
     // Keep focus on the same item. If that item left the list (marked read), stay
     // at the same position, i.e. the next card, like Gmail.
     const at = focusId === null ? -1 : visibleItems.findIndex((i) => String(i.id) === focusId);

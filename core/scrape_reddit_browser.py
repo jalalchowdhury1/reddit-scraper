@@ -7,7 +7,7 @@ person's browser, and the new Reddit page carries everything as attributes on ea
 <shreddit-post>: real upvotes, comment count, title, link, and self-post text.
 No login, no API key, no AI needed.
 
-Runs daily from launchd (mac/reddit-browser.sh). Writes the same
+Runs at 07:35 + 19:35 from launchd (mac/reddit-browser.sh). Writes the same
 data/r_<sub>[_yearly]/posts.csv files as scrape_top.py, plus
 data/reddit_browser.json so GitHub's RSS fallback leaves fresh lists alone.
 
@@ -28,7 +28,9 @@ from reddit_common import SUBREDDITS, BROWSER_META, list_key, tier_base, tier_sc
 
 COLUMNS = ["id", "title", "selftext", "permalink", "score", "upvotes", "comments", "score_real"]
 WANT = 50                # posts per list (same as the old JSON limit=50)
-MIN_POSTS = 10           # page showed fewer posts than this = broken page; keep the old file
+# A page with fewer posts than this is broken (challenge page, error page); keep
+# the old file. A real list can be short: r/lifehacks had 7 posts for Sep 2026.
+MIN_POSTS = 5
 RUN_DEADLINE_S = 15 * 60
 DEFAULT_PROFILE = Path.home() / ".local/share/reddit-browser/profile"
 UA = ("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
@@ -93,17 +95,28 @@ def write_list(rows: list, key: str, root: Path = Path("data")) -> Path:
     return path
 
 
-def update_meta(saved: dict, path: Path = BROWSER_META):
-    """Merge {list_key: iso time} into data/reddit_browser.json."""
+def update_meta(saved: dict, path: Path = BROWSER_META, checked: dict = None):
+    """Merge {list_key: iso time} into data/reddit_browser.json.
+
+    lists   = when each list was last SAVED. GitHub's RSS backup skips those under 36 h.
+    checked = when the Mac last reached each list's real page, saved or not. A real list
+              can be too short to save (MIN_POSTS); this still proves the job reached it,
+              so fleet-health grades `checked` and doesn't page over a quiet sub."""
     try:
         meta = json.loads(path.read_text())
     except (OSError, ValueError):
         meta = {}
-    lists = meta.get("lists", {}) if isinstance(meta.get("lists"), dict) else {}
-    lists.update(saved)
-    meta = {"note": "When the Mac mini's real browser last saved each Reddit list. "
-                    "GitHub's RSS fallback skips lists saved in the last 36 h.",
-            "updated": utc_now_iso(), "lists": dict(sorted(lists.items()))}
+    if not isinstance(meta, dict):
+        meta = {}
+
+    def merged(name, new):
+        old = meta.get(name) if isinstance(meta.get(name), dict) else {}
+        return dict(sorted({**old, **new}.items()))
+    meta = {"note": "When the Mac mini's real browser last saved (lists) and last reached "
+                    "(checked) each Reddit list. GitHub's RSS fallback skips lists saved "
+                    "in the last 36 h.",
+            "updated": utc_now_iso(), "lists": merged("lists", saved),
+            "checked": merged("checked", {**saved, **(checked or {})})}
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(meta, indent=1) + "\n")
 
@@ -138,6 +151,34 @@ async def read_list(page, sub: str, t: str) -> list:
     return (await page.evaluate(READ_POSTS_JS))[:WANT + 10]
 
 
+def page_ok(raw: list, rows: list) -> bool:
+    """Save a list only if the page really loaded (enough posts on it, counted
+    BEFORE videos are dropped) and at least one post is readable."""
+    return len(raw) >= MIN_POSTS and bool(rows)
+
+
+def install_browser() -> bool:
+    """A Playwright upgrade (brew/pip) can leave its browser missing: download
+    it once, like `python3 -m playwright install chromium`, then carry on."""
+    import subprocess
+    print("  🔧 browser missing: running `playwright install chromium`")
+    r = subprocess.run([sys.executable, "-m", "playwright", "install", "chromium"],
+                       capture_output=True, text=True, timeout=600)
+    print("  🔧 install " + ("ok" if r.returncode == 0 else f"failed: {r.stderr.strip()[-200:]}"))
+    return r.returncode == 0
+
+
+async def open_browser(p, profile: Path, visible: bool):
+    kwargs = dict(headless=not visible, viewport={"width": 1280, "height": 900},
+                  locale="en-US", timezone_id="America/New_York", user_agent=UA)
+    try:
+        return await p.chromium.launch_persistent_context(str(profile), **kwargs)
+    except Exception as e:
+        if "Executable doesn't exist" not in str(e) or not install_browser():
+            raise
+        return await p.chromium.launch_persistent_context(str(profile), **kwargs)
+
+
 async def run(profile: Path, subs: list, visible: bool) -> dict:
     from playwright.async_api import async_playwright  # lazy: tests import this file without it
 
@@ -145,9 +186,7 @@ async def run(profile: Path, subs: list, visible: bool) -> dict:
     deadline = time.monotonic() + RUN_DEADLINE_S
     profile.mkdir(parents=True, exist_ok=True)
     async with async_playwright() as p:
-        ctx = await p.chromium.launch_persistent_context(
-            str(profile), headless=not visible, viewport={"width": 1280, "height": 900},
-            locale="en-US", timezone_id="America/New_York", user_agent=UA)
+        ctx = await open_browser(p, profile, visible)
         try:
             page = ctx.pages[0] if ctx.pages else await ctx.new_page()
             try:
@@ -163,8 +202,8 @@ async def run(profile: Path, subs: list, visible: bool) -> dict:
                         failed.append(key)
                         continue
                     t0 = time.monotonic()
-                    # Health = posts on the page, not rows kept: r/lifehacks is mostly
-                    # videos, so 50 posts on the page can leave only 6 readable rows.
+                    # Health = posts on the page, not rows kept: a video-heavy sub can
+                    # show 50 posts and leave only a few readable rows.
                     raw = []
                     for attempt in (1, 2):  # challenge page, slow load or hiccup: warm up again, retry once
                         try:
@@ -177,7 +216,7 @@ async def run(profile: Path, subs: list, visible: bool) -> dict:
                         if len(raw) >= MIN_POSTS:
                             break
                     rows = rows_from_page(raw, sub)
-                    if len(raw) >= MIN_POSTS and rows:
+                    if page_ok(raw, rows):
                         write_list(rows, key)
                         saved[key] = utc_now_iso()
                         update_meta({key: saved[key]})  # stamp each list now: a killed run keeps its stamps
@@ -187,6 +226,8 @@ async def run(profile: Path, subs: list, visible: bool) -> dict:
                               f"{with_text} with text, top {rows[0]['upvotes'] or '?'} upvotes "
                               f"({time.monotonic() - t0:.1f}s)")
                     else:
+                        if raw:  # Reddit served the real list (a challenge page has no posts), just a short one
+                            update_meta({}, checked={key: utc_now_iso()})
                         failed.append(key)
                         misses_in_a_row += 1
                         print(f"  ⚠️ {key}: page showed {len(raw)} posts ({len(rows)} readable), old file kept")
