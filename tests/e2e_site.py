@@ -224,6 +224,43 @@ async def main():
         back = await pg.evaluate("""visibleItems.filter(i => !i._kept).map(i => String(i.id)).join() ===
             allData[currentTab].filter(i => !isRead(i)).map(i => String(i.id)).join()""")
         check("Mixed = the server's order again", back)
+        # Sub chips: one tap = one subreddit; the label says so; Mark all read stays inside it; tap again = All.
+        await pg.click('[data-tab="monthly"]:visible'); await pg.wait_for_timeout(400)
+        all_cards = await pg.locator("#feed .item").count()
+        chip = pg.locator('#feed .sub-chips [data-act="sub"]').nth(1)
+        sub, chip_n = await chip.get_attribute("data-sub"), int(await chip.locator(".count").inner_text())
+        await chip.click(); await pg.wait_for_timeout(400)
+        subs_shown = await pg.evaluate("[...new Set(visibleItems.map(subKey))]")
+        label = await pg.inner_text("#progress-label")
+        check("Sub chip shows only that sub, count matches the chip",
+              subs_shown == [sub] and await pg.locator("#feed .item").count() == chip_n and " only" in label, f"{sub}: {subs_shown} | {label}")
+        others = "itemsFor('monthly').filter(i => subKey(i) !== subFilter.monthly && !isRead(i)).length"
+        before_others = await pg.evaluate(others)
+        await pg.click("#btn-markall"); await pg.wait_for_timeout(700)
+        caught = await pg.inner_text("#feed")
+        check("Mark all read stays inside the sub, chips stay to get back",
+              await pg.evaluate(others) == before_others and "All caught up" in caught
+              and await pg.locator("#feed .sub-chips").count() == 1, caught[:80])
+        await pg.click("#toast-undo"); await pg.wait_for_timeout(700)
+        await pg.click(f'#feed .sub-chips [data-sub="{sub}"]'); await pg.wait_for_timeout(400)
+        check("Tapping the chosen chip again shows All",
+              await pg.evaluate("subFilter.monthly === null") and await pg.locator("#feed .item").count() == all_cards,
+              f"{await pg.locator('#feed .item').count()} vs {all_cards}")
+        # Cleared-today list: tap "N cleared today" -> today's read items, newest first; untick = back to unread.
+        first_id = await pg.locator("#feed .item").first.get_attribute("data-id")
+        await pg.locator("#feed .item").first.locator('[data-act="read"]').click(); await pg.wait_for_timeout(700)
+        n_today = await pg.evaluate("readByDay[etDate()] || 0")
+        await pg.click("#btn-cleared"); await pg.wait_for_timeout(400)
+        head = await pg.inner_text("#feed .cleared-label")
+        top_id = await pg.locator("#feed .item").first.get_attribute("data-id")
+        check("Cleared list opens with the item just cleared on top",
+              f"Cleared today · {n_today}" in head and top_id == first_id, f"{head} | {top_id} vs {first_id}")
+        await pg.locator("#feed .item").first.locator('[data-act="read"]').click(); await pg.wait_for_timeout(700)
+        gone = await pg.locator(f'#feed .item[data-id="{first_id}"]').count() == 0
+        check("Unticking in the list marks it unread and drops it", gone and not await pg.evaluate(f"cloudReadPosts.has('{first_id}')"))
+        await pg.click('[data-tab="monthly"]:visible'); await pg.wait_for_timeout(400)
+        check("Tapping the tab closes the list",
+              not await pg.evaluate("viewCleared") and await pg.locator("#feed .item").count() == all_cards)
         ow = await pg.evaluate("document.documentElement.scrollWidth > window.innerWidth")
         check("No sideways scroll on phone", not ow)
         check("No JS errors (phone)", not errs, "; ".join(errs)[:200])

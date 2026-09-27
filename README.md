@@ -38,9 +38,11 @@ headless browser → Reddit         News, AM Reads, SatPost, Reddit backup, GitH
   (`core/scrape_github_trending.py`).
 - **On the phone:** the tabs sit in a bottom bar, the header slides away while you scroll
   down, and pulling down at the top refreshes. Under the date: how many items you cleared
-  today and your streak of days with at least one cleared (counted across your devices).
+  today and your streak of days with at least one cleared (counted across your devices). Tap
+  "N cleared today" to see those items (untick one to bring it back).
 - **Order:** Monthly and Yearly have a Mixed / Most upvotes switch. Most upvotes re-sorts the
-  same 50 posts high to low; which posts make the list never changes.
+  same 50 posts high to low; which posts make the list never changes. Chips under it show
+  one subreddit at a time (TIL, ELI5, ...); tap the chosen chip again for All.
 - **The 13 subs** live in `core/reddit_common.py`: dataisbeautiful, todayilearned, bestof,
   getmotivated, UnethicalLifeProTips, LifeProTips, TrueReddit, UpliftingNews, lifehacks,
   Productivity, PersonalFinance, explainlikeimfive, AskHistorians.

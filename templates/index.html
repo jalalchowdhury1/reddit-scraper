@@ -101,6 +101,20 @@
         .seg { display: inline-flex; margin-left: auto; padding: 2px; border-radius: 999px; border: 1px solid var(--line); background: var(--surface); }
         .seg button { height: 28px; padding: 0 12px; border-radius: 999px; font-size: .76rem; font-weight: 500; color: var(--muted); transition: background .2s, color .2s; }
         .seg button.on { background: var(--text); color: var(--bg); }
+        /* Monthly/Yearly subreddit chips: phones scroll them sideways, wide screens wrap */
+        .sub-chips { grid-column: 1 / -1; display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; margin: 0 -16px 4px; padding: 2px 16px 8px; }
+        .sub-chips::-webkit-scrollbar { display: none; }
+        @media (min-width: 701px) { .sub-chips { flex-wrap: wrap; overflow: visible; margin: 0 0 4px; padding: 2px 0 8px; } }
+        .chip { flex-shrink: 0; height: 30px; padding: 0 11px; border-radius: 999px; border: 1px solid var(--line); font-size: .78rem; font-weight: 500;
+                color: var(--muted); display: inline-flex; align-items: center; gap: 6px; transition: background .2s, color .2s; }
+        .chip .count { font-size: .7rem; color: var(--faint); font-variant-numeric: tabular-nums; }
+        .chip.on { background: var(--text); color: var(--bg); border-color: var(--text); }
+        .chip.on .count { color: var(--bg); opacity: .65; }
+        /* "Cleared today" list: everything here is read, so don't fade it */
+        #feed.cleared .item.read .item-main { opacity: .9; }
+        .cleared-label .pill-btn { height: 32px; padding: 0 14px; font-size: .78rem; margin-left: auto; color: var(--text); }
+        .streak-link { font: inherit; color: inherit; text-decoration: underline dotted; text-underline-offset: 3px; }
+        .streak-link i { color: var(--muted); font-size: .7rem; }
         .kept-label .pill-btn { height: 32px; padding: 0 12px; font-size: .78rem; margin-left: auto; color: var(--text); }
         .item { position: relative; border-radius: var(--radius); overflow: hidden; margin: 2px 0; }
         .swipe-bg { position: absolute; inset: 0; display: flex; justify-content: space-between; align-items: center; padding: 0 22px; font-size: 1.35rem; opacity: 0; }
@@ -371,6 +385,12 @@ let amShowOlder = false;
 // the server's tier mix (so one big sub can't take over), true = the same posts
 // by upvotes, high to low. Only the order changes, never which posts are picked.
 let sortTop = store.get('dr_sort_top', false) === true;
+// Subreddit filter on Monthly/Yearly (27 Sep 2026): tap a chip to see one sub.
+// Per tab, this session only (a reload shows everything again), and the progress
+// row says "ELI5 only" so a filter can never silently hide posts.
+const subFilter = { monthly: null, yearly: null };
+// The "cleared today" list, opened from the line under the date.
+let viewCleared = false;
 let query = '';
 let focusIndex = -1;
 let focusId = null;   // the focused item's id; render() re-finds it so a list change can't shift focus
@@ -470,16 +490,20 @@ function carried(tab, withRead = showRead) {
 // change, not per render: the list can hold thousands of ticks.
 let readByDay = {};   // 'YYYY-MM-DD' (Eastern) -> items marked read that day
 const etDayOfHour = {};   // 'YYYY-MM-DDTHH' (UTC, as toISOString writes it) -> Eastern day; ET offsets are whole hours
+function etDayOf(t) {   // readAt ISO string -> Eastern 'YYYY-MM-DD', or null (unknown time)
+    if (typeof t !== 'string' || !t) return null;
+    const hour = t.slice(0, 13);
+    let d = etDayOfHour[hour];
+    if (d === undefined) {
+        const ms = Date.parse(t);
+        d = etDayOfHour[hour] = isNaN(ms) ? null : etDate(new Date(ms));
+    }
+    return d;
+}
 function countReadDays() {
     readByDay = {};
     for (const t of Object.values(cloudReadAt)) {
-        if (typeof t !== 'string' || !t) continue;   // unknown time: counts for nothing
-        const hour = t.slice(0, 13);
-        let d = etDayOfHour[hour];
-        if (d === undefined) {
-            const ms = Date.parse(t);
-            d = etDayOfHour[hour] = isNaN(ms) ? null : etDate(new Date(ms));
-        }
+        const d = etDayOf(t);
         if (d) readByDay[d] = (readByDay[d] || 0) + 1;
     }
 }
@@ -488,7 +512,7 @@ function streakHTML() {
     let day = n ? today : prevDay(today), streak = 0;
     while (readByDay[day]) { streak++; day = prevDay(day); }
     const parts = [];
-    if (n) parts.push(`${n} cleared today`);
+    if (n) parts.push(`<button class="streak-link" id="btn-cleared" aria-label="Show the ${n} items cleared today">${n} cleared today <i class="ph ph-caret-right" aria-hidden="true"></i></button>`);
     if (streak >= 2) parts.push(n ? `<i class="ph-fill ph-fire" aria-hidden="true"></i> ${streak}-day streak`
                                   : `Clear one to keep your ${streak}-day streak`);
     return parts.join(' · ');
@@ -560,6 +584,35 @@ function upvoteNum(item) {
     return m ? parseFloat(m[1]) * ({ k: 1e3, m: 1e6 }[m[2]] || 1) : -1;
 }
 const isReddit = (tab) => tab === 'monthly' || tab === 'yearly';
+const subKey = (item) => String(item.source || '').replace(/^r\//, '').toLowerCase();
+const SUB_SHORT = { todayilearned: 'TIL', explainlikeimfive: 'ELI5', unethicallifeprotips: 'ULPT', lifeprotips: 'LPT' };
+const subName = (key, item) => SUB_SHORT[key] || String((item && item.source) || key).replace(/^r\//, '');
+// The tab's sub filter, or null. A filter whose sub has left the list switches itself off.
+function activeSub(tab) {
+    const sub = isReddit(tab) ? subFilter[tab] : null;
+    if (sub && !itemsFor(tab).some((i) => subKey(i) === sub)) { subFilter[tab] = null; return null; }
+    return sub;
+}
+// What the tab shows: itemsFor() narrowed to the chosen sub (Mark all read uses this too).
+function tabItems(tab) {
+    const sub = activeSub(tab);
+    return sub ? itemsFor(tab).filter((i) => subKey(i) === sub) : itemsFor(tab);
+}
+function subChipsHTML(tab) {
+    const all = itemsFor(tab), sub = activeSub(tab), subs = new Map();
+    all.forEach((i) => {
+        const k = subKey(i);
+        if (!k) return;
+        const e = subs.get(k) || { n: 0, item: i };
+        if (!isRead(i)) e.n++;
+        subs.set(k, e);
+    });
+    // A sub with nothing left to read is a dead end, unless read items are showing (or it's the chosen one).
+    const list = [...subs].filter(([k, e]) => e.n || showRead || k === sub).sort((a, b) => b[1].n - a[1].n || a[0].localeCompare(b[0]));
+    const total = all.filter((i) => !isRead(i)).length;
+    const chip = (k, label, n) => `<button class="chip ${(sub || '') === k ? 'on' : ''}" data-act="sub" data-sub="${esc(k)}" aria-pressed="${(sub || '') === k}">${esc(label)}${n ? ` <span class="count">${n}</span>` : ''}</button>`;
+    return `<div class="sub-chips" role="group" aria-label="Show one subreddit">${chip('', 'All', total)}${list.map(([k, e]) => chip(k, subName(k, e.item), e.n)).join('')}</div>`;
+}
 
 function sourceOf(item) {
     if (item.source) return item.source;
@@ -659,11 +712,14 @@ function render() {
         return;
     }
 
+    document.getElementById('feed').classList.toggle('cleared', viewCleared && !query);
+    if (viewCleared && !query) { renderCleared(); return; }
+
     let items, older = [];
     if (query) {
         items = searchAll(query);
     } else {
-        items = itemsFor(currentTab);
+        items = tabItems(currentTab);
         if (currentTab === 'ritholtz' && amShowOlder) older = (allData.ritholtz || []).filter((i) => !amIsCurrent(i));
     }
     const total = items.length;
@@ -694,9 +750,10 @@ function render() {
         const sat = shown.filter((i) => i.kind === 'SATPOST');
         if (sat.length) html += `<div class="section-label">SatPost</div>` + sat.map(cardHTML).join('');
     } else if (total > 0 && shown.length === 0) {
-        const doneToday = readByDay[etDate()] || 0;
-        html = `<div class="state"><i class="ph ph-check-circle"></i><h2>All caught up</h2>
-                <p>You've read all ${total} ${currentTab === 'ritholtz' ? "of today's AM Reads" : 'items in this tab'}.${doneToday > 1 ? ` ${doneToday} items cleared today across every tab.` : ''}</p>
+        const doneToday = readByDay[etDate()] || 0, sub = activeSub(currentTab);
+        // Filtered to one sub: keep the chips so there's a way back to All.
+        html = (sub ? subChipsHTML(currentTab) : '') + `<div class="state"><i class="ph ph-check-circle"></i><h2>All caught up</h2>
+                <p>You've read all ${total} ${currentTab === 'ritholtz' ? "of today's AM Reads" : sub ? `${esc(subName(sub, items[0]))} posts in this tab` : 'items in this tab'}.${doneToday > 1 ? ` ${doneToday} items cleared today across every tab.` : ''}</p>
                 <button class="pill-btn" data-act="showread"><i class="ph ph-eye"></i>Show read items</button></div>`;
     } else if (total === 0) {
         html = currentTab === 'favorites'
@@ -719,7 +776,7 @@ function render() {
                     <div class="seg" role="group" aria-label="Order">
                         <button data-act="sort" data-sort="mix" class="${sortTop ? '' : 'on'}" aria-pressed="${!sortTop}">Mixed</button>
                         <button data-act="sort" data-sort="top" class="${sortTop ? 'on' : ''}" aria-pressed="${sortTop}">Most upvotes</button>
-                    </div></div>`;
+                    </div></div>` + subChipsHTML(currentTab);
             }
             const keptShown = shown.filter((i) => i._kept);
             html += shown.filter((i) => !i._kept).map(cardHTML).join('');
@@ -749,7 +806,16 @@ function render() {
     if (shownOlder.length) {
         html += `<div class="section-label"><i class="ph ph-clock-counter-clockwise"></i>Earlier list · ${esc(etWeekday(shownOlder[0].date || etDate()))}</div>` + shownOlder.map(cardHTML).join('');
     }
+    paintFeed(html);
+}
+
+// Puts the feed HTML in place, then the footer stamps and the j/k focus.
+function paintFeed(html) {
+    const feed = document.getElementById('feed');
+    const chips = feed.querySelector('.sub-chips'), chipsLeft = chips ? chips.scrollLeft : 0;
     feed.innerHTML = html;
+    const chipsNow = feed.querySelector('.sub-chips');
+    if (chipsNow) chipsNow.scrollLeft = chipsLeft;   // a tick re-renders; the chip row must not jump back
     const up = allData && allData.updated;
     const stamps = up ? [up.ritholtz && 'AM Reads ' + clock(up.ritholtz), up.news && 'News ' + clock(up.news),
                          up.reddit && 'Reddit ' + clock(up.reddit), up.github && 'GitHub ' + clock(up.github)].filter(Boolean) : [];
@@ -762,6 +828,39 @@ function render() {
     paintFocus(false);
 }
 
+// "Cleared today": every item marked read today (Eastern), newest first, on any
+// device. The tick on a card here marks it unread again. Any tab closes it.
+function renderCleared() {
+    const today = etDate();
+    const ids = Object.entries(cloudReadAt).filter(([, t]) => etDayOf(t) === today)
+        .sort((a, b) => Date.parse(b[1]) - Date.parse(a[1])).map(([id]) => id);
+    const tabOf = {};
+    TABS.forEach((t) => {
+        ((allData && allData[t.key]) || []).forEach((i) => { tabOf[String(i.id)] = tabOf[String(i.id)] || t.label; });
+        Object.keys((kept[t.key]) || {}).forEach((id) => { tabOf[id] = tabOf[id] || t.label; });
+    });
+    const found = ids.map((id) => { const i = findItem(id); return i && { ...i, _tab: tabOf[id] || '' }; }).filter(Boolean);
+    const lost = ids.length - found.length;
+    visibleItems = found;
+    setProgress(0, 0);
+    paintFeed(`<div class="section-label cleared-label"><i class="ph ph-check-circle"></i>Cleared today · ${ids.length}
+                   <button class="pill-btn" data-act="closecleared">Done</button></div>`
+        + (ids.length ? found.map(cardHTML).join('')
+                      : `<div class="state"><i class="ph ph-check-circle"></i><h2>Nothing cleared yet today</h2><p>Items you mark read today show up here, newest first.</p></div>`)
+        + (lost ? `<div class="section-label">+ ${lost} more that are no longer in any list</div>` : ''));
+}
+function openCleared() {
+    if (!viewCleared) scrollPos[currentTab] = window.scrollY;
+    viewCleared = true;
+    if (query) { query = ''; document.getElementById('searchInput').value = ''; document.getElementById('search').classList.remove('open'); }
+    focusIndex = -1; focusId = null;
+    render();
+    showHeader();
+    window.scrollTo(0, 0);
+}
+function closeCleared() { viewCleared = false; focusIndex = -1; focusId = null; render(); window.scrollTo(0, scrollPos[currentTab] || 0); }
+document.getElementById('streak').addEventListener('click', (e) => { if (e.target.closest('#btn-cleared')) openCleared(); });
+
 function setProgress(total, unread) {
     const row = document.getElementById('progress');
     row.style.display = total ? 'flex' : 'none';
@@ -769,7 +868,11 @@ function setProgress(total, unread) {
     // Say what the list is: Monthly/Yearly are a top-50 pick, News is a date window.
     const totals = (allData && allData.totals) || {};
     let scope = '';
-    if (!query && total && (currentTab === 'monthly' || currentTab === 'yearly')) {
+    const sub = !query && activeSub(currentTab);
+    if (sub) {
+        const one = itemsFor(currentTab).find((i) => subKey(i) === sub);
+        scope = ` · ${subName(sub, one)} only`;
+    } else if (!query && total && (currentTab === 'monthly' || currentTab === 'yearly')) {
         const nKept = carried(currentTab).length, nLive = total - nKept;
         if (totals[currentTab] > nLive) scope = ` · top ${nLive} of ${totals[currentTab]}`;
         if (nKept) scope += ` + ${nKept} kept`;
@@ -838,7 +941,7 @@ const buzz = () => { try { navigator.vibrate && navigator.vibrate(12); } catch {
 
 function findItem(id) {
     for (const i of visibleItems) if (String(i.id) === String(id)) return i;
-    for (const k of ['monthly', 'yearly', 'news', 'ritholtz']) {
+    for (const k of ['monthly', 'yearly', 'news', 'ritholtz', 'github']) {
         const hit = allData && (allData[k] || []).find((i) => String(i.id) === String(id));
         if (hit) return hit;
     }
@@ -863,9 +966,10 @@ function favItem(item) {
 }
 
 function switchTab(tab) {
-    scrollPos[currentTab] = window.scrollY;
+    if (!viewCleared) scrollPos[currentTab] = window.scrollY;   // the cleared list's scroll isn't this tab's
     store.set('dr_scroll', scrollPos);
     currentTab = tab;
+    viewCleared = false;
     store.set('dr_tab', tab);
     focusIndex = -1; focusId = null;
     if (query) { query = ''; document.getElementById('searchInput').value = ''; document.getElementById('search').classList.remove('open'); }
@@ -875,7 +979,8 @@ function switchTab(tab) {
 }
 
 function markKeptRead() {
-    const ids = carried(currentTab, false).map((i) => i.id);
+    const sub = activeSub(currentTab);
+    const ids = carried(currentTab, false).filter((i) => !sub || subKey(i) === sub).map((i) => i.id);
     if (!ids.length) return;
     setRead(ids, true);
     buzz();
@@ -883,7 +988,7 @@ function markKeptRead() {
 }
 
 function markAll() {
-    const ids = (query ? searchAll(query) : itemsFor(currentTab)).filter((i) => !isRead(i)).map((i) => i.id);
+    const ids = (query ? searchAll(query) : tabItems(currentTab)).filter((i) => !isRead(i)).map((i) => i.id);
     if (!ids.length) return;
     setRead(ids, true);
     buzz();
@@ -894,6 +999,7 @@ function markAll() {
 const onTabClick = (e) => {
     const b = e.target.closest('[data-tab]');
     if (!b) return;
+    if (viewCleared && b.dataset.tab === currentTab) { closeCleared(); return; }
     // Tapping the tab you're already on jumps back to the top.
     if (b.dataset.tab === currentTab && !query) { window.scrollTo({ top: 0, behavior: 'smooth' }); focusIndex = -1; focusId = null; paintFocus(false); return; }
     switchTab(b.dataset.tab);
@@ -909,6 +1015,14 @@ document.getElementById('feed').addEventListener('click', (e) => {
         if (a === 'older') { amShowOlder = true; render(); return; }
         if (a === 'showread') { setShowRead(true); return; }
         if (a === 'keptread') { markKeptRead(); return; }
+        if (a === 'sub') {
+            const k = act.dataset.sub || null;
+            subFilter[currentTab] = subFilter[currentTab] === k ? null : k;   // tap the chosen chip again = All
+            focusIndex = -1; focusId = null;
+            render();
+            return;
+        }
+        if (a === 'closecleared') { closeCleared(); return; }
         if (a === 'sort') {
             sortTop = act.dataset.sort === 'top';
             store.set('dr_sort_top', sortTop);
@@ -1114,6 +1228,7 @@ document.getElementById('btn-theme').onclick = () => {
     toast(`Theme: ${next === 'auto' ? 'match system' : next}`);
 };
 function openSearch() {
+    if (viewCleared) { viewCleared = false; render(); }
     const box = document.getElementById('search');
     box.classList.add('open');
     document.getElementById('searchInput').focus();
@@ -1149,6 +1264,7 @@ document.addEventListener('keydown', (e) => {
     else if ((e.key === 'r' || e.key === 'e') && cur) toggleRead(cur);
     else if ((e.key === 'f' || e.key === 's') && cur) favItem(cur);
     else if (e.key === '/') { e.preventDefault(); openSearch(); }
+    else if (e.key === 'Escape' && viewCleared) closeCleared();
     else if (/^[1-9]$/.test(e.key) && +e.key <= TABS.length) switchTab(TABS[+e.key - 1].key);
     else return;
 });
@@ -1181,7 +1297,7 @@ async function loadData(restoreScroll = true) {
         loadError = !allData;
     }
     render();
-    if (restoreScroll && !query && scrollPos[currentTab]) { showHeader(); window.scrollTo(0, scrollPos[currentTab]); }
+    if (restoreScroll && !query && !viewCleared && scrollPos[currentTab]) { showHeader(); window.scrollTo(0, scrollPos[currentTab]); }
     return ok;
 }
 
@@ -1189,7 +1305,7 @@ async function loadData(restoreScroll = true) {
 // when it comes back to the foreground after 20+ minutes (or on a new day).
 let lastDay = etDate();
 document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'hidden') { leftPage(); scrollPos[currentTab] = window.scrollY; store.set('dr_scroll', scrollPos); return; }
+    if (document.visibilityState === 'hidden') { leftPage(); if (!viewCleared) scrollPos[currentTab] = window.scrollY; store.set('dr_scroll', scrollPos); return; }
     backOnPage();
     if (Date.now() - lastLoad > 20 * 60e3 || etDate() !== lastDay) { lastDay = etDate(); amShowOlder = false; loadData(); }
 });

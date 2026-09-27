@@ -418,7 +418,7 @@ python3 core/scrape_reddit_browser.py --only LifeProTips --visible   # needs Pla
     deadline and block messages once), the stuck-profile fallback, the
     `METHOD CHECK` line, and GitHub's side (stalest first, own stamps, the RSS check line, only
     a real top list saved, and that `python core/scrape_top.py` really runs `main()`).
-- **`python3 tests/e2e_site.py [base_url]`** — 72 real-browser checks (~90 s): every tab shows
+- **`python3 tests/e2e_site.py [base_url]`** — 78 real-browser checks (~100 s): every tab shows
   all the API's posts with the right label, the GitHub tab (API's top 10 in GitHub's order,
   "top 10 of N", GitHub's star counts, read + Undo, keys 5/6, its 24 h stale notice), real upvotes on cards, opening ≠ reading, the
   "Done with X?" prompt, undo, keys, stale notices (News 36 h, Reddit 48 h), footer stamps,
@@ -429,7 +429,9 @@ python3 core/scrape_reddit_browser.py --only LifeProTips --visible   # needs Pla
   phone layout (all 6 tabs in the bottom bar, on screen and tappable; header tucks and returns;
   a real CDP touch pull refreshes, a short one doesn't, offline says so; the today line counts
   a tick and Undo; streak math; Most upvotes sorts both tabs high to low with the same posts,
-  is remembered, and Mixed restores the server's order), desktop shows chips not the bar, no JS errors. Against the
+  is remembered, and Mixed restores the server's order; a sub chip shows only that sub with
+  the chip's count and "X only", Mark all read stays inside it, tapping it again = All; the
+  cleared list opens with the item just ticked on top, unticking drops it, a tab tap closes it), desktop shows chips not the bar, no JS errors. Against the
   local dev server some steps are slow (uvicorn answers one `/api/data` at a time, ~0.7 s
   each, so parallel pages queue); the checks wait for data instead of fixed sleeps. Needs Playwright (use `/opt/homebrew/bin/python3` on the Mac; the
   venv doesn't have it). Always a fresh throwaway headless browser. Run it against a local
@@ -575,7 +577,17 @@ python3 core/scrape_reddit_browser.py --only LifeProTips --visible   # needs Pla
   server's tier order) | "Most upvotes" (the SAME 50 re-sorted high to low by the parsed
   "23.3k" strings, `upvoteNum`; no upvotes = last; stable, so ties keep the mix order); one
   setting for both tabs, per device (`dr_sort_top`). It must never change WHICH posts are
-  picked: by upvotes alone TIL would take 46/50 (§5). Progress row ("50 of 50 left · top 50 of
+  picked: by upvotes alone TIL would take 46/50 (§5). **Sub chips** under it: "All N" + one
+  chip per sub in the tab (live + kept), unread counts, most first, short names (TIL, ELI5,
+  LPT, ULPT). A chip narrows the list, the kept section, the progress label ("· ELI5 only")
+  and Mark all read (`tabItems()` = `itemsFor()` + the filter); tab badges stay whole-tab.
+  Per tab, this session only (`subFilter`, a reload shows All), and a sub that leaves the list
+  switches itself off. When a filtered sub is all read, "All caught up" keeps the chips so
+  there's a way back. **Cleared today list**: the "N cleared today" part of the today line is
+  a button → every item ticked read today (Eastern, any device) newest first, found via
+  `findItem` (all 5 lists + kept + favorites; "+ N more that are no longer in any list" for the
+  rest). Its tick = mark unread (Undo works). Closed by Done, Escape, any tab, or search;
+  its scroll never overwrites the tab's saved scroll. Progress row ("50 of 50 left · top 50 of
   534", "27 of 27 left · last 7 days") + Mark all read (with Undo); swipe left = read, right =
   favorite; search across tabs; text size + light/dark/auto; keys j/k/o/r/f/u(z), 1-6 = tabs; remembers tab
   and scroll; re-fetches when resumed after 20 min. **Opening a link must NOT mark it read** (the
