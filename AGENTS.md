@@ -390,7 +390,7 @@ python3 core/scrape_reddit_browser.py --only LifeProTips --visible   # needs Pla
 ```
 
 ### Tests
-- **`.venv/bin/python -m pytest tests -q`** — 82 tests, under a minute, no network:
+- **`.venv/bin/python -m pytest tests -q`** — 86 tests, under a minute, no network:
   - `tests/test_am_reads.py`: AM Reads cleanup/dedup helpers.
   - `tests/test_feeds.py`: RSS parsing + honest scores, the News retry (503/404), the live API's
     honesty/no-repeats rules on the committed data, the Mac scraper's rows and CSV round trip,
@@ -418,7 +418,7 @@ python3 core/scrape_reddit_browser.py --only LifeProTips --visible   # needs Pla
     deadline and block messages once), the stuck-profile fallback, the
     `METHOD CHECK` line, and GitHub's side (stalest first, own stamps, the RSS check line, only
     a real top list saved, and that `python core/scrape_top.py` really runs `main()`).
-- **`python3 tests/e2e_site.py [base_url]`** — 59 real-browser checks (~80 s): every tab shows
+- **`python3 tests/e2e_site.py [base_url]`** — 68 real-browser checks (~90 s): every tab shows
   all the API's posts with the right label, the GitHub tab (API's top 10 in GitHub's order,
   "top 10 of N", GitHub's star counts, read + Undo, keys 5/6, its 24 h stale notice), real upvotes on cards, opening ≠ reading, the
   "Done with X?" prompt, undo, keys, stale notices (News 36 h, Reddit 48 h), footer stamps,
@@ -426,7 +426,11 @@ python3 core/scrape_reddit_browser.py --only LifeProTips --visible   # needs Pla
   in the counts; reading one removes it; the eye button shows it again; Undo still works after
   a data reload; "Mark these read" clears them; one that left 30+ days ago expires; a post the
   server moves between tabs shows once; no duplicates once back; a removed sub's posts go),
-  phone layout, no JS errors. Needs Playwright (use `/opt/homebrew/bin/python3` on the Mac; the
+  phone layout (all 6 tabs in the bottom bar, on screen and tappable; header tucks and returns;
+  a real CDP touch pull refreshes, a short one doesn't, offline says so; the today line counts
+  a tick and Undo; streak math), desktop shows chips not the bar, no JS errors. Against the
+  local dev server some steps are slow (uvicorn answers one `/api/data` at a time, ~0.7 s
+  each, so parallel pages queue); the checks wait for data instead of fixed sleeps. Needs Playwright (use `/opt/homebrew/bin/python3` on the Mac; the
   venv doesn't have it). Always a fresh throwaway headless browser. Run it against a local
   server before shipping UI changes, and against the live URL after.
 - **CI:** `.github/workflows/tests.yml` runs pytest on every push to `main` that touches code
@@ -553,7 +557,20 @@ python3 core/scrape_reddit_browser.py --only LifeProTips --visible   # needs Pla
 **Live production path:**
 - `server.py` — FastAPI: `/`, `/api/data`, `/api/status`, PWA files (§3).
 - `templates/index.html` — the whole page (plain CSS tokens + Phosphor icons + Firebase; no
-  Tailwind, no build step). 6 tabs with unread counts; progress row ("50 of 50 left · top 50 of
+  Tailwind, no build step). 6 tabs with unread counts: header chips on wide screens, a
+  glass **bottom tab bar** (`#tabbar`, icon + label + badge) on phones (<=700 px) where the chips
+  are hidden; both navs render the same `data-tab` buttons (tests must click
+  `[data-tab="x"]:visible`, the first match is the hidden one). Phones only: the header
+  **tucks away while scrolling down** (`header.tucked`) and returns on scroll up, near the top,
+  or a tab switch (`showHeader`); `body::before` keeps a strip behind the iPhone clock.
+  **Pull down at the top to refresh** (touch handlers on `document`; only when scrollY <= 0 and
+  the drag is down + mostly vertical, so card swipes are untouched): `loadData(false)` returns
+  `'fresh' | 'offline' | 'failed'` (20 s cap); the toast says "Refreshed · N new", "nothing
+  new", "You're offline. Showing the last saved copy." (sw.js tags its cached `/api/data` with
+  `X-Offline-Copy: 1`) or "Couldn't refresh". **Today line** under the date: "N cleared today ·
+  K-day streak" / "Clear one to keep your K-day streak" (K >= 2), from the synced read ticks'
+  `readAt` per Eastern day (`countReadDays`, run per read-list change and in `setRead`, not per
+  render: thousands of ticks). Progress row ("50 of 50 left · top 50 of
   534", "27 of 27 left · last 7 days") + Mark all read (with Undo); swipe left = read, right =
   favorite; search across tabs; text size + light/dark/auto; keys j/k/o/r/f/u(z), 1-6 = tabs; remembers tab
   and scroll; re-fetches when resumed after 20 min. **Opening a link must NOT mark it read** (the
@@ -583,7 +600,7 @@ python3 core/scrape_reddit_browser.py --only LifeProTips --visible   # needs Pla
   missed runs). Footer: when AM Reads, News, Reddit and GitHub last landed. Sync write failures show a toast + "(offline)". Firebase layout:
   `sync_groups/{key}/favorites` + `read_posts`.
 - `manifest.json` + `sw.js` — PWA; network-first service worker (cache `daily-reader-v2`, only
-  the offline fallback).
+  the offline fallback; an offline `/api/data` copy carries `X-Offline-Copy: 1`).
 - `server_assets/icon.png` — app icon.
 - `core/reddit_common.py` — `SUBREDDITS`, tiers, freshness handshake (shared, stdlib only).
 - `core/scrape_reddit_browser.py` — the real Reddit source (Mac mini).

@@ -31,11 +31,12 @@ async def main():
         pg.on("pageerror", lambda e: errs.append(str(e)))
         pg.on("console", lambda m: m.type == "error" and "favicons" not in m.text and errs.append("console: " + m.text))
         await pg.goto(BASE + "/", wait_until="load")
-        await pg.wait_for_timeout(3000)
+        await pg.wait_for_function("allData", timeout=20000)   # a cold local server can take ~2 s
+        await pg.wait_for_timeout(1500)
         api = await pg.evaluate("allData")
         # Every tab shows exactly what the API sent (nothing read yet in a fresh browser).
         for key in ("monthly", "yearly", "news"):
-            await pg.click(f'[data-tab="{key}"]'); await pg.wait_for_timeout(400)
+            await pg.click(f'[data-tab="{key}"]:visible'); await pg.wait_for_timeout(400)
             cards = await pg.locator("#feed .item").count()
             label = await pg.inner_text("#progress-label")
             check(f"{key} shows all {len(api[key])} API posts", cards == len(api[key]), f"{cards} cards | {label}")
@@ -44,7 +45,7 @@ async def main():
                 check("News label says last 7 days", "last 7 days" in label, label)
             elif total > cards:
                 check(f"{key} label says top {cards} of {total}", f"top {cards} of {total}" in label, label)
-        await pg.click('[data-tab="monthly"]'); await pg.wait_for_timeout(500)
+        await pg.click('[data-tab="monthly"]:visible'); await pg.wait_for_timeout(500)
 
         feed = await pg.inner_text("#feed")
         want = [i["upvotes"] for i in api["monthly"][:5]]
@@ -99,11 +100,65 @@ async def main():
 
         # active tab tap -> top
         await pg.evaluate("window.scrollTo(0, 1500)"); await pg.wait_for_timeout(300)
-        await pg.click('[data-tab="monthly"]'); await pg.wait_for_timeout(900)
+        await pg.click('[data-tab="monthly"]:visible'); await pg.wait_for_timeout(900)
         check("Tapping the active tab scrolls to top", await pg.evaluate("window.scrollY") < 5)
 
+        # Phone tab bar: all 6 tabs at the bottom, on screen, not covered; header chips hidden.
+        bar = await pg.evaluate("""[...document.querySelectorAll('#tabbar [data-tab]')].map(b => { const r = b.getBoundingClientRect();
+            const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+            return [b.dataset.tab, Math.round(r.left), Math.round(r.right), Math.round(r.bottom), !!hit && b.contains(hit)]; })""")
+        chips_hidden = await pg.evaluate("getComputedStyle(document.getElementById('tabs')).display === 'none'")
+        check("Phone: all 6 tabs in the bottom bar, on screen and tappable",
+              len(bar) == 6 and chips_hidden and all(l >= 0 and r <= 390 and b <= 844 and ok for _, l, r, b, ok in bar), str(bar))
+        # Header tucks away scrolling down, comes back scrolling up and on a tab switch.
+        tucked = lambda: pg.evaluate("document.querySelector('header').classList.contains('tucked')")
+        await pg.wait_for_timeout(500)
+        for y in (300, 600, 900):
+            await pg.evaluate(f"window.scrollTo(0, {y})"); await pg.wait_for_timeout(120)
+        await pg.wait_for_timeout(300)
+        down = await tucked()
+        await pg.evaluate("window.scrollTo(0, 700)"); await pg.wait_for_timeout(400)
+        up = await tucked()
+        await pg.evaluate("window.scrollTo(0, 1200)"); await pg.wait_for_timeout(400)
+        await pg.click('[data-tab="yearly"]:visible'); await pg.wait_for_timeout(500)
+        on_switch = await tucked()
+        check("Header tucks scrolling down, returns scrolling up and on a tab switch", down and not up and not on_switch, f"{down}/{up}/{on_switch}")
+        await pg.click('[data-tab="monthly"]:visible'); await pg.wait_for_timeout(300)
+        await pg.evaluate("window.scrollTo(0, 0)"); await pg.wait_for_timeout(500)
+
+        # Pull to refresh: a real touch drag down from the top re-fetches; a short one doesn't.
+        cdp = await ctx.new_cdp_session(pg)
+        fetches = []
+        pg.on("request", lambda r: "/api/data" in r.url and fetches.append(r.url))
+        async def drag(y1, y2):
+            await cdp.send("Input.dispatchTouchEvent", {"type": "touchStart", "touchPoints": [{"x": 200, "y": y1}]})
+            for y in range(y1, y2 + 1, 12):
+                await cdp.send("Input.dispatchTouchEvent", {"type": "touchMove", "touchPoints": [{"x": 200, "y": y}]})
+            await cdp.send("Input.dispatchTouchEvent", {"type": "touchEnd", "touchPoints": []})
+        await pg.evaluate("hideToast()")
+        await drag(300, 340); await pg.wait_for_timeout(1200)
+        short_ok = not fetches and not (await pg.inner_text("#toast-msg")).startswith("Refreshed")
+        await drag(300, 520)
+        # the local dev server answers one request at a time, so this can take a while
+        try: await pg.wait_for_function("document.getElementById('toast-msg').textContent.startsWith('Refreshed')", timeout=30000)
+        except Exception: pass
+        msg = await pg.evaluate("document.getElementById('toast-msg').textContent")
+        check("Pull down at the top refreshes; a short pull doesn't", short_ok and len(fetches) == 1 and msg.startswith("Refreshed"),
+              f"short ok={short_ok} | {len(fetches)} fetch | {msg} | " + str(await pg.evaluate("[document.getElementById('ptr').className, document.getElementById('toast-msg').textContent, window.scrollY, loadError]")))
+        check("Refresh leaves you at the top", await pg.evaluate("window.scrollY") < 5)
+        n_errs = len(errs)
+        await ctx.set_offline(True)
+        await pg.evaluate("hideToast()"); await drag(300, 520)
+        try: await pg.wait_for_function("document.getElementById('toast-msg').textContent.includes('offline')", timeout=25000)
+        except Exception: pass
+        off_msg = await pg.evaluate("document.getElementById('toast-msg').textContent")
+        await ctx.set_offline(False)
+        # Offline on purpose: its failed-request console lines are expected. Page crashes still count.
+        errs[n_errs:] = [e for e in errs[n_errs:] if not e.startswith("console:")]
+        check("Offline pull says so (the worker's saved copy), never 'Refreshed'", off_msg.startswith("You're offline"), off_msg)
+
         # News: relative times + one copy per story
-        await pg.click('[data-tab="news"]'); await pg.wait_for_timeout(500)
+        await pg.click('[data-tab="news"]:visible'); await pg.wait_for_timeout(500)
         nfeed = await pg.inner_text("#feed")
         check("News shows relative time", ("ago" in nfeed) or ("yesterday" in nfeed))
         titles = await pg.locator("#feed .item-title").all_inner_texts()
@@ -111,11 +166,11 @@ async def main():
         check("News has one copy per headline", len(norm) == len(set(norm)), f"{len(norm)} cards")
 
         # AM Reads: SatPost after its own label, if any
-        await pg.click('[data-tab="ritholtz"]'); await pg.wait_for_timeout(500)
+        await pg.click('[data-tab="ritholtz"]:visible'); await pg.wait_for_timeout(500)
         am = await pg.inner_text("#feed")
         check("AM Reads renders", ("AM Reads" in am) or ("Weekend Reads" in am) or ("aren't out yet" in am), am.split("\n")[0][:50])
         # GitHub Trending: GitHub's own top 10, in its order, with its star counts.
-        await pg.click('[data-tab="github"]'); await pg.wait_for_timeout(500)
+        await pg.click('[data-tab="github"]:visible'); await pg.wait_for_timeout(500)
         gh = api.get("github", [])
         gcards = await pg.locator("#feed .item").count()
         glabel = await pg.inner_text("#progress-label")
@@ -130,8 +185,19 @@ async def main():
         check("GitHub tab has its label", "Trending today on GitHub" in await pg.inner_text("#feed"))
         await pg.locator("#feed .item").first.locator('[data-act="read"]').click(); await pg.wait_for_timeout(700)
         check("Marking a GitHub repo read hides it", await pg.locator("#feed .item").count() == gcards - 1, await pg.inner_text("#progress-label"))
+        streak1 = await pg.inner_text("#streak")
+        check("Today line counts it: '1 cleared today'", streak1.startswith("1 cleared today"), streak1)
         await pg.click("#toast-undo"); await pg.wait_for_timeout(700)
         check("Undo brings the repo back", await pg.locator("#feed .item").count() == gcards)
+        check("Undo takes it off the today line", "cleared" not in await pg.inner_text("#streak"), await pg.inner_text("#streak"))
+        s = await pg.evaluate("""(() => { const saved = cloudReadAt, at = (n) => new Date(Date.now() - n * 864e5).toISOString();
+            cloudReadAt = { x1: at(1), x2: at(2), x3: at(2), bad: 'not a date' }; countReadDays(); render();
+            const a = document.getElementById('streak').textContent;
+            cloudReadAt = { ...cloudReadAt, x4: at(0) }; countReadDays(); render();
+            const b = document.getElementById('streak').textContent;
+            cloudReadAt = saved; countReadDays(); render(); return [a, b]; })()""")
+        check("Streak: nothing today asks to keep it; one today extends it",
+              s[0] == "Clear one to keep your 2-day streak" and s[1].startswith("1 cleared today") and "3-day streak" in s[1], str(s))
         print("   footer:", await pg.inner_text("#updated"))
         footer = await pg.inner_text("#updated")
         check("Footer shows update times", "Updated:" in footer)
@@ -158,10 +224,10 @@ async def main():
             await route.fulfill(response=r, body=json.dumps(d), headers={**r.headers, "content-type": "application/json"})
         await pg.route("**/api/data", stale)
         await pg.goto(BASE + "/", wait_until="load"); await pg.wait_for_timeout(2500)
-        await pg.click('[data-tab="news"]'); await pg.wait_for_timeout(400)
+        await pg.click('[data-tab="news"]:visible'); await pg.wait_for_timeout(400)
         n = await pg.locator("#feed .notice").count()
         check("Stale News shows a notice", n == 1, (await pg.locator("#feed .notice").inner_text())[:90] if n else "")
-        await pg.click('[data-tab="monthly"]'); await pg.wait_for_timeout(400)
+        await pg.click('[data-tab="monthly"]:visible'); await pg.wait_for_timeout(400)
         check("Other tabs show no News notice", await pg.locator("#feed .notice").count() == 0)
 
         # ---------- stale Reddit notice (Mac mini stopped refreshing) ----------
@@ -173,10 +239,10 @@ async def main():
         await pg2.route("**/api/data", stale_reddit)
         await pg2.goto(BASE + "/", wait_until="load"); await pg2.wait_for_timeout(2500)
         for key in ("monthly", "yearly"):
-            await pg2.click(f'[data-tab="{key}"]'); await pg2.wait_for_timeout(400)
+            await pg2.click(f'[data-tab="{key}"]:visible'); await pg2.wait_for_timeout(400)
             n = await pg2.locator("#feed .notice").count()
             check(f"Stale Reddit shows a notice on {key}", n == 1 and "Mac mini" in await pg2.inner_text("#feed .notice"))
-        await pg2.click('[data-tab="news"]'); await pg2.wait_for_timeout(400)
+        await pg2.click('[data-tab="news"]:visible'); await pg2.wait_for_timeout(400)
         check("News shows no Reddit notice", "Mac mini" not in await pg2.inner_text("#feed"))
         await pg2.close()
 
@@ -195,7 +261,7 @@ async def main():
         check("Stale GitHub shows a notice", n == 1 and "GitHub Trending" in await pg3.inner_text("#feed .notice"))
         await pg3.keyboard.press("6"); await pg3.wait_for_timeout(400)
         check("Key 6 opens Favorites", await pg3.evaluate("currentTab") == "favorites")
-        await pg3.click('[data-tab="monthly"]'); await pg3.wait_for_timeout(400)
+        await pg3.click('[data-tab="monthly"]:visible'); await pg3.wait_for_timeout(400)
         check("Monthly shows no GitHub notice", "GitHub Trending" not in await pg3.inner_text("#feed"))
         await pg3.close()
 
@@ -227,6 +293,8 @@ async def main():
         check("Focus stays on the same card", now_id == fid, f"{fid} -> {now_id}")
         await pg.evaluate(f"setRead(['{first_id}'], false)"); await pg.wait_for_timeout(400)
 
+        check("Desktop: header chips, no bottom tab bar", await pg.evaluate(
+            "getComputedStyle(document.getElementById('tabbar')).display === 'none' && getComputedStyle(document.getElementById('tabs')).display !== 'none'"))
         cols = await pg.evaluate("getComputedStyle(document.getElementById('feed')).gridTemplateColumns.split(' ').length")
         check("Desktop keeps 2 columns", cols == 2, str(cols))
         check("No JS errors (desktop)", not errs2, "; ".join(errs2)[:200])
@@ -237,7 +305,8 @@ async def main():
         pg = await ctx.new_page()
         errs3 = []
         pg.on("pageerror", lambda e: errs3.append(str(e)))
-        await pg.goto(BASE + "/", wait_until="load"); await pg.wait_for_timeout(2500)  # 1st visit remembers the lists
+        await pg.goto(BASE + "/", wait_until="load")  # 1st visit remembers the lists
+        await pg.wait_for_function("allData", timeout=20000); await pg.wait_for_timeout(1000)
         first = await pg.evaluate("({gone: allData.monthly.slice(0, 2).map(i => String(i.id)),"
                                   " subs: allData.monthly.slice(0, 2).map(i => i.source.slice(2)),"
                                   " mover: String(allData.yearly[0].id)})")
@@ -258,14 +327,14 @@ async def main():
         async def load_monthly():
             await pg.reload(wait_until="load")
             await pg.wait_for_function("allData && (readLoaded || syncBroken)", timeout=20000)
-            await pg.click('[data-tab="monthly"]'); await pg.wait_for_timeout(400)
+            await pg.click('[data-tab="monthly"]:visible'); await pg.wait_for_timeout(400)
         kept_ids = lambda: pg.evaluate("[...document.querySelectorAll('#feed .kept-label ~ .item')].map(e => e.dataset.id)")
         label = lambda: pg.inner_text("#progress-label")
         await load_monthly()
         live_n = await pg.evaluate("allData.monthly.length")
         check("Unread posts that drop out stay, under their own label", sorted(await kept_ids()) == sorted(gone), f"{await kept_ids()} vs {gone}")
         check("Label counts the kept posts", f"top {live_n} of" in await label() and "+ 2 kept" in await label(), await label())
-        check("Tab badge counts the kept posts", await pg.inner_text('[data-tab="monthly"] .count') == str(live_n + 2))
+        check("Tab badge counts the kept posts", await pg.inner_text('[data-tab="monthly"]:visible .count') == str(live_n + 2))
         read_id = (await kept_ids())[0]
         await pg.click('#feed .kept-label ~ .item [data-act="read"]'); await pg.wait_for_timeout(600)
         check("Reading a kept post removes it", await kept_ids() == [x for x in gone if x != read_id] and "+ 1 kept" in await label(), await label())
@@ -289,7 +358,7 @@ async def main():
         mode["move"] = True
         await load_monthly()
         seen_ids = await pg.evaluate("[...document.querySelectorAll('#feed .item')].map(e => e.dataset.id)")
-        await pg.click('[data-tab="yearly"]'); await pg.wait_for_timeout(400)
+        await pg.click('[data-tab="yearly"]:visible'); await pg.wait_for_timeout(400)
         seen_ids += await pg.evaluate("[...document.querySelectorAll('#feed .item')].map(e => e.dataset.id)")
         check("A post moved between tabs shows once", seen_ids.count(mover) == 1, f"{seen_ids.count(mover)}x")
         # Back in the live list = shown once, in its normal place.

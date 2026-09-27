@@ -1,4 +1,4 @@
-// Daily Reader service worker (v2, 2026-09-26).
+// Daily Reader service worker (v2, 2026-09-26; offline /api/data marked 2026-09-27).
 // NETWORK-FIRST for everything: the old worker was cache-first, which would
 // have shown yesterday's feed on open. Cache is only the offline fallback.
 const CACHE_NAME = 'daily-reader-v2';
@@ -29,6 +29,13 @@ self.addEventListener('fetch', (e) => {
         }
         return res;
       })
-      .catch(() => caches.match(e.request))
+      // Offline: the saved copy, marked so the page can say it's not fresh
+      // (pull-to-refresh must not claim "Refreshed" from a saved copy).
+      .catch(() => caches.match(e.request).then((r) => {
+        if (!r || url.pathname !== '/api/data') return r;
+        const h = new Headers(r.headers);
+        h.set('X-Offline-Copy', '1');
+        return new Response(r.body, { status: r.status, statusText: r.statusText, headers: h });
+      }))
   );
 });
