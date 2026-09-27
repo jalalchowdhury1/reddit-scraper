@@ -12,8 +12,8 @@ Repo: `github.com/jalalchowdhury1/reddit-scraper` (public) · Python + vanilla J
 
 ## 1. What this is
 
-A **zero-cost personal reading page**. It pulls the top posts from 13 subreddits plus Bangladesh
-news and two newsletters into one page, and syncs "read" / "favorite" across devices with
+A **zero-cost personal reading page**. It pulls the top posts from 13 subreddits, Bangladesh
+news, two newsletters and GitHub's trending top 10 into one page, and syncs "read" / "favorite" across devices with
 Firebase.
 
 **In 30 seconds:** robots save lists as CSV files into `data/` and push them to GitHub →
@@ -29,6 +29,7 @@ lives in the browser and in Firebase.
 | GitHub `.github/workflows/reddit_backup.yml` | every 3 h (`:17`) | Reddit **only for lists the Mac hasn't saved in 36 h** (RSS, 6 per run, stalest first), `data/reddit_github.json` |
 | GitHub `.github/workflows/daily_scrape.yml` | 03:00 UTC, retry 09:00 UTC | News, AM Reads, SatPost (no Reddit since 26 Sep 2026) |
 | GitHub `.github/workflows/am_reads.yml` | 11:45 / 13:30 / 15:30 UTC | AM Reads + SatPost again (Ritholtz posts ~6:30 AM ET) |
+| GitHub `.github/workflows/github_trending.yml` | every 6 h (`:41`) | `data/github_trending/repos.csv` (github.com/trending, today) |
 
 ### Data flow
 
@@ -43,13 +44,15 @@ GitHub Actions, 03:00 UTC (+ 09:00 retry)
    └─ core/scrape_googlenews.py → data/googlenews/articles.csv (append + dedup)
    └─ core/scrape_trung.py      → data/trung/articles.csv      (overwrite)
    └─ git add -f data/ && commit && push
+GitHub Actions, every 6 h (github_trending.yml)
+   └─ core/scrape_github_trending.py → data/github_trending/repos.csv (overwrite, only if list_problem() passes)
                                   │
                                   ▼  Vercel auto-deploys every push to main
 Browser ─▶ server.py (FastAPI on Vercel) ─▶ GET /api/data
               ▼
-   { monthly, yearly, news, ritholtz, totals, reddit_subs, updated }
+   { monthly, yearly, news, ritholtz, github, totals, reddit_subs, updated }
               ▼
-index.html: 5 tabs (Monthly / Yearly / News / AM Reads / ★ Favorites)
+index.html: 6 tabs (Monthly / Yearly / News / AM Reads / GitHub / ★ Favorites)
    read + favorite state ↔ localStorage ↔ Firebase Firestore (cross-device)
 ```
 
@@ -67,6 +70,7 @@ the **AM Reads** tab (`AM READS` / `WEEKEND READS` vs `SATPOST` in each item's m
 | `core/scrape_ritholtz.py` | GitHub (daily + am_reads) | ritholtz.com AM Reads / Weekend Reads | `data/ritholtz/articles.csv` (+ `seen.json`) | **overwrite**, only when the post changed |
 | `core/scrape_googlenews.py` | GitHub (daily) | Google News RSS (Bangladesh) | `data/googlenews/articles.csv` | **append + dedup** on `(article_id, category)` |
 | `core/scrape_trung.py` | GitHub (daily + am_reads) | readtrung.com Substack RSS (SatPost) | `data/trung/articles.csv` | **overwrite** |
+| `core/scrape_github_trending.py` | GitHub (every 6 h) | github.com/trending HTML (today, all languages) | `data/github_trending/repos.csv` | **overwrite**, only when `list_problem()` passes |
 
 `core/reddit_common.py` (stdlib only) holds what the Reddit scrapers share: **`SUBREDDITS`
 (the authoritative list, 13 entries)**, `SUBREDDIT_TIERS`, `tier_score()`, and the Mac/GitHub
@@ -292,6 +296,22 @@ post and extract articles.
 - SatPost (`scrape_trung.py`) keeps ~20 back issues in its CSV; `server.py` serves only the last
   7 days of them.
 
+### 2f. `core/scrape_github_trending.py` — GitHub tab (added 27 Sep 2026)
+- No official trending API, so it parses `https://github.com/trending` (one
+  `<article class="Box-row">` per repo). Saves **every** repo on the page (usually 15-25) in
+  GitHub's own order: `rank, repo, url, description, language, stars, forks, stars_today,
+  scraped_at`. The site shows the top 10 (`server.py:GITHUB_TOP`).
+- `list_problem()` refuses a list with fewer than 10 repos, a repeated repo, or star counts
+  missing on most rows (= the layout changed). Refused or failed fetch → exit 1, the old file
+  stays, the workflow run goes red. Same rule as Reddit: a wrong list is worse than an old one.
+- `fetch()` retries 5xx/429/network errors 3 times (waits 5 s, 20 s); other 4xx fail at once.
+- Log lines: `GITHUB TRENDING OK: N repos (top: …)` / `GITHUB TRENDING FAILED: <why>`; the
+  workflow prints `GITHUB TRENDING PUSHED: <sha>` or `NO CHANGE`.
+- Runs on GitHub Actions: GitHub doesn't block its own runners. Star counts move every run, so
+  expect a data commit (= a Vercel deploy) every 6 h.
+- GitHub's order is **not** "most stars today" (e.g. #3 can have fewer than #4). The tab keeps
+  GitHub's order on purpose: "top 10" means what github.com/trending shows.
+
 ---
 
 ## 3. Backend (`server.py`)
@@ -301,7 +321,7 @@ post and extract articles.
 - `GET /manifest.json`, `/sw.js`, `/icon.png` (`server_assets/icon.png`) — the PWA files.
   `vercel.json` routes everything to FastAPI, so these need their own routes (all three 404'd
   before 26 Sep 2026).
-- `GET /api/data` → `{monthly, yearly, news, ritholtz, totals, reddit_subs, updated}`:
+- `GET /api/data` → `{monthly, yearly, news, ritholtz, github, totals, reddit_subs, updated}`:
   - **Reddit** = every `data/r_*/posts.csv` whose sub is in `SUBREDDITS` (imported from
     `core/reddit_common.py`; `vercel.json` bundles `core/**` for this). Folder `_yearly` → Yearly,
     else Monthly. CSVs without `id`/`title` are skipped. Dedup on `(id, time_filter)`, sorted by
@@ -318,10 +338,16 @@ post and extract articles.
     first; full `ts` so the page can say "3h ago". `totals.news_days = 7`.
   - **ritholtz** = `data/ritholtz/articles.csv` (`rth_` ids) + the last 7 days of
     `data/trung/articles.csv` (`trg_` ids), sorted by date, newest first, capped at 50.
+  - **github** = `data/github_trending/repos.csv` sorted by `rank`, rows that aren't `owner/name`
+    or have no numeric rank dropped, deduped by repo, top `GITHUB_TOP = 10`. Card: `title` =
+    `owner/name`, `id` = `gh_owner_name` lowercased (**no `/`**: read state is one Firestore doc
+    per id and a slash would split the path), `rank`, `stars` ("87.5k"), `stars_today`
+    ("2,608"), `language`; numbers blank when the page didn't give them. `totals.github` = repos
+    on the page ("top 10 of 15").
   - **`reddit_subs`** = the tracked subs (sorted). The page forgets kept unread posts whose sub
     isn't in it, so removing a sub also clears it from every device's kept list.
-  - **`updated`** = `{news, ritholtz, reddit}` (UTC ISO): the newest `scraped_at` in each news
-    CSV, and the newest Mac save in `data/reddit_browser.json` (tracked subs only).
+  - **`updated`** = `{news, ritholtz, reddit, github}` (UTC ISO): the newest `scraped_at` in each
+    news/GitHub CSV, and the newest Mac save in `data/reddit_browser.json` (tracked subs only).
   - Items carry structured fields (`upvotes`, `rank`, `when`, `mins`, `ts`, `date`, `kind`,
     `category`, `source`, `domain`); `meta` is a legacy display string the page doesn't parse.
 - `GET /api/status` → the health page for fleet-health and humans:
@@ -355,11 +381,12 @@ python3.10 -m venv .venv && .venv/bin/pip install -r requirements-scraper.txt py
 .venv/bin/python core/scrape_ritholtz.py
 .venv/bin/python core/scrape_googlenews.py
 .venv/bin/python core/scrape_trung.py
+.venv/bin/python core/scrape_github_trending.py
 python3 core/scrape_reddit_browser.py --only LifeProTips --visible   # needs Playwright
 ```
 
 ### Tests
-- **`.venv/bin/python -m pytest tests -q`** — 67 tests, under a minute, no network:
+- **`.venv/bin/python -m pytest tests -q`** — 82 tests, under a minute, no network:
   - `tests/test_am_reads.py`: AM Reads cleanup/dedup helpers.
   - `tests/test_feeds.py`: RSS parsing + honest scores, the News retry (503/404), the live API's
     honesty/no-repeats rules on the committed data, the Mac scraper's rows and CSV round trip,
@@ -372,6 +399,12 @@ python3 core/scrape_reddit_browser.py --only LifeProTips --visible   # needs Pla
     another job, a clone left mid-rebase, a stale `index.lock`, a broken clone, the log trim, and
     the Playwright reinstall after a Python upgrade (fake `python3`). It also pins the exact log
     patterns fleet-health greps for.
+  - `tests/test_github_trending.py`: the parser on a saved copy of the real page
+    (`tests/fixtures/github_trending.html`, 12 rows), `list_problem()` (layout change, moved
+    star counts, short or repeated list), `main()` keeps the old file on a bad page, the fetch
+    retry (503/429 retried, 404 not), the `__main__` guard, and the server's tab (top 10 in
+    order, real numbers, slash-free ids, one bad row costs one row, a broken file costs only
+    this tab, `/api/status` counts).
   - `tests/test_reddit_backups.py`: the backup ladder with canned replies. `list_problem()`
     (redirect/login wall, other subs, an older list, lost upvotes, the short-list proof), the
     JSON and RSS parsers, every ladder path (page ok; blocked → json; layout change → rss; short
@@ -381,8 +414,9 @@ python3 core/scrape_reddit_browser.py --only LifeProTips --visible   # needs Pla
     deadline and block messages once), the stuck-profile fallback, the
     `METHOD CHECK` line, and GitHub's side (stalest first, own stamps, the RSS check line, only
     a real top list saved, and that `python core/scrape_top.py` really runs `main()`).
-- **`python3 tests/e2e_site.py [base_url]`** — 47 real-browser checks (~70 s): every tab shows
-  all the API's posts with the right label, real upvotes on cards, opening ≠ reading, the
+- **`python3 tests/e2e_site.py [base_url]`** — 59 real-browser checks (~80 s): every tab shows
+  all the API's posts with the right label, the GitHub tab (API's top 10 in GitHub's order,
+  "top 10 of N", GitHub's star counts, read + Undo, keys 5/6, its 24 h stale notice), real upvotes on cards, opening ≠ reading, the
   "Done with X?" prompt, undo, keys, stale notices (News 36 h, Reddit 48 h), footer stamps,
   kept unread posts (the API response is edited to drop two: both stay under their label and
   in the counts; reading one removes it; the eye button shows it again; Undo still works after
@@ -417,6 +451,8 @@ python3 core/scrape_reddit_browser.py --only LifeProTips --visible   # needs Pla
   twice a day, so the retry never ran when News failed. Checkout uses `fetch-depth: 50` (the guard
   needs history); `concurrency: daily-scrape` (no cancel) serializes a late 03:00 against 09:00.
 - `am_reads.yml`: ritholtz + trung only, commits only on change.
+- `github_trending.yml` (every 6 h at :41): §2f. Python 3.10, `concurrency: github-trending`,
+  timeout 10 min, commits `data/github_trending/` only on change, same 3-try rebase loop.
 
 ### Dependency split (keep it, see §5)
 - `requirements.txt` — Vercel minimal: `fastapi, uvicorn, Jinja2, pydantic, pandas==2.1.4,
@@ -508,14 +544,17 @@ python3 core/scrape_reddit_browser.py --only LifeProTips --visible   # needs Pla
 **Live production path:**
 - `server.py` — FastAPI: `/`, `/api/data`, `/api/status`, PWA files (§3).
 - `templates/index.html` — the whole page (plain CSS tokens + Phosphor icons + Firebase; no
-  Tailwind, no build step). 5 tabs with unread counts; progress row ("50 of 50 left · top 50 of
+  Tailwind, no build step). 6 tabs with unread counts; progress row ("50 of 50 left · top 50 of
   534", "27 of 27 left · last 7 days") + Mark all read (with Undo); swipe left = read, right =
-  favorite; search across tabs; text size + light/dark/auto; keys j/k/o/r/f/u(z); remembers tab
+  favorite; search across tabs; text size + light/dark/auto; keys j/k/o/r/f/u(z), 1-6 = tabs; remembers tab
   and scroll; re-fetches when resumed after 20 min. **Opening a link must NOT mark it read** (the
   owner peeks without reading; only the tick / left swipe / `r` / Mark all read / the prompt's
   "Mark read" count). Opened-but-unread cards get a hollow dot + "Opened" tag (localStorage
   `dr_opened`, 21 days); coming back after 10+ s shows "Done with X? [Mark read]"; tap a blurb to
-  expand; "New" tag = first seen on this device today (`dr_first_seen`). **Unread posts are kept
+  expand; "New" tag = first seen on this device today (`dr_first_seen`; Monthly, Yearly and
+  GitHub). **GitHub tab:** GitHub's top 10 under "Trending today on GitHub", meta
+  "#1 · +2,608 stars today · 87.5k stars"; no kept-unread logic (a repo that leaves trending
+  just goes). **Unread posts are kept
   until read** (the owner's call, 26 Sep 2026): the random part of the tier score reshuffles the
   top 50 on every scrape (measured: ~8 Monthly and ~3 Yearly posts swap out per run), so the page
   remembers every Monthly/Yearly post it has shown (localStorage `dr_kept`, per device). One that
@@ -531,8 +570,8 @@ python3 core/scrape_reddit_browser.py --only LifeProTips --visible   # needs Pla
   is no longer in `/api/data`'s `reddit_subs`. Kept posts only appear once the cloud read list
   has loaded (or sync failed), so read posts never flash up as unread. **Warning cards:** News
   when `updated.news` is 36 h+ old; Monthly/Yearly when `updated.reddit` is 48 h+ old (the Mac
-  stopped; lists may be older and show ranks). Footer: when AM Reads, News and Reddit last
-  landed. Sync write failures show a toast + "(offline)". Firebase layout:
+  stopped; lists may be older and show ranks); GitHub when `updated.github` is 24 h+ old (4
+  missed runs). Footer: when AM Reads, News, Reddit and GitHub last landed. Sync write failures show a toast + "(offline)". Firebase layout:
   `sync_groups/{key}/favorites` + `read_posts`.
 - `manifest.json` + `sw.js` — PWA; network-first service worker (cache `daily-reader-v2`, only
   the offline fallback).
@@ -542,8 +581,10 @@ python3 core/scrape_reddit_browser.py --only LifeProTips --visible   # needs Pla
 - `mac/reddit-browser.sh` + `mac/com.jalal.reddit-browser.plist` — its launchd job.
 - `core/scrape_top.py` — GitHub's Reddit backup (RSS → JSON, batched, every 3 h).
 - `core/scrape_ritholtz.py`, `core/scrape_googlenews.py`, `core/scrape_trung.py` — the other feeds.
+- `core/scrape_github_trending.py` — the GitHub tab (§2f).
 - `vercel.json` — deploy config.
-- `.github/workflows/reddit_backup.yml`, `daily_scrape.yml`, `am_reads.yml` — scrape + commit;
+- `.github/workflows/reddit_backup.yml`, `daily_scrape.yml`, `am_reads.yml`,
+  `github_trending.yml` — scrape + commit;
   `tests.yml` — pytest.
 - `tests/` — §4.
 - `data/**` — committed scrape output (the "database").

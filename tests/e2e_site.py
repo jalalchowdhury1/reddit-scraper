@@ -1,4 +1,4 @@
-"""End-to-end checks of the real page in a headless browser (~40 s).
+"""End-to-end checks of the real page in a headless browser (~80 s).
 
 usage: python3 tests/e2e_site.py [base_url]     (default http://localhost:8791)
   local: .venv/bin/uvicorn server:app --port 8791, then run this
@@ -114,11 +114,31 @@ async def main():
         await pg.click('[data-tab="ritholtz"]'); await pg.wait_for_timeout(500)
         am = await pg.inner_text("#feed")
         check("AM Reads renders", ("AM Reads" in am) or ("Weekend Reads" in am) or ("aren't out yet" in am), am.split("\n")[0][:50])
+        # GitHub Trending: GitHub's own top 10, in its order, with its star counts.
+        await pg.click('[data-tab="github"]'); await pg.wait_for_timeout(500)
+        gh = api.get("github", [])
+        gcards = await pg.locator("#feed .item").count()
+        glabel = await pg.inner_text("#progress-label")
+        check("GitHub tab shows the API's top 10", gcards == len(gh) == 10, f"{gcards} cards / {len(gh)} in API | {glabel}")
+        if api.get("totals", {}).get("github", 0) > 10:
+            check("GitHub label says top 10 of N", f"top 10 of {api['totals']['github']}" in glabel, glabel)
+        gtitles = await pg.locator("#feed .item-title").all_inner_texts()
+        check("GitHub cards in GitHub's order", gtitles == [i["title"] for i in gh], f"{gtitles[:2]}")
+        gmeta = await pg.locator("#feed .item .meta").first.inner_text()
+        check("GitHub card shows #1 + GitHub's own star counts",
+              gmeta.startswith("#1") and f"+{gh[0]['stars_today']} stars today" in gmeta and f"{gh[0]['stars']} stars" in gmeta, gmeta)
+        check("GitHub tab has its label", "Trending today on GitHub" in await pg.inner_text("#feed"))
+        await pg.locator("#feed .item").first.locator('[data-act="read"]').click(); await pg.wait_for_timeout(700)
+        check("Marking a GitHub repo read hides it", await pg.locator("#feed .item").count() == gcards - 1, await pg.inner_text("#progress-label"))
+        await pg.click("#toast-undo"); await pg.wait_for_timeout(700)
+        check("Undo brings the repo back", await pg.locator("#feed .item").count() == gcards)
         print("   footer:", await pg.inner_text("#updated"))
         footer = await pg.inner_text("#updated")
         check("Footer shows update times", "Updated:" in footer)
         if api["updated"].get("reddit"):
             check("Footer shows when Reddit last came from the Mac", "Reddit " in footer, footer)
+        if api["updated"].get("github"):
+            check("Footer shows when GitHub Trending last landed", "GitHub " in footer, footer)
         ow = await pg.evaluate("document.documentElement.scrollWidth > window.innerWidth")
         check("No sideways scroll on phone", not ow)
         check("No JS errors (phone)", not errs, "; ".join(errs)[:200])
@@ -159,6 +179,25 @@ async def main():
         await pg2.click('[data-tab="news"]'); await pg2.wait_for_timeout(400)
         check("News shows no Reddit notice", "Mac mini" not in await pg2.inner_text("#feed"))
         await pg2.close()
+
+        # ---------- stale GitHub notice (the 6-hourly job stopped) ----------
+        pg3 = await ctx.new_page()
+        async def stale_github(route):
+            r = await route.fetch(); d = await r.json()
+            d["updated"]["github"] = "2026-09-01T12:41:00Z"
+            d["updated"]["reddit"] = datetime.now(timezone.utc).isoformat()
+            await route.fulfill(response=r, body=json.dumps(d), headers={**r.headers, "content-type": "application/json"})
+        await pg3.route("**/api/data", stale_github)
+        await pg3.goto(BASE + "/", wait_until="load"); await pg3.wait_for_timeout(2500)
+        await pg3.keyboard.press("5"); await pg3.wait_for_timeout(400)   # key 5 = the GitHub tab
+        check("Key 5 opens the GitHub tab", await pg3.evaluate("currentTab") == "github")
+        n = await pg3.locator("#feed .notice").count()
+        check("Stale GitHub shows a notice", n == 1 and "GitHub Trending" in await pg3.inner_text("#feed .notice"))
+        await pg3.keyboard.press("6"); await pg3.wait_for_timeout(400)
+        check("Key 6 opens Favorites", await pg3.evaluate("currentTab") == "favorites")
+        await pg3.click('[data-tab="monthly"]'); await pg3.wait_for_timeout(400)
+        check("Monthly shows no GitHub notice", "GitHub Trending" not in await pg3.inner_text("#feed"))
+        await pg3.close()
 
         # desktop keyboard: j, r, u
         await pg.keyboard.press("j"); await pg.wait_for_timeout(200)

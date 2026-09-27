@@ -1,0 +1,56 @@
+name: GitHub Trending
+# Saves github.com/trending (today, all languages) for the site's GitHub tab
+# (core/scrape_github_trending.py). The page changes through the day, so every
+# 6 h at :41 (00:41 / 06:41 / 12:41 / 18:41 UTC). GitHub doesn't block its own
+# runners (unlike Reddit). Public repo = no Actions minutes cost.
+on:
+  schedule:
+    - cron: '41 */6 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: github-trending
+  cancel-in-progress: false
+
+jobs:
+  github-trending:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.10'
+
+      - name: Install dependencies
+        timeout-minutes: 4
+        run: pip install -r requirements-scraper.txt
+
+      - name: Scrape GitHub Trending
+        timeout-minutes: 3
+        run: python core/scrape_github_trending.py
+
+      - name: Commit if the list changed
+        timeout-minutes: 2
+        run: |
+          git config --global user.name 'github-actions[bot]'
+          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+          git add -f data/github_trending/
+          if git diff --cached --quiet; then
+            echo "NO CHANGE: GitHub Trending already current"
+            exit 0
+          fi
+          git commit -m "GitHub Trending update"
+          # Another robot may have pushed meanwhile; rebase and retry.
+          ok=0
+          for i in 1 2 3; do
+            git pull --rebase -X theirs origin main && git push && { ok=1; break; }
+            git rebase --abort 2>/dev/null || true
+            sleep 5
+          done
+          [ "$ok" = 1 ] || { echo "PUSH FAILED after 3 tries"; exit 1; }
+          echo "GITHUB TRENDING PUSHED: $(git rev-parse --short HEAD)"

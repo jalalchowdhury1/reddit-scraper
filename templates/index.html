@@ -303,6 +303,7 @@ const TABS = [
     { key: 'yearly', label: 'Yearly' },
     { key: 'news', label: 'News' },
     { key: 'ritholtz', label: 'AM Reads' },
+    { key: 'github', label: 'GitHub' },
     { key: 'favorites', label: 'Favorites' },
 ];
 let allData = null, loadError = false, lastLoad = 0;
@@ -333,13 +334,13 @@ function noteOpened(item) {
     setTimeout(render, 250);          // after the browser has followed the link
 }
 
-// "New" = first seen on this device today (Monthly/Yearly only; News shows "3h ago").
+// "New" = first seen on this device today (Monthly/Yearly/GitHub; News shows "3h ago").
 let firstSeen = {};
 function trackFirstSeen() {
     const saved = store.get('dr_first_seen', null);
     const firstVisit = saved === null;   // nothing is "new" on a device's first visit
     const map = saved || {}, live = new Set(), today = etDate();
-    ['monthly', 'yearly'].forEach((k) => (allData[k] || []).forEach((i) => {
+    ['monthly', 'yearly', 'github'].forEach((k) => (allData[k] || []).forEach((i) => {
         const id = String(i.id); live.add(id);
         if (!(id in map)) map[id] = firstVisit ? 'old' : today;
     }));
@@ -449,6 +450,10 @@ function metaHTML(item) {
     if (!isRead(item) && wasOpened(item)) tags.push('<span class="tag"><i class="ph ph-eye" aria-hidden="true"></i> Opened</span>');
     if (item.upvotes) out.push(item.upvotes + ' upvotes');
     else if (item.rank && item.when) out.push(`#${item.rank} this ${item.when}`);
+    // GitHub Trending: its place on today's page, then GitHub's own star counts.
+    if (item.domain === 'github.com' && item.rank) out.push(`#${item.rank}`);
+    if (item.stars_today) out.push(`+${item.stars_today} stars today`);
+    if (item.stars) out.push(`${item.stars} stars`);
     if (item.category) out.push(item.category);
     if (item.ts) out.push(ago(item.ts));
     else if (item.date && !String(item.id).startsWith('rth_')) out.push(shortDate(item.date));
@@ -478,7 +483,7 @@ function searchAll(q) {
     q = q.toLowerCase();
     const seen = new Set(), out = [];
     const pools = [...TABS.filter((t) => t.key !== 'favorites').map((t) => [t, [...((allData && allData[t.key]) || []), ...carried(t.key, true)]]),
-                   [TABS[4], cloudFavorites]];
+                   [TABS.find((t) => t.key === 'favorites'), cloudFavorites]];
     pools.forEach(([t, list]) => list.forEach((i) => {
         const hay = `${i.title} ${i.desc} ${i.meta} ${i.source || ''} ${i.domain || ''}`.toLowerCase();
         if (hay.includes(q) && !seen.has(String(i.id))) { seen.add(String(i.id)); out.push({ ...i, _tab: t.label }); }
@@ -587,13 +592,14 @@ function render() {
     } else if (total === 0) {
         html = currentTab === 'favorites'
             ? `<div class="state"><i class="ph ph-star"></i><h2>No favorites yet</h2><p>Tap the star on any item, or swipe it right, to keep it here.</p></div>`
-            : `<div class="state"><i class="ph ph-tray"></i><h2>Nothing here today</h2><p>The next scrape runs overnight.</p></div>`;
+            : `<div class="state"><i class="ph ph-tray"></i><h2>Nothing here today</h2><p>${currentTab === 'github' ? 'GitHub Trending refreshes every 6 hours.' : 'The next scrape runs overnight.'}</p></div>`;
     } else {
         if (currentTab === 'ritholtz' && items[0] && items[0].kind) {
             const lead = items.find((i) => i.kind !== 'SATPOST') || items[0];
             const kindName = { 'WEEKEND READS': 'Weekend Reads', 'AM READS': 'AM Reads', 'SATPOST': 'SatPost' }[lead.kind] || 'AM Reads';
             html += `<div class="section-label">${esc(kindName)} · ${esc(etWeekday(lead.date))}</div>`;
         }
+        if (currentTab === 'github') html += `<div class="section-label"><i class="ph ph-github-logo"></i>Trending today on GitHub</div>`;
         if (currentTab === 'ritholtz') {
             const main = shown.filter((i) => !isSat(i)), sat = shown.filter(isSat);
             html += main.map(cardHTML).join('');
@@ -619,13 +625,18 @@ function render() {
     if (!query && (currentTab === 'monthly' || currentTab === 'yearly') && redditAt && Date.now() - Date.parse(redditAt) > 48 * 3600e3) {
         html = `<div class="notice"><i class="ph ph-warning"></i><span>The Mac mini last refreshed Reddit ${esc(clock(redditAt))}. Until it catches up, lists may be older and show each post's rank instead of upvotes.</span></div>` + html;
     }
+    // GitHub Trending refreshes every 6 hours; 24h without it = 4 missed runs.
+    const githubAt = allData && allData.updated && allData.updated.github;
+    if (!query && currentTab === 'github' && githubAt && Date.now() - Date.parse(githubAt) > 24 * 3600e3) {
+        html = `<div class="notice"><i class="ph ph-warning"></i><span>GitHub Trending last refreshed ${esc(clock(githubAt))}, so this list is older than usual.</span></div>` + html;
+    }
     if (shownOlder.length) {
         html += `<div class="section-label"><i class="ph ph-clock-counter-clockwise"></i>Earlier list · ${esc(etWeekday(shownOlder[0].date || etDate()))}</div>` + shownOlder.map(cardHTML).join('');
     }
     feed.innerHTML = html;
     const up = allData && allData.updated;
     const stamps = up ? [up.ritholtz && 'AM Reads ' + clock(up.ritholtz), up.news && 'News ' + clock(up.news),
-                         up.reddit && 'Reddit ' + clock(up.reddit)].filter(Boolean) : [];
+                         up.reddit && 'Reddit ' + clock(up.reddit), up.github && 'GitHub ' + clock(up.github)].filter(Boolean) : [];
     document.getElementById('updated').textContent = stamps.length ? 'Updated: ' + stamps.join(' · ') : '';
     // Keep focus on the same item. If that item left the list (marked read), stay
     // at the same position, i.e. the next card, like Gmail.
@@ -648,6 +659,7 @@ function setProgress(total, unread) {
         if (nKept) scope += ` + ${nKept} kept`;
     }
     if (!query && total && currentTab === 'news' && totals.news_days) scope = ` · last ${totals.news_days} days`;
+    if (!query && total && currentTab === 'github' && totals.github > total) scope = ` · top ${total} of ${totals.github}`;
     document.getElementById('progress-label').textContent = (unread ? `${unread} of ${total} left` : `All ${total} read`) + scope;
     document.getElementById('progress-bar').style.width = total ? `${(done / total) * 100}%` : '0';
     const btn = document.getElementById('btn-markall');
@@ -895,7 +907,7 @@ document.getElementById('btn-link').onclick = () => {
     if (k && k.trim()) { try { localStorage.setItem('dailyReaderSyncKey', k.trim().toUpperCase()); } catch {} location.reload(); }
 };
 
-// ---------- Keyboard (desktop): j/k move, o open, r read, f favorite, / search, 1-5 tabs ----------
+// ---------- Keyboard (desktop): j/k move, o open, r read, f favorite, / search, 1-6 tabs ----------
 function paintFocus(scroll = true) {
     document.querySelectorAll('.item.focused').forEach((el) => el.classList.remove('focused'));
     focusId = focusIndex >= 0 && visibleItems[focusIndex] ? String(visibleItems[focusIndex].id) : null;
@@ -915,7 +927,7 @@ document.addEventListener('keydown', (e) => {
     else if ((e.key === 'r' || e.key === 'e') && cur) toggleRead(cur);
     else if ((e.key === 'f' || e.key === 's') && cur) favItem(cur);
     else if (e.key === '/') { e.preventDefault(); openSearch(); }
-    else if (/^[1-5]$/.test(e.key)) switchTab(TABS[+e.key - 1].key);
+    else if (/^[1-9]$/.test(e.key) && +e.key <= TABS.length) switchTab(TABS[+e.key - 1].key);
     else return;
 });
 

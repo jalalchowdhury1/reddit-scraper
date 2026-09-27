@@ -105,6 +105,36 @@ def icon():
                         headers={"Cache-Control": "public, max-age=604800"})
 
 NEWS_DAYS = 7
+GITHUB_TOP = 10   # the GitHub tab = GitHub's own top 10 of today's trending page
+
+
+def github_id(repo: str) -> str:
+    """'NVIDIA/Model-Optimizer' -> 'gh_nvidia_model-optimizer'. Read state is a
+    Firestore doc per id and '/' would split the path; owners never contain '_',
+    so the first '_' after 'gh_' is unambiguous."""
+    return "gh_" + repo.strip().lower().replace("/", "_")
+
+
+def github_item(row) -> dict:
+    """One data/github_trending/repos.csv row -> a card. Numbers only when the
+    page gave them (never invented)."""
+    repo = str(row["repo"]).strip()
+    lang = str(row.get("language", "")).strip()
+    num = lambda k: pd.to_numeric(row.get(k, ""), errors="coerce")
+    stars, today, rank = num("stars"), num("stars_today"), int(row["rank"])
+    return {
+        "id": github_id(repo),
+        "title": repo,
+        "desc": short_text(row.get("description", "")),
+        "url": f"https://github.com/{repo}",
+        "meta": f"GITHUB • #{rank} • {lang}",
+        "source": f"GitHub · {lang}" if lang else "GitHub",
+        "domain": "github.com",
+        "rank": rank,
+        "stars": format_score(int(stars)) if pd.notna(stars) and math.isfinite(stars) else "",
+        "stars_today": f"{int(today):,}" if pd.notna(today) and math.isfinite(today) else "",
+        "language": lang,
+    }
 
 
 def is_tracked(sub: str) -> bool:
@@ -197,8 +227,9 @@ def reddit_item(row):
 
 @app.get("/api/data")
 def get_data():
-    data = {"monthly": [], "yearly": [], "news": [], "ritholtz": []}
-    updated = {"news": "", "ritholtz": "", "reddit": ""}
+    data = {"monthly": [], "yearly": [], "news": [], "ritholtz": [], "github": []}
+    updated = {"news": "", "ritholtz": "", "reddit": "", "github": ""}
+    github_pool = 0
     
     # Load Reddit
     try:
@@ -344,6 +375,29 @@ def get_data():
             log.exception("SatPost failed to build")
             data["ritholtz"] = [i for i in data["ritholtz"] if i.get("kind") != "SATPOST"]
 
+    # Load GitHub Trending (core/scrape_github_trending.py): today's page, in
+    # GitHub's own order. The tab shows the top GITHUB_TOP.
+    gh_df = read_csv_safe(BASE_DIR / "data/github_trending/repos.csv")
+    if gh_df is not None:
+        try:
+            gh_df = gh_df.fillna("")
+            if {"repo", "rank"}.issubset(gh_df.columns):
+                updated["github"] = newest_scrape(gh_df)
+                gh_df = gh_df[gh_df["repo"].astype(str).str.count("/") == 1]
+                gh_df = gh_df.assign(rank=pd.to_numeric(gh_df["rank"], errors="coerce"))
+                gh_df = gh_df.dropna(subset=["rank"]).sort_values("rank", kind="stable")
+                gh_df = gh_df.drop_duplicates(subset=["repo"], keep="first")
+                github_pool = len(gh_df)
+                for _, row in gh_df.iterrows():
+                    try:  # one odd row costs that row
+                        data["github"].append(github_item(row))
+                    except Exception as e:
+                        log.warning("skipping bad GitHub row %r: %s", row.get("repo"), e)
+                data["github"] = data["github"][:GITHUB_TOP]
+        except Exception:
+            log.exception("GitHub Trending failed to build")
+            data["github"] = []
+
     # Chronological sort for the merged AM Reads tab
     def extract_date_from_meta(item):
         match = re.search(r'\d{4}-\d{2}-\d{2}', item.get('meta', ''))
@@ -363,7 +417,8 @@ def get_data():
     yearly_all = [i for i in yearly_pool if i["id"] not in monthly_ids]
     data["yearly"] = yearly_all[:50]
     # How many posts the top 50 were picked from (the site says "top 50 of 582").
-    data["totals"] = {"monthly": monthly_pool, "yearly": len(yearly_all), "news_days": NEWS_DAYS}
+    data["totals"] = {"monthly": monthly_pool, "yearly": len(yearly_all), "news_days": NEWS_DAYS,
+                      "github": github_pool}
     # The page keeps unread posts that drop out of the top 50 (index.html
     # trackKept). This list lets it forget posts from a sub that was removed.
     data["reddit_subs"] = sorted(TRACKED_SUBS) if TRACKED_SUBS else []
@@ -400,5 +455,5 @@ def status():
         "reddit_missing": [k for k in expected if k not in saved],
         "tracked_subs": len(TRACKED_SUBS) if TRACKED_SUBS else None,
         "updated": d["updated"],
-        "counts": {k: len(d[k]) for k in ("monthly", "yearly", "news", "ritholtz")},
+        "counts": {k: len(d[k]) for k in ("monthly", "yearly", "news", "ritholtz", "github")},
     }

@@ -122,7 +122,7 @@ def test_status_endpoint_lists_oldest_first_and_names_missing_lists(site):
     assert s["tracked_subs"] == len(SUBREDDITS)
     assert len(s["reddit_missing"]) == 2 * len(SUBREDDITS) - 2
     assert "r_todayilearned_yearly" in s["reddit_missing"] and "r_LifeProTips" not in s["reddit_missing"]
-    assert s["counts"] == {"monthly": 8, "yearly": 8, "news": 0, "ritholtz": 0}
+    assert s["counts"] == {"monthly": 8, "yearly": 8, "news": 0, "ritholtz": 0, "github": 0}
 
 
 def test_status_grades_checked_so_a_short_list_is_not_stale(site):
