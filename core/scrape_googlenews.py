@@ -77,7 +77,10 @@ def fetch_with_retry(session, url, waits=RETRY_WAITS, sleep=time.sleep):
             sleep(waits[i])
     raise RuntimeError(f"gave up after {len(waits) + 1} tries: {err}")
 
-def scrape_google_news() -> List[Dict]:
+def scrape_google_news(errors: List[str] = None) -> List[Dict]:
+    """All strictly-filtered articles across QUERIES. A query that fails is logged
+    and, when `errors` is given, appended to it as "<query>: <error>" so main() can
+    tell a quiet day from a dead feed (26 Sep 2026: all 3 failed, exit 0, nothing saved)."""
     print("="*50)
     print("🌐 Google News Aggregator (Strictly Filtered)")
     print("="*50)
@@ -136,14 +139,18 @@ def scrape_google_news() -> List[Dict]:
                 })
         except Exception as e:
             print(f"❌ Error fetching '{query_str}': {e}")
+            if errors is not None:
+                errors.append(f"{query_str}: {e}")
         time.sleep(1.5)
         
     return all_articles
 
-def save_articles(articles: List[Dict]):
+def save_articles(articles: List[Dict]) -> int:
+    """Append + dedup into data/googlenews/articles.csv. Returns the file's total rows
+    (0 = nothing saved)."""
     if not articles:
         print("No articles passed the strict filters.")
-        return
+        return 0
         
     out_dir = "data/googlenews"
     os.makedirs(out_dir, exist_ok=True)
@@ -156,10 +163,31 @@ def save_articles(articles: List[Dict]):
         combined = combined.drop_duplicates(subset=["article_id", "category"], keep="last")
         combined.to_csv(csv_path, index=False)
         print(f"✅ Updated {csv_path} ({len(combined)} total rows)")
-    else:
-        df.to_csv(csv_path, index=False)
-        print(f"✅ Saved {csv_path} ({len(df)} rows)")
+        return len(combined)
+    df.to_csv(csv_path, index=False)
+    print(f"✅ Saved {csv_path} ({len(df)} rows)")
+    return len(df)
+
+
+def main() -> int:
+    """Exit code for the workflow: 1 when nothing was saved (every query failed, or
+    none of the results passed the filters) or the save itself raised; 0 otherwise.
+    The LAST line is always one of the two markers below — daily_scrape.yml keeps
+    going on a 1 (Ritholtz/Trung still commit) and fails the run at the end."""
+    errors: List[str] = []
+    try:
+        articles = scrape_google_news(errors)
+        total = save_articles(articles)
+    except Exception as e:
+        print(f"GOOGLE NEWS FAILED: {type(e).__name__}: {e}")
+        return 1
+    failed = f"{len(errors)}/{len(QUERIES)} queries failed"
+    if not articles or not total:
+        print(f"GOOGLE NEWS FAILED: 0 articles saved ({failed})")
+        return 1
+    print(f"GOOGLE NEWS: saved {len(articles)} articles ({total} total rows, {failed})")
+    return 0
+
 
 if __name__ == "__main__":
-    articles = scrape_google_news()
-    save_articles(articles)
+    raise SystemExit(main())

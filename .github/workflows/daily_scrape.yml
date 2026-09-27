@@ -63,11 +63,22 @@ jobs:
       - name: Run Scrapers
         # Reddit is not here: the Mac mini scrapes it, and reddit_backup.yml refills
         # stale lists every 3 hours, so News and AM Reads never wait on Reddit.
+        # Each scraper runs even if an earlier one failed, and the commit step below
+        # still saves whatever the others wrote; the LAST step then fails the run.
+        # (26 Sep 2026: Google News saved nothing, exited 0, run was green.)
+        id: scrape
         if: steps.guard.outputs.run == 'true'
         run: |
-          python core/scrape_ritholtz.py
-          python core/scrape_googlenews.py
-          python core/scrape_trung.py
+          set +e
+          python core/scrape_ritholtz.py; R=$?
+          python core/scrape_googlenews.py; G=$?
+          python core/scrape_trung.py; T=$?
+          echo "scraper exits: ritholtz=$R googlenews=$G trung=$T"
+          BAD=""
+          [ "$R" = 0 ] || BAD="$BAD ritholtz=$R"
+          [ "$G" = 0 ] || BAD="$BAD googlenews=$G"
+          [ "$T" = 0 ] || BAD="$BAD trung=$T"
+          echo "failed=${BAD# }" >> "$GITHUB_OUTPUT"
 
       - name: Commit and push changes
         if: steps.guard.outputs.run == 'true'
@@ -95,3 +106,11 @@ jobs:
           done
           [ "$ok" = 1 ] || { echo "PUSH FAILED after 3 tries"; exit 1; }
           echo "DATA PUSHED: $N data files in $(git rev-parse --short HEAD)"
+
+      - name: Fail the run if a scraper failed
+        # After the commit on purpose: the other scrapers' data is already pushed.
+        # A red run also means the 09:00 retry re-runs (News wasn't committed).
+        if: steps.guard.outputs.run == 'true' && steps.scrape.outputs.failed != ''
+        run: |
+          echo "SCRAPERS FAILED: ${{ steps.scrape.outputs.failed }}"
+          exit 1

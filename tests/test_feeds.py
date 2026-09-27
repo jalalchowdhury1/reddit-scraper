@@ -190,3 +190,62 @@ def test_github_rss_skips_lists_the_mac_saved_recently(tmp_path):
     assert fresh_keys(["not", "a", "dict"], now) == {}
     assert list(fresh) == ["r_LifeProTips"] and round(fresh["r_LifeProTips"]) == 18   # 66 h old = stale
     assert list_key("bestof", "year") == "r_bestof_yearly" and list_key("bestof", "month") == "r_bestof"
+
+
+# --- Google News exit code (27 Sep 2026): a run that saved nothing must not exit 0 ---
+import scrape_googlenews as gn
+
+NEWS_RSS = b"""<?xml version="1.0"?><rss><channel>
+<item><title>India and Bangladesh sign trade agreement - Dhaka Tribune</title>
+<link>https://example.com/a1</link><description>Bangladesh economy exports</description>
+<source>Dhaka Tribune</source><pubDate>Sat, 26 Sep 2026 10:00:00 GMT</pubDate></item>
+</channel></rss>"""
+
+
+class _Resp:
+    status_code = 200
+    content = NEWS_RSS
+    def raise_for_status(self):
+        pass
+
+
+def _news(monkeypatch, tmp_path, get):
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(gn.time, "sleep", lambda s: None)
+    monkeypatch.setattr(gn, "RETRY_WAITS", ())
+    monkeypatch.setattr(gn.requests.Session, "get", lambda self, url, timeout=15: get(url))
+
+
+def test_news_all_queries_failing_exits_1_with_marker(monkeypatch, tmp_path, capsys):
+    def boom(url):
+        raise requests.ConnectionError("503 everywhere")
+    _news(monkeypatch, tmp_path, boom)
+    monkeypatch.setattr(gn, "fetch_with_retry", lambda session, url: session.get(url))
+    assert gn.main() == 1
+    last = capsys.readouterr().out.strip().splitlines()[-1]
+    assert last == "GOOGLE NEWS FAILED: 0 articles saved (3/3 queries failed)"
+    assert not (tmp_path / "data/googlenews/articles.csv").exists()
+
+
+def test_news_save_crash_exits_1(monkeypatch, tmp_path, capsys):
+    _news(monkeypatch, tmp_path, lambda url: _Resp())
+    monkeypatch.setattr(gn, "save_articles", lambda a: (_ for _ in ()).throw(OSError("disk full")))
+    assert gn.main() == 1
+    assert capsys.readouterr().out.strip().splitlines()[-1] == "GOOGLE NEWS FAILED: OSError: disk full"
+
+
+def test_news_success_exits_0_and_saves(monkeypatch, tmp_path, capsys):
+    _news(monkeypatch, tmp_path, lambda url: _Resp())
+    assert gn.main() == 0
+    last = capsys.readouterr().out.strip().splitlines()[-1]
+    assert last.startswith("GOOGLE NEWS: saved 1 articles (1 total rows, 0/3 queries failed)")
+    assert (tmp_path / "data/googlenews/articles.csv").exists()
+
+
+def test_daily_workflow_keeps_committing_when_news_fails():
+    wf = open(os.path.join(ROOT, ".github/workflows/daily_scrape.yml")).read()
+    run = wf[wf.index("- name: Run Scrapers"):wf.index("- name: Commit and push changes")]
+    assert "set +e" in run and "googlenews=$G" in run and '"$GITHUB_OUTPUT"' in run
+    # the failing step comes AFTER the commit, so Ritholtz/Trung still land
+    assert wf.index("- name: Commit and push changes") < wf.index("- name: Fail the run if a scraper failed")
+    assert "steps.scrape.outputs.failed != ''" in wf

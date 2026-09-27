@@ -259,6 +259,10 @@ ignores untracked subs anyway, but the dead files would sit in every deploy.
 - Sweeps 3 Google News RSS queries (`Bangladesh Economy`, `Bangladesh India`,
   `Bangladesh business`).
 - Drops any item whose source is in `BLOCKED_SOURCES` (a long blocklist of Indian outlets).
+- Exit code (27 Sep 2026): `main()` exits **1** when nothing was saved (every query failed, or
+  nothing passed the filters) or the save raised; its last line is
+  `GOOGLE NEWS: saved N articles (T total rows, F/3 queries failed)` or
+  `GOOGLE NEWS FAILED: …`. Before this, a run where all 3 queries died exited 0 (26 Sep).
 - `fetch_with_retry()` tries each query 3 times (waits 5 s, 20 s) on 5xx/429/network errors;
   other 4xx fail at once. Added 26 Sep 2026 after all 3 queries 503'd and News sat a day old.
 - Keeps an item **only if** its `title + description` matches one of `STRICT_FILTERS`'s phrase
@@ -444,6 +448,11 @@ python3 core/scrape_reddit_browser.py --only LifeProTips --visible   # needs Pla
   waits on Reddit), `git add -f data/`, commits "Automated daily data update", pushes with a
   3-try rebase loop, then prints `DATA PUSHED: N data files` (fleet-health greps it). Nothing new
   → `NO DATA CHANGES`. `workflow_dispatch` always runs.
+  **Scraper failures (27 Sep 2026):** the scrape step runs all three with `set +e`, prints
+  `scraper exits: ritholtz=R googlenews=G trung=T`, the commit step still pushes what the
+  others wrote, and a LAST step (`Fail the run if a scraper failed`) prints
+  `SCRAPERS FAILED: googlenews=1` and exits 1 — so a dead feed turns the run red (and, for
+  News, the 09:00 retry re-runs because `data/googlenews/` wasn't committed).
 - **Two crons + dedupe guard (don't "simplify" away):** `0 3 * * *` is the real run; `0 9 * * *`
   is a retry added after 2026-07-09, when GitHub never assigned a runner to the 03:00 job. A guard
   skips *scheduled* runs when **`data/googlenews/`** was already committed today (UTC). It checked
