@@ -205,6 +205,25 @@ async def main():
             check("Footer shows when Reddit last came from the Mac", "Reddit " in footer, footer)
         if api["updated"].get("github"):
             check("Footer shows when GitHub Trending last landed", "GitHub " in footer, footer)
+        # Order switch (Monthly/Yearly): Most upvotes = the same posts high to low, remembered; Mixed = the server's order.
+        live_nums = "visibleItems.filter(i => !i._kept).map(upvoteNum)"
+        await pg.click('[data-tab="monthly"]:visible'); await pg.wait_for_timeout(400)
+        mix_ids = await pg.evaluate("visibleItems.map(i => String(i.id)).sort().join()")
+        await pg.click('[data-act="sort"][data-sort="top"]'); await pg.wait_for_timeout(400)
+        nums = await pg.evaluate(live_nums)
+        same = await pg.evaluate("visibleItems.map(i => String(i.id)).sort().join()") == mix_ids
+        check("Most upvotes: Monthly high to low, same posts", nums == sorted(nums, reverse=True) and min(nums) > 0 and same, str(nums[:6]))
+        await pg.click('[data-tab="yearly"]:visible'); await pg.wait_for_timeout(400)
+        ynums = await pg.evaluate(live_nums)
+        check("Most upvotes applies to Yearly too", ynums == sorted(ynums, reverse=True), str(ynums[:6]))
+        await pg.reload(wait_until="load")
+        await pg.wait_for_function("allData && (readLoaded || syncBroken)", timeout=20000); await pg.wait_for_timeout(500)
+        remembered = await pg.evaluate("sortTop && document.querySelector('[data-sort=\"top\"]').classList.contains('on')")
+        check("The order choice is remembered", remembered)
+        await pg.click('[data-act="sort"][data-sort="mix"]'); await pg.wait_for_timeout(400)
+        back = await pg.evaluate("""visibleItems.filter(i => !i._kept).map(i => String(i.id)).join() ===
+            allData[currentTab].filter(i => !isRead(i)).map(i => String(i.id)).join()""")
+        check("Mixed = the server's order again", back)
         ow = await pg.evaluate("document.documentElement.scrollWidth > window.innerWidth")
         check("No sideways scroll on phone", not ow)
         check("No JS errors (phone)", not errs, "; ".join(errs)[:200])
