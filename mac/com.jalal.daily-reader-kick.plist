@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- Install: cp mac/morning-kick.sh ~/.local/bin/daily-reader-kick.sh
+              cp mac/com.jalal.daily-reader-kick.plist ~/Library/LaunchAgents/
+              launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.jalal.daily-reader-kick.plist
+     Starts AM Reads + GitHub Trending at 07:00, 08:30, 10:00 local (ET).
+     StartCalendarInterval, never StartInterval (drifts on the Mac mini). -->
+<plist version="1.0">
+<dict>
+    <key>Label</key><string>com.jalal.daily-reader-kick</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/bash</string>
+        <string>/Users/jalalchowdhury/.local/bin/daily-reader-kick.sh</string>
+    </array>
+    <key>StartCalendarInterval</key>
+    <array>
+        <dict><key>Hour</key><integer>7</integer><key>Minute</key><integer>0</integer></dict>
+        <dict><key>Hour</key><integer>8</integer><key>Minute</key><integer>30</integer></dict>
+        <dict><key>Hour</key><integer>10</integer><key>Minute</key><integer>0</integer></dict>
+    </array>
+    <key>StandardOutPath</key><string>/Users/jalalchowdhury/Library/Logs/daily-reader-kick.log</string>
+    <key>StandardErrorPath</key><string>/Users/jalalchowdhury/Library/Logs/daily-reader-kick.log</string>
+</dict>
+</plist>

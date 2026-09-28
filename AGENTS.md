@@ -700,3 +700,12 @@ launchctl print gui/$(id -u)/com.jalal.reddit-browser | grep -E 'state|last exit
   clone is re-cloned automatically).
 - **A tab is suddenly empty**: check Vercel's runtime logs for `daily-reader` warnings (a broken
   CSV is logged there and costs only its own tab).
+
+## Morning kick from the Mac mini (28 Sep 2026)
+GitHub's cron started am_reads.yml 2-4 h late (the 11:45 UTC slot ran at 15:48).
+launchd `com.jalal.daily-reader-kick` (mac/com.jalal.daily-reader-kick.plist,
+script mac/morning-kick.sh installed as ~/.local/bin/daily-reader-kick.sh) runs
+`gh workflow run` for am_reads.yml + github_trending.yml at 07:00, 08:30, 10:00 ET.
+Log: ~/Library/Logs/daily-reader-kick.log ("KICK OK <workflow>"). The GHA cron
+lines stay as backup. GitHub Trending's daily page can list <10 repos (8 on
+28 Sep); the scraper tops up from ?since=weekly with blank stars_today.
