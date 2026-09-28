@@ -26,7 +26,9 @@ from bs4 import BeautifulSoup
 URL = "https://github.com/trending"
 OUTPUT_DIR = "data/github_trending"
 OUTPUT_FILE = f"{OUTPUT_DIR}/repos.csv"
-MIN_REPOS = 10          # the page lists ~15-25; fewer than the 10 we show = something broke
+MIN_REPOS = 5           # today's page lists ~8-25; under 5 = the layout broke
+SHOW = 10               # the site shows 10 (server.py GITHUB_TOP); a short day is topped up from weekly
+WEEKLY_URL = URL + "?since=weekly"
 HEADERS = {"User-Agent": "Mozilla/5.0 (DailyReader; +https://reddit-scraper-lyart.vercel.app)"}
 COLUMNS = ["rank", "repo", "url", "description", "language", "stars", "forks", "stars_today", "scraped_at"]
 
@@ -104,6 +106,20 @@ def save(rows: list, path: str = OUTPUT_FILE) -> None:
     df.to_csv(path, index=False)
 
 
+def top_up(rows: list, weekly: list, want: int = SHOW) -> list:
+    """Today's list, filled to `want` with this week's trending repos not already on it.
+    Fill-ins get no stars_today (their number is a weekly count, not today's)."""
+    have = {r["repo"] for r in rows}
+    out = list(rows)
+    for w in weekly:
+        if len(out) >= want:
+            break
+        if w["repo"] not in have:
+            out.append({**w, "rank": len(out) + 1, "stars_today": None})
+            have.add(w["repo"])
+    return out
+
+
 def main() -> int:
     print(f"Fetching {URL} ...")
     try:
@@ -115,6 +131,15 @@ def main() -> int:
     if problem:
         print(f"GITHUB TRENDING FAILED: {problem}; keeping the old list")
         return 1
+    if len(rows) < SHOW:
+        # GitHub's daily page is sometimes short (8 repos on 28 Sep 2026).
+        try:
+            weekly = parse_trending(fetch(WEEKLY_URL))
+            before = len(rows)
+            rows = top_up(rows, weekly)
+            print(f"  today listed only {before}; added {len(rows) - before} from this week's trending")
+        except Exception as e:
+            print(f"  today listed only {len(rows)}; weekly top-up failed ({e}), saving the short list")
     save(rows)
     top = ", ".join(r["repo"] for r in rows[:3])
     print(f"GITHUB TRENDING OK: {len(rows)} repos (top: {top})")

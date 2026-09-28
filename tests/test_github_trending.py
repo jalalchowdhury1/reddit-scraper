@@ -60,7 +60,8 @@ def test_a_layout_change_is_refused():
 
 def test_a_short_or_repeated_list_is_refused():
     rows = gt.parse_trending(PAGE)
-    assert "only 9" in gt.list_problem(rows[:9])
+    assert "only 4" in gt.list_problem(rows[:4])
+    assert gt.list_problem(rows[:8]) == ""   # a short day (8 on 28 Sep 2026) is real, not broken
     assert "twice" in gt.list_problem(rows + rows[:1])
 
 
@@ -74,6 +75,37 @@ def test_main_keeps_the_old_file_when_the_page_is_wrong(tmp_path, monkeypatch, c
     assert gt.main() == 1
     assert "GITHUB TRENDING FAILED" in capsys.readouterr().out
     assert (tmp_path / gt.OUTPUT_FILE).read_text() == saved
+
+
+def test_a_short_day_is_topped_up_from_weekly_without_repeats(tmp_path, monkeypatch, capsys):
+    rows = gt.parse_trending(PAGE)
+    monkeypatch.chdir(tmp_path)
+    urls = []
+    monkeypatch.setattr(gt, "fetch", lambda url=gt.URL: urls.append(url) or url)
+    weekly = [dict(r, repo=f"week/r{i}") for i, r in enumerate(rows)]
+    monkeypatch.setattr(gt, "parse_trending", lambda html: rows[:8] if html == gt.URL else rows[6:7] + weekly)
+    assert gt.main() == 0
+    assert urls == [gt.URL, gt.WEEKLY_URL]
+    saved = gt.pd.read_csv(tmp_path / gt.OUTPUT_FILE)
+    assert list(saved["rank"]) == list(range(1, 11))
+    assert list(saved["repo"][:8]) == [r["repo"] for r in rows[:8]]
+    assert list(saved["repo"][8:]) == ["week/r0", "week/r1"]   # rows[6] already on today's list: skipped
+    assert saved["stars_today"][8:].isna().all()                 # weekly counts are not "today"
+    assert "added 2 from this week" in capsys.readouterr().out
+
+
+def test_a_short_day_still_saves_when_weekly_fails(tmp_path, monkeypatch, capsys):
+    rows = gt.parse_trending(PAGE)
+    monkeypatch.chdir(tmp_path)
+    def fetch(url=gt.URL):
+        if url == gt.WEEKLY_URL:
+            raise RuntimeError("HTTP 503")
+        return url
+    monkeypatch.setattr(gt, "fetch", fetch)
+    monkeypatch.setattr(gt, "parse_trending", lambda html: rows[:8])
+    assert gt.main() == 0
+    assert len(gt.pd.read_csv(tmp_path / gt.OUTPUT_FILE)) == 8
+    assert "weekly top-up failed" in capsys.readouterr().out
 
 
 def test_main_reports_a_network_failure(monkeypatch, capsys):
