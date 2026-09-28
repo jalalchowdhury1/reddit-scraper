@@ -1,11 +1,11 @@
 rank,repo,url,description,language,stars,forks,stars_today,scraped_at
-1,debpalash/VoiceStudio,https://github.com/debpalash/VoiceStudio,"VoiceStudio is the open-source, fully-local ElevenLabs alternative — voice cloning, voice design, video dubbing, dictation, transcription & audiobook creation in 646 languages.",Python,42364,4981,3274.0,2026-09-28T14:42:29
-2,paperclipai/paperclip,https://github.com/paperclipai/paperclip,The open-source app everyone uses to manage agents at work,TypeScript,91898,15824,3185.0,2026-09-28T14:42:29
-3,vectorize-io/hindsight,https://github.com/vectorize-io/hindsight,Hindsight: Agent Memory That Learns,Python,39988,5342,4413.0,2026-09-28T14:42:29
-4,NawfalMotii79/PLFM_RADAR,https://github.com/NawfalMotii79/PLFM_RADAR,"Open-source, low-cost 10.5 GHz PLFM phased array RADAR system",PLSQL,25645,5875,145.0,2026-09-28T14:42:29
-5,cs341-illinois/coursebook,https://github.com/cs341-illinois/coursebook,Open Source Introductory Systems Programming Textbook for the University of Illinois,TeX,2298,222,265.0,2026-09-28T14:42:29
-6,byoungd/up,https://github.com/byoungd/up,An advanced guide which might benefit you a lot 🎉 . 韩先凯的人生进阶指南 人生进阶指南 离谱的人生 人生进阶 AI学习 AI指南 韩先凯的AI学习指南 英语学习指南/英语学习教程/英语学习/学英语,JavaScript,64454,6501,310.0,2026-09-28T14:42:29
-7,mvschwarz/openrig,https://github.com/mvschwarz/openrig,Multi-agent harness that runs Claude Code and Codex together as one system,TypeScript,1443,125,781.0,2026-09-28T14:42:29
-8,dream-num/univer,https://github.com/dream-num/univer,"The Office Harness for AI Agents — Spreadsheets, Docs, Slides, Canvas, Relational Tables, and PDF in one runtime.",TypeScript,21015,1788,1105.0,2026-09-28T14:42:29
-9,anthropics/financial-services,https://github.com/anthropics/financial-services,,Python,37989,5479,,2026-09-28T14:42:29
-10,cloudflare/security-audit-skill,https://github.com/cloudflare/security-audit-skill,"A coding-agent skill for multi-phase security audits with independently verified, machine-readable findings",JavaScript,22589,1313,,2026-09-28T14:42:29
+1,debpalash/VoiceStudio,https://github.com/debpalash/VoiceStudio,"VoiceStudio is the open-source, fully-local ElevenLabs alternative — voice cloning, voice design, video dubbing, dictation, transcription & audiobook creation in 646 languages.",Python,43918,5085,3274.0,2026-09-28T23:29:19
+2,paperclipai/paperclip,https://github.com/paperclipai/paperclip,The open-source app everyone uses to manage agents at work,TypeScript,92698,15882,3185.0,2026-09-28T23:29:19
+3,vectorize-io/hindsight,https://github.com/vectorize-io/hindsight,Hindsight: Agent Memory That Learns,Python,40911,5532,4413.0,2026-09-28T23:29:19
+4,NawfalMotii79/PLFM_RADAR,https://github.com/NawfalMotii79/PLFM_RADAR,"Open-source, low-cost 10.5 GHz PLFM phased array RADAR system",PLSQL,25742,5885,145.0,2026-09-28T23:29:19
+5,cs341-illinois/coursebook,https://github.com/cs341-illinois/coursebook,Open Source Introductory Systems Programming Textbook for the University of Illinois,TeX,2488,235,316.0,2026-09-28T23:29:19
+6,byoungd/up,https://github.com/byoungd/up,An advanced guide which might benefit you a lot 🎉 . 韩先凯的人生进阶指南 人生进阶指南 离谱的人生 人生进阶 AI学习 AI指南 韩先凯的AI学习指南 英语学习指南/英语学习教程/英语学习/学英语,JavaScript,64625,6510,310.0,2026-09-28T23:29:19
+7,mvschwarz/openrig,https://github.com/mvschwarz/openrig,Multi-agent harness that runs Claude Code and Codex together as one system,TypeScript,1686,135,781.0,2026-09-28T23:29:19
+8,dream-num/univer,https://github.com/dream-num/univer,"The Office Harness for AI Agents — Spreadsheets, Docs, Slides, Canvas, Relational Tables, and PDF in one runtime.",TypeScript,21222,1798,1105.0,2026-09-28T23:29:19
+9,anthropics/financial-services,https://github.com/anthropics/financial-services,,Python,38049,5481,,2026-09-28T23:29:19
+10,cloudflare/security-audit-skill,https://github.com/cloudflare/security-audit-skill,"A coding-agent skill for multi-phase security audits with independently verified, machine-readable findings",JavaScript,22728,1322,,2026-09-28T23:29:19
