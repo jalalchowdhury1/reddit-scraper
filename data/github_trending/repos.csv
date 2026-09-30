@@ -1,15 +1,15 @@
 rank,repo,url,description,language,stars,forks,stars_today,scraped_at
-1,debpalash/VoiceStudio,https://github.com/debpalash/VoiceStudio,"VoiceStudio is the open-source, fully-local ElevenLabs alternative — voice cloning, voice design, video dubbing, dictation, transcription & audiobook creation in 646 languages.",Python,47939,5380,4712,2026-09-29T22:34:38
-2,NVIDIA/OpenShell,https://github.com/NVIDIA/OpenShell,"OpenShell is the safe, private runtime for autonomous AI agents.",Rust,10510,1413,978,2026-09-29T22:34:38
-3,vectorize-io/hindsight,https://github.com/vectorize-io/hindsight,Hindsight: Agent Memory That Learns,Python,42770,5763,2541,2026-09-29T22:34:38
-4,paperclipai/paperclip,https://github.com/paperclipai/paperclip,The open-source app everyone uses to manage agents at work,TypeScript,94382,16044,2412,2026-09-29T22:34:38
-5,t8y2/dbx,https://github.com/t8y2/dbx,"25 MB lightweight cross-platform database client for 100+ databases, including MySQL, PostgreSQL, SQLite, Redis, MongoDB, DuckDB, SQL Server, and Dameng. Built-in AI, MCP Server, CLI, desktop and Docker. | 轻量级跨平台数据库管理工具，支持 MySQL、PostgreSQL、SQLite、Redis、MongoDB、达梦等 100+ 数据库，提供桌面端、Docker、CLI、内置 AI 助手和 MCP。",Rust,21929,2084,349,2026-09-29T22:34:38
-6,mvschwarz/openrig,https://github.com/mvschwarz/openrig,Multi-agent harness that runs Claude Code and Codex together as one system,TypeScript,2379,170,733,2026-09-29T22:34:38
-7,oblien/openship,https://github.com/oblien/openship,Self-hosted deployment platform,TypeScript,13784,1233,436,2026-09-29T22:34:38
-8,averygan/reclip,https://github.com/averygan/reclip,"Download videos from almost any website. Lightweight, self-hosted media downloader with a clean web UI.",HTML,10049,1529,114,2026-09-29T22:34:38
-9,cs341-illinois/coursebook,https://github.com/cs341-illinois/coursebook,Open Source Introductory Systems Programming Textbook for the University of Illinois,TeX,3058,273,569,2026-09-29T22:34:38
-10,rohitg00/ai-engineering-from-scratch,https://github.com/rohitg00/ai-engineering-from-scratch,Learn it. Build it. Ship it for others.,Python,61273,10524,855,2026-09-29T22:34:38
-11,VectifyAI/PageIndex,https://github.com/VectifyAI/PageIndex,"📑 PageIndex: Document Index for Vectorless, Reasoning-based RAG",Python,37267,3259,822,2026-09-29T22:34:38
-12,willfaust/Madeira,https://github.com/willfaust/Madeira,Run x86-64 Windows PC games on jailed iOS via FEX-Emu + Wine + DXMT,C,1079,187,85,2026-09-29T22:34:38
-13,dream-num/univer,https://github.com/dream-num/univer,"The Office Harness for AI Agents — Spreadsheets, Docs, Slides, Canvas, Relational Tables, and PDF in one runtime.",TypeScript,21816,1840,692,2026-09-29T22:34:38
-14,rakyll/hey,https://github.com/rakyll/hey,"HTTP load generator, ApacheBench (ab) replacement",Go,20456,1310,31,2026-09-29T22:34:38
+1,debpalash/VoiceStudio,https://github.com/debpalash/VoiceStudio,"VoiceStudio is the open-source, fully-local ElevenLabs alternative — voice cloning, voice design, video dubbing, dictation, transcription & audiobook creation in 646 languages.",Python,48781,5458,4758,2026-09-30T05:56:23
+2,NVIDIA/OpenShell,https://github.com/NVIDIA/OpenShell,"OpenShell is the safe, private runtime for autonomous AI agents.",Rust,10859,1436,990,2026-09-30T05:56:23
+3,vectorize-io/hindsight,https://github.com/vectorize-io/hindsight,Hindsight: Agent Memory That Learns,Python,43147,5806,2575,2026-09-30T05:56:23
+4,paperclipai/paperclip,https://github.com/paperclipai/paperclip,The open-source app everyone uses to manage agents at work,TypeScript,94716,16079,2458,2026-09-30T05:56:23
+5,t8y2/dbx,https://github.com/t8y2/dbx,"25 MB lightweight cross-platform database client for 100+ databases, including MySQL, PostgreSQL, SQLite, Redis, MongoDB, DuckDB, SQL Server, and Dameng. Built-in AI, MCP Server, CLI, desktop and Docker. | 轻量级跨平台数据库管理工具，支持 MySQL、PostgreSQL、SQLite、Redis、MongoDB、达梦等 100+ 数据库，提供桌面端、Docker、CLI、内置 AI 助手和 MCP。",Rust,22395,2101,232,2026-09-30T05:56:23
+6,mvschwarz/openrig,https://github.com/mvschwarz/openrig,Multi-agent harness that runs Claude Code and Codex together as one system,TypeScript,2559,181,737,2026-09-30T05:56:23
+7,oblien/openship,https://github.com/oblien/openship,Self-hosted deployment platform,TypeScript,13985,1251,437,2026-09-30T05:56:23
+8,averygan/reclip,https://github.com/averygan/reclip,"Download videos from almost any website. Lightweight, self-hosted media downloader with a clean web UI.",HTML,10305,1547,113,2026-09-30T05:56:23
+9,cs341-illinois/coursebook,https://github.com/cs341-illinois/coursebook,Open Source Introductory Systems Programming Textbook for the University of Illinois,TeX,3194,278,572,2026-09-30T05:56:23
+10,rohitg00/ai-engineering-from-scratch,https://github.com/rohitg00/ai-engineering-from-scratch,Learn it. Build it. Ship it for others.,Python,61671,10555,786,2026-09-30T05:56:23
+11,VectifyAI/PageIndex,https://github.com/VectifyAI/PageIndex,"📑 PageIndex: Document Index for Vectorless, Reasoning-based RAG",Python,37590,3274,835,2026-09-30T05:56:23
+12,willfaust/Madeira,https://github.com/willfaust/Madeira,Run x86-64 Windows PC games on jailed iOS via FEX-Emu + Wine + DXMT,C,1139,192,81,2026-09-30T05:56:23
+13,dream-num/univer,https://github.com/dream-num/univer,"The Office Harness for AI Agents — Spreadsheets, Docs, Slides, Canvas, Relational Tables, and PDF in one runtime.",TypeScript,21972,1859,696,2026-09-30T05:56:23
+14,rakyll/hey,https://github.com/rakyll/hey,"HTTP load generator, ApacheBench (ab) replacement",Go,20537,1314,34,2026-09-30T05:56:23
