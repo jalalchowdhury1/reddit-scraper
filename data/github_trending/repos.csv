@@ -1,18 +1,16 @@
 rank,repo,url,description,language,stars,forks,stars_today,scraped_at
-1,NVIDIA/OpenShell,https://github.com/NVIDIA/OpenShell,"OpenShell is the safe, private runtime for autonomous AI agents.",Rust,13607,1597,1281,2026-10-01T11:00:39
-2,debpalash/VoiceStudio,https://github.com/debpalash/VoiceStudio,"VoiceStudio is the open-source, fully-local ElevenLabs alternative — voice cloning, voice design, video dubbing, dictation, transcription & audiobook creation in 646 languages.",Python,50991,5651,3483,2026-10-01T11:00:39
-3,mvschwarz/openrig,https://github.com/mvschwarz/openrig,Multi-agent harness that runs Claude Code and Codex together as one system,TypeScript,3297,226,624,2026-10-01T11:00:39
-4,mksglu/context-mode,https://github.com/mksglu/context-mode,"Context window optimization for AI coding agents. Sandboxes tool output (98% reduction), persists session memory, and enforces routing across 17 platforms via MCP + hooks.",TypeScript,24632,1776,90,2026-10-01T11:00:39
-5,DietrichGebert/ponytail,https://github.com/DietrichGebert/ponytail,Makes your AI agent think like the laziest senior dev in the room. The best code is the code you never wrote.,JavaScript,149686,8042,743,2026-10-01T11:00:39
-6,harry0703/MoneyPrinterTurbo,https://github.com/harry0703/MoneyPrinterTurbo,利用 AI 大模型和自动化工作流，根据主题或关键词一键生成高清短视频。Generate HD short videos from a topic or keyword with an automated AI workflow.,Python,127803,19987,431,2026-10-01T11:00:39
-7,openclaw/openclaw,https://github.com/openclaw/openclaw,The AI that really does things. Any OS. Any Platform. The lobster way. 🦞,TypeScript,391112,82237,136,2026-10-01T11:00:39
-8,ComposioHQ/awesome-claude-skills,https://github.com/ComposioHQ/awesome-claude-skills,"A curated list of awesome Claude Skills, resources, and tools for customizing Claude AI workflows",Python,76274,8886,123,2026-10-01T11:00:39
-9,mattpocock/skills,https://github.com/mattpocock/skills,Skills for Real Engineers. Straight from my .agents directory.,Shell,273361,22973,876,2026-10-01T11:00:39
-10,heygen-com/hyperframes,https://github.com/heygen-com/hyperframes,Write HTML. Render video. Built for agents.,TypeScript,54990,4998,349,2026-10-01T11:00:39
-11,firebase/firebase-ios-sdk,https://github.com/firebase/firebase-ios-sdk,Firebase SDK for Apple App Development,C++,6801,1801,8,2026-10-01T11:00:39
-12,modelcontextprotocol/servers,https://github.com/modelcontextprotocol/servers,Model Context Protocol Servers,TypeScript,90905,11736,50,2026-10-01T11:00:39
-13,byoungd/up,https://github.com/byoungd/up,An advanced guide which might benefit you a lot 🎉 . 韩先凯的人生进阶指南 人生进阶指南 离谱的人生 人生进阶 AI学习 AI指南 韩先凯的AI学习指南 英语学习指南/英语学习教程/英语学习/学英语,JavaScript,66557,6648,743,2026-10-01T11:00:39
-14,colbymchenry/codegraph,https://github.com/colbymchenry/codegraph,"Pre-indexed code knowledge graph, auto syncs on code changes, for Claude Code, Codex, Gemini, Cursor, OpenCode, AntiGravity, Kiro, CoPilot, and Hermes Agent — fewer tokens, fewer tool calls, 100% local",C,72718,4666,118,2026-10-01T11:00:39
-15,t8y2/dbx,https://github.com/t8y2/dbx,"25 MB lightweight cross-platform database client for 100+ databases, including MySQL, PostgreSQL, SQLite, Redis, MongoDB, DuckDB, SQL Server, and Dameng. Built-in AI, MCP Server, CLI, desktop and Docker. | 轻量级跨平台数据库管理工具，支持 MySQL、PostgreSQL、SQLite、Redis、MongoDB、达梦等 100+ 数据库，提供桌面端、Docker、CLI、内置 AI 助手和 MCP。",Rust,23597,2171,1138,2026-10-01T11:00:39
-16,NawfalMotii79/PLFM_RADAR,https://github.com/NawfalMotii79/PLFM_RADAR,"Open-source, low-cost 10.5 GHz PLFM phased array RADAR system",PLSQL,26497,5985,263,2026-10-01T11:00:39
-17,VectifyAI/PageIndex,https://github.com/VectifyAI/PageIndex,"📑 PageIndex: Document Index for Vectorless, Reasoning-based RAG",Python,38314,3322,1097,2026-10-01T11:00:39
+1,DietrichGebert/ponytail,https://github.com/DietrichGebert/ponytail,Makes your AI agent think like the laziest senior dev in the room. The best code is the code you never wrote.,JavaScript,149686,8042,743,2026-10-01T11:01:06
+2,mattpocock/skills,https://github.com/mattpocock/skills,Skills for Real Engineers. Straight from my .agents directory.,Shell,273361,22973,876,2026-10-01T11:01:06
+3,NVIDIA/OpenShell,https://github.com/NVIDIA/OpenShell,"OpenShell is the safe, private runtime for autonomous AI agents.",Rust,13607,1597,1281,2026-10-01T11:01:06
+4,firebase/firebase-ios-sdk,https://github.com/firebase/firebase-ios-sdk,Firebase SDK for Apple App Development,C++,6801,1801,8,2026-10-01T11:01:06
+5,mvschwarz/openrig,https://github.com/mvschwarz/openrig,Multi-agent harness that runs Claude Code and Codex together as one system,TypeScript,3297,226,624,2026-10-01T11:01:06
+6,cursor/plugins,https://github.com/cursor/plugins,Cursor plugin specification and official plugins,TypeScript,9226,869,157,2026-10-01T11:01:06
+7,obra/superpowers,https://github.com/obra/superpowers,An agentic skills framework & software development methodology that works.,Shell,293640,26269,594,2026-10-01T11:01:06
+8,mksglu/context-mode,https://github.com/mksglu/context-mode,"Context window optimization for AI coding agents. Sandboxes tool output (98% reduction), persists session memory, and enforces routing across 17 platforms via MCP + hooks.",TypeScript,24632,1776,90,2026-10-01T11:01:06
+9,heygen-com/hyperframes,https://github.com/heygen-com/hyperframes,Write HTML. Render video. Built for agents.,TypeScript,54991,4998,349,2026-10-01T11:01:06
+10,earendil-works/pi,https://github.com/earendil-works/pi,"AI agent toolkit: unified LLM API, agent loop, TUI, coding agent CLI",TypeScript,110896,14101,294,2026-10-01T11:01:06
+11,tile-ai/tilelang,https://github.com/tile-ai/tilelang,Domain-specific language designed to streamline the development of high-performance GPU/CPU/Accelerators kernels,Python,7954,804,157,2026-10-01T11:01:06
+12,pablostanley/yoinks,https://github.com/pablostanley/yoinks,yoink any video from your terminal. no shady ads.,TypeScript,2557,243,356,2026-10-01T11:01:06
+13,HunxByts/GhostTrack,https://github.com/HunxByts/GhostTrack,Useful tool to track location or mobile number,Python,16089,2231,635,2026-10-01T11:01:06
+14,pbakaus/impeccable,https://github.com/pbakaus/impeccable,The design language that makes your AI harness better at design.,JavaScript,73239,4423,463,2026-10-01T11:01:06
+15,Friedrich-M/UniMate,https://github.com/Friedrich-M/UniMate,[SIGGRAPH Asia 2026] UniMate: One Unified Model to Animate Diverse Skeletons,Python,918,91,225,2026-10-01T11:01:06
