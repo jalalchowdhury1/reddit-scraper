@@ -1,16 +1,16 @@
 rank,repo,url,description,language,stars,forks,stars_today,scraped_at
-1,DietrichGebert/ponytail,https://github.com/DietrichGebert/ponytail,Makes your AI agent think like the laziest senior dev in the room. The best code is the code you never wrote.,JavaScript,150433,8077,1179,2026-10-01T22:53:35
-2,mattpocock/skills,https://github.com/mattpocock/skills,Skills for Real Engineers. Straight from my .agents directory.,Shell,273847,22991,888,2026-10-01T22:53:35
-3,NVIDIA/OpenShell,https://github.com/NVIDIA/OpenShell,"OpenShell is the safe, private runtime for autonomous AI agents.",Rust,13981,1622,2503,2026-10-01T22:53:35
-4,firebase/firebase-ios-sdk,https://github.com/firebase/firebase-ios-sdk,Firebase SDK for Apple App Development,C++,6850,1806,112,2026-10-01T22:53:35
-5,mvschwarz/openrig,https://github.com/mvschwarz/openrig,"Build your own network of agents from Claude Code, Codex and Pi: persistent teams with roles, shared context and owned work.",TypeScript,3672,245,640,2026-10-01T22:53:35
-6,cursor/plugins,https://github.com/cursor/plugins,Cursor plugin specification and official plugins,TypeScript,9313,882,157,2026-10-01T22:53:35
-7,obra/superpowers,https://github.com/obra/superpowers,An agentic skills framework & software development methodology that works.,Shell,293944,26291,476,2026-10-01T22:53:35
-8,mksglu/context-mode,https://github.com/mksglu/context-mode,"Context window optimization for AI coding agents. Sandboxes tool output (98% reduction), persists session memory, and enforces routing across 17 platforms via MCP + hooks.",TypeScript,24765,1783,357,2026-10-01T22:53:35
-9,heygen-com/hyperframes,https://github.com/heygen-com/hyperframes,Write HTML. Render video. Built for agents.,TypeScript,55304,5016,624,2026-10-01T22:53:35
-10,earendil-works/pi,https://github.com/earendil-works/pi,"AI agent toolkit: unified LLM API, agent loop, TUI, coding agent CLI",TypeScript,111175,14126,294,2026-10-01T22:53:35
-11,tile-ai/tilelang,https://github.com/tile-ai/tilelang,Domain-specific language designed to streamline the development of high-performance GPU/CPU/Accelerators kernels,Python,8085,812,157,2026-10-01T22:53:35
-12,pablostanley/yoinks,https://github.com/pablostanley/yoinks,yoink any video from your terminal. no shady ads.,TypeScript,2896,273,356,2026-10-01T22:53:35
-13,HunxByts/GhostTrack,https://github.com/HunxByts/GhostTrack,Useful tool to track location or mobile number,Python,16365,2250,369,2026-10-01T22:53:35
-14,pbakaus/impeccable,https://github.com/pbakaus/impeccable,The design language that makes your AI harness better at design.,JavaScript,73633,4436,602,2026-10-01T22:53:35
-15,Friedrich-M/UniMate,https://github.com/Friedrich-M/UniMate,[SIGGRAPH Asia 2026] UniMate: One Unified Model to Animate Diverse Skeletons,Python,1054,99,225,2026-10-01T22:53:35
+1,DietrichGebert/ponytail,https://github.com/DietrichGebert/ponytail,Makes your AI agent think like the laziest senior dev in the room. The best code is the code you never wrote.,JavaScript,150812,8091,1194,2026-10-02T06:08:49
+2,mattpocock/skills,https://github.com/mattpocock/skills,Skills for Real Engineers. Straight from my .agents directory.,Shell,274093,23019,883,2026-10-02T06:08:49
+3,NVIDIA/OpenShell,https://github.com/NVIDIA/OpenShell,"OpenShell is the safe, private runtime for autonomous AI agents.",Rust,14118,1635,2456,2026-10-02T06:08:49
+4,firebase/firebase-ios-sdk,https://github.com/firebase/firebase-ios-sdk,Firebase SDK for Apple App Development,C++,6885,1808,112,2026-10-02T06:08:49
+5,mvschwarz/openrig,https://github.com/mvschwarz/openrig,"Build your own network of agents from Claude Code, Codex and Pi: persistent teams with roles, shared context and owned work.",TypeScript,3848,256,642,2026-10-02T06:08:49
+6,cursor/plugins,https://github.com/cursor/plugins,Cursor plugin specification and official plugins,TypeScript,9352,885,150,2026-10-02T06:08:49
+7,obra/superpowers,https://github.com/obra/superpowers,An agentic skills framework & software development methodology that works.,Shell,294076,26304,455,2026-10-02T06:08:49
+8,mksglu/context-mode,https://github.com/mksglu/context-mode,"Context window optimization for AI coding agents. Sandboxes tool output (98% reduction), persists session memory, and enforces routing across 17 platforms via MCP + hooks.",TypeScript,24844,1788,362,2026-10-02T06:08:49
+9,heygen-com/hyperframes,https://github.com/heygen-com/hyperframes,Write HTML. Render video. Built for agents.,TypeScript,55462,5025,627,2026-10-02T06:08:49
+10,earendil-works/pi,https://github.com/earendil-works/pi,"AI agent toolkit: unified LLM API, agent loop, TUI, coding agent CLI",TypeScript,111369,14143,298,2026-10-02T06:08:49
+11,tile-ai/tilelang,https://github.com/tile-ai/tilelang,Domain-specific language designed to streamline the development of high-performance GPU/CPU/Accelerators kernels,Python,8163,820,163,2026-10-02T06:08:49
+12,pablostanley/yoinks,https://github.com/pablostanley/yoinks,yoink any video from your terminal. no shady ads.,TypeScript,3061,290,361,2026-10-02T06:08:49
+13,HunxByts/GhostTrack,https://github.com/HunxByts/GhostTrack,Useful tool to track location or mobile number,Python,16509,2264,368,2026-10-02T06:08:49
+14,pbakaus/impeccable,https://github.com/pbakaus/impeccable,The design language that makes your AI harness better at design.,JavaScript,73828,4444,495,2026-10-02T06:08:49
+15,Friedrich-M/UniMate,https://github.com/Friedrich-M/UniMate,[SIGGRAPH Asia 2026] UniMate: One Unified Model to Animate Diverse Skeletons,Python,1126,102,217,2026-10-02T06:08:49
