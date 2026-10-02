@@ -1,18 +1,18 @@
 rank,repo,url,description,language,stars,forks,stars_today,scraped_at
-1,Panniantong/Agent-Reach,https://github.com/Panniantong/Agent-Reach,"Give your AI agent eyes to see the entire internet. Read & search Twitter, Reddit, YouTube, GitHub, Bilibili, XiaoHongShu — one CLI, zero API fees.",Python,87971,7764,683,2026-10-02T14:01:04
-2,JuliusBrussee/caveman,https://github.com/JuliusBrussee/caveman,🪨 why use many token when few token do trick. Viral skill + proxy for coding agents that cuts 65% of tokens by talking like a caveman.,Go,108897,6311,193,2026-10-02T14:01:04
-3,obra/superpowers,https://github.com/obra/superpowers,An agentic skills framework & software development methodology that works.,Shell,294255,26316,561,2026-10-02T14:01:04
-4,DietrichGebert/ponytail,https://github.com/DietrichGebert/ponytail,Makes your AI agent think like the laziest senior dev in the room. The best code is the code you never wrote.,JavaScript,151243,8118,1429,2026-10-02T14:01:04
-5,pbakaus/impeccable,https://github.com/pbakaus/impeccable,The design language that makes your AI harness better at design.,JavaScript,74018,4468,717,2026-10-02T14:01:04
-6,mattpocock/skills,https://github.com/mattpocock/skills,Skills for Real Engineers. Straight from my .agents directory.,Shell,274417,23052,955,2026-10-02T14:01:04
-7,NVIDIA/OpenShell,https://github.com/NVIDIA/OpenShell,"OpenShell is the safe, private runtime for autonomous AI agents.",Rust,14263,1646,584,2026-10-02T14:01:04
-8,coreyhaines31/marketingskills,https://github.com/coreyhaines31/marketingskills,"Marketing skills for Claude Code and AI agents. CRO, copywriting, SEO, analytics, and growth engineering.",JavaScript,52266,7873,139,2026-10-02T14:01:04
-9,heygen-com/hyperframes,https://github.com/heygen-com/hyperframes,Write HTML. Render video. Built for agents.,TypeScript,55659,5039,584,2026-10-02T14:01:04
-10,mksglu/context-mode,https://github.com/mksglu/context-mode,"Context window optimization for AI coding agents. Sandboxes tool output (98% reduction), persists session memory, and enforces routing across 17 platforms via MCP + hooks.",TypeScript,24934,1794,276,2026-10-02T14:01:04
-11,google/skills,https://github.com/google/skills,Agent Skills for Google products and technologies,Python,20630,1714,78,2026-10-02T14:01:04
-12,getsentry/sentry,https://github.com/getsentry/sentry,Developer-first error tracking and performance monitoring,Python,44937,4886,12,2026-10-02T14:01:04
-13,colbymchenry/codegraph,https://github.com/colbymchenry/codegraph,"Pre-indexed code knowledge graph, auto syncs on code changes, for Claude Code, Codex, Gemini, Cursor, OpenCode, AntiGravity, Kiro, CoPilot, and Hermes Agent — fewer tokens, fewer tool calls, 100% local",C,72849,4680,241,2026-10-02T14:01:04
-14,cursor/plugins,https://github.com/cursor/plugins,Cursor plugin specification and official plugins,TypeScript,9407,891,168,2026-10-02T14:01:04
-15,mvschwarz/openrig,https://github.com/mvschwarz/openrig,"Build your own network of agents from Claude Code, Codex and Pi: persistent teams with roles, shared context and owned work.",TypeScript,4058,273,691,2026-10-02T14:01:04
-16,Effect-TS/effect,https://github.com/Effect-TS/effect,Build production-ready applications in TypeScript,TypeScript,16415,796,76,2026-10-02T14:01:04
-17,pablostanley/yoinks,https://github.com/pablostanley/yoinks,yoink any video from your terminal. no shady ads.,TypeScript,3258,301,629,2026-10-02T14:01:04
+1,Panniantong/Agent-Reach,https://github.com/Panniantong/Agent-Reach,"Give your AI agent eyes to see the entire internet. Read & search Twitter, Reddit, YouTube, GitHub, Bilibili, XiaoHongShu — one CLI, zero API fees.",Python,88537,7793,683,2026-10-02T22:32:08
+2,JuliusBrussee/caveman,https://github.com/JuliusBrussee/caveman,🪨 why use many token when few token do trick. Viral skill + proxy for coding agents that cuts 65% of tokens by talking like a caveman.,Go,109062,6315,271,2026-10-02T22:32:08
+3,obra/superpowers,https://github.com/obra/superpowers,An agentic skills framework & software development methodology that works.,Shell,294427,26318,561,2026-10-02T22:32:08
+4,DietrichGebert/ponytail,https://github.com/DietrichGebert/ponytail,Makes your AI agent think like the laziest senior dev in the room. The best code is the code you never wrote.,JavaScript,151710,8137,1429,2026-10-02T22:32:08
+5,pbakaus/impeccable,https://github.com/pbakaus/impeccable,The design language that makes your AI harness better at design.,JavaScript,74270,4478,717,2026-10-02T22:32:08
+6,mattpocock/skills,https://github.com/mattpocock/skills,Skills for Real Engineers. Straight from my .agents directory.,Shell,274666,23058,955,2026-10-02T22:32:08
+7,NVIDIA/OpenShell,https://github.com/NVIDIA/OpenShell,"OpenShell is the safe, private runtime for autonomous AI agents.",Rust,14404,1658,584,2026-10-02T22:32:08
+8,coreyhaines31/marketingskills,https://github.com/coreyhaines31/marketingskills,"Marketing skills for Claude Code and AI agents. CRO, copywriting, SEO, analytics, and growth engineering.",JavaScript,52381,7878,139,2026-10-02T22:32:08
+9,heygen-com/hyperframes,https://github.com/heygen-com/hyperframes,Write HTML. Render video. Built for agents.,TypeScript,55852,5036,584,2026-10-02T22:32:08
+10,mksglu/context-mode,https://github.com/mksglu/context-mode,"Context window optimization for AI coding agents. Sandboxes tool output (98% reduction), persists session memory, and enforces routing across 17 platforms via MCP + hooks.",TypeScript,25008,1798,276,2026-10-02T22:32:08
+11,google/skills,https://github.com/google/skills,Agent Skills for Google products and technologies,Python,20720,1720,78,2026-10-02T22:32:08
+12,getsentry/sentry,https://github.com/getsentry/sentry,Developer-first error tracking and performance monitoring,Python,45015,4889,12,2026-10-02T22:32:08
+13,colbymchenry/codegraph,https://github.com/colbymchenry/codegraph,"Pre-indexed code knowledge graph, auto syncs on code changes, for Claude Code, Codex, Gemini, Cursor, OpenCode, AntiGravity, Kiro, CoPilot, and Hermes Agent — fewer tokens, fewer tool calls, 100% local",C,72932,4682,163,2026-10-02T22:32:08
+14,cursor/plugins,https://github.com/cursor/plugins,Cursor plugin specification and official plugins,TypeScript,9485,896,168,2026-10-02T22:32:08
+15,mvschwarz/openrig,https://github.com/mvschwarz/openrig,"Build your own network of agents from Claude Code, Codex and Pi: persistent teams with roles, shared context and owned work.",TypeScript,4257,291,691,2026-10-02T22:32:08
+16,Effect-TS/effect,https://github.com/Effect-TS/effect,Build production-ready applications in TypeScript,TypeScript,16521,800,76,2026-10-02T22:32:08
+17,pablostanley/yoinks,https://github.com/pablostanley/yoinks,yoink any video from your terminal. no shady ads.,TypeScript,3465,306,629,2026-10-02T22:32:08
