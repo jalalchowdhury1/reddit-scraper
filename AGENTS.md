@@ -28,7 +28,7 @@ lives in the browser and in Firebase.
 | **Mac mini** launchd `com.jalal.reddit-browser` → `mac/reddit-browser.sh` → `core/scrape_reddit_browser.py` | 07:35 + 19:35 local | `data/r_<sub>[_yearly]/posts.csv` with **real upvotes**, `data/reddit_browser.json` |
 | GitHub `.github/workflows/reddit_backup.yml` | every 3 h (`:17`) | Reddit **only for lists the Mac hasn't saved in 36 h** (RSS, 6 per run, stalest first), `data/reddit_github.json` |
 | GitHub `.github/workflows/daily_scrape.yml` | 03:00 UTC, retry 09:00 UTC | News, AM Reads, SatPost (no Reddit since 26 Sep 2026) |
-| GitHub `.github/workflows/am_reads.yml` | 11:45 / 13:30 / 15:30 UTC | AM Reads + SatPost again (Ritholtz posts ~6:30 AM ET) |
+| GitHub `.github/workflows/am_reads.yml` | AWS One Clock 07:00 / 08:30 / 10:00 ET (+ Mac kick); GH backstop 15:30 UTC only (2 Oct) | AM Reads + SatPost again (Ritholtz posts ~6:30 AM ET) |
 | GitHub `.github/workflows/github_trending.yml` | every 6 h (`:41`) | `data/github_trending/repos.csv` (github.com/trending, today) |
 
 ### Data flow
@@ -293,7 +293,7 @@ post and extract articles.
     the same post keeps it.
   - Unchanged post → the CSV is not rewritten (no empty commits from the morning job).
   - **Timing:** Ritholtz posts ~6:30 AM ET but the nightly job runs 11 PM ET, so it always caught
-    the *previous* morning's list. `am_reads.yml` re-scrapes at 11:45 / 13:30 / 15:30 UTC and
+    the *previous* morning's list. `am_reads.yml` re-scrapes at 07:00 / 08:30 / 10:00 ET (AWS One Clock; GH backstop 15:30 UTC) and
     commits only on change.
   - The page shows only items dated today (US/Eastern); Sunday also shows Saturday's Weekend
     Reads; otherwise an empty state with an opt-in "Show <day>'s list" button.

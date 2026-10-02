@@ -3,12 +3,14 @@ name: Morning AM Reads
 # The nightly job (daily_scrape.yml, 03:00 UTC = 11 PM ET) therefore always
 # grabbed the PREVIOUS morning's list, so the site showed yesterday's reads
 # every morning. This job re-checks after the post goes up.
-# 11:45 UTC = 7:45 AM EDT / 6:45 AM EST; 13:30 and 15:30 UTC are retries
-# (GitHub cron often starts 1-2h late). Public repo = no Actions minutes cost.
+# Primary start = AWS One Clock (one-clock-reader-amreads-a/-b) at 7:00,
+# 8:30 and 10:00 AM America/New_York, plus the Mac kick at the same times.
+# This GitHub cron is the BACKSTOP only (2 Oct 2026): 15:30 UTC is 30 min
+# after AWS's latest start (10:00 EST = 15:00 UTC), so it never shares a
+# minute with AWS (the old 13:30 UTC cron did, every winter) — one-clock
+# race_audit.py proves it. Public repo = no Actions minutes cost.
 on:
   schedule:
-    - cron: '45 11 * * *'
-    - cron: '30 13 * * *'
     - cron: '30 15 * * *'
   workflow_dispatch:
 
