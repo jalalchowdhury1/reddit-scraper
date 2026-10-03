@@ -91,6 +91,25 @@ JUNK_URL_RE = re.compile(r"(itunes\.apple\.com|podcasts\.apple\.com|open\.spotif
 SEEN_FILE = "data/ritholtz/seen.json"
 SEEN_KEEP_DAYS = 45
 
+# What the SOURCE looked like on the last successful check, for /api/freshness
+# (3 Oct 2026): `source_newest_ts` = publish time of the newest AM/Weekend Reads
+# post on ritholtz.com, `checked_at` = when we read it (UTC). Written on EVERY run
+# that reached the post, even when the list on disk is already that post, so a day
+# Ritholtz skips (holiday, vacation) reads "source newest == served" = fresh, and a
+# producer that stops running shows up as an old `checked_at`.
+SOURCE_FILE = "data/ritholtz/source.json"
+
+
+def write_source_meta(source_newest_ts: str, path: str = SOURCE_FILE, now: datetime = None) -> Dict:
+    meta = {"source_newest_ts": source_newest_ts,
+            "checked_at": (now or datetime.now(ZoneInfo("UTC"))).strftime("%Y-%m-%dT%H:%M:%SZ")}
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    tmp = path + ".tmp"
+    with open(tmp, "w") as f:
+        json.dump(meta, f, indent=1)
+    os.replace(tmp, path)
+    return meta
+
 
 def clean_title_text(text: str) -> str:
     """Strip zero-width chars, leading bullets/punctuation and collapse spaces."""
@@ -247,7 +266,7 @@ def find_am_reads_url(session: requests.Session) -> Optional[str]:
 # ============================================================================
 
 
-def extract_articles(post_url: str, session: requests.Session) -> List[Dict]:
+def extract_articles(post_url: str, session: requests.Session, seen_post: Dict = None) -> List[Dict]:
     """
     Extract articles from an AM Reads post.
     
@@ -274,7 +293,10 @@ def extract_articles(post_url: str, session: requests.Session) -> List[Dict]:
     soup = BeautifulSoup(resp.content, "html.parser")
     articles = []
     seen_titles = set()
-    post_date = get_post_date(soup) or datetime.now(ET).isoformat()
+    real_date = get_post_date(soup)
+    if seen_post is not None:
+        seen_post["post_date"] = real_date   # the source's real stamp only, never "now"
+    post_date = real_date or datetime.now(ET).isoformat()
     print(f"    Post published: {post_date}")
     
     # Find all links in the post content
@@ -548,7 +570,13 @@ def scrape_am_reads() -> List[Dict]:
     time.sleep(SCRAPER_DELAY)
     
     # Step 2: Extract articles from the post
-    articles = extract_articles(post_url, session)
+    seen_post = {}
+    articles = extract_articles(post_url, session, seen_post)
+    if seen_post.get("post_date"):
+        meta = write_source_meta(seen_post["post_date"])
+        print(f"    Source check: newest post {meta['source_newest_ts']} (checked {meta['checked_at']})")
+    else:
+        print("    WARNING: newest post has no publish time; source.json not updated")
     if not articles:
         return []
 

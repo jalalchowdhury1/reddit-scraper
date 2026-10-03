@@ -467,7 +467,14 @@ def status():
 REDDIT_MAX_AGE_H = 52   # Mac every 12 h; dead Mac -> GitHub backup after 36 h, 6 lists / 3 h
 NEWS_MAX_AGE_H = 38     # 03:00 UTC + 09:00 retry; worst seen 32.5 h (25-26 Sep), + GHA lag
 GITHUB_MAX_AGE_H = 18   # every 6 h + morning kicks; worst seen 8.9 h
-AM_READS_LAG_H = 6      # Ritholtz posts ~06:00-06:30 ET Mon-Sat (Sat = Weekend Reads, no Sunday)
+# AM Reads (3 Oct 2026): graded against the SOURCE, not Ritholtz's calendar. The producer
+# (core/scrape_ritholtz.py) writes data/ritholtz/source.json on every run: the newest
+# post it saw on ritholtz.com (`source_newest_ts`) and when (`checked_at`). A day he
+# doesn't post leaves source newest == served = green; the old Mon-Sat 06:30 cap
+# called that red.
+AM_READS_GRACE_H = 4      # post ~06:30 ET -> runs 07:00 / 08:30 / 10:00 ET (+ push/deploy)
+AM_READS_CHECK_MAX_H = 26  # runs 07:00/08:30/10:00/11:30 ET + 23:00 ET nightly; worst gap 11.5 h
+SOURCE_META = "data/ritholtz/source.json"
 
 
 def _age_h(stamp, now):
@@ -478,32 +485,15 @@ def _age_h(stamp, now):
     return round((now - when.to_pydatetime()).total_seconds() / 3600, 1)
 
 
-def _eastern_offset_h(utc: datetime) -> int:
-    """US/Eastern offset (-4 EDT / -5 EST) by the US DST rule, no tz database needed."""
-    def nth_sunday(month, n):
-        d = datetime(utc.year, month, 1, tzinfo=timezone.utc)
-        d += timedelta(days=(6 - d.weekday()) % 7)
-        return d + timedelta(weeks=n - 1)
-    start = nth_sunday(3, 2) + timedelta(hours=7)   # 2:00 EST
-    end = nth_sunday(11, 1) + timedelta(hours=6)    # 2:00 EDT
-    return -4 if start <= utc < end else -5
-
-
-def am_reads_max_age_h(now: datetime) -> float:
-    """Hours since the latest Ritholtz slot (Mon-Sat 06:30 ET) that is due by now
-    (slot + AM_READS_LAG_H), + 1 h because posts land 06:00-06:30. The served list
-    must be at least that new: a missed weekday turns red the next morning, while
-    Sunday and Monday 05:00 still accept Saturday's Weekend Reads."""
-    off = timedelta(hours=_eastern_offset_h(now))
-    et = now + off
-    for back in range(0, 9):
-        day = (et - timedelta(days=back)).date()
-        if day.weekday() == 6:     # Sunday: no post
-            continue
-        slot_et = datetime(day.year, day.month, day.day, 6, 30, tzinfo=timezone.utc)
-        if slot_et + timedelta(hours=AM_READS_LAG_H) <= et:
-            return round((et - slot_et).total_seconds() / 3600 + 1, 1)
-    return 48.0  # not reached: some Mon-Sat slot is always due within 8 days
+def am_reads_source_meta() -> dict:
+    """data/ritholtz/source.json as the producer wrote it ({} if missing/broken)."""
+    try:
+        with open(BASE_DIR / SOURCE_META) as f:
+            meta = json.load(f)
+        return meta if isinstance(meta, dict) else {}
+    except Exception:
+        log.warning("AM Reads source meta unreadable: %s", SOURCE_META)
+        return {}
 
 
 def served_reddit_age(items, suffix, saved, github, now):
@@ -527,6 +517,7 @@ def freshness_items(now: datetime = None) -> list:
     saved, github = reddit_list_stamps("lists"), reddit_list_stamps("lists", GITHUB_META)
     rith = [i for i in d["ritholtz"] if i.get("kind") != "SATPOST"]
     satpost = [i for i in d["ritholtz"] if i.get("kind") == "SATPOST"]
+    src = am_reads_source_meta()
 
     def newest(items):
         ages = [a for a in (_age_h(i.get("pub_ts"), now) for i in items) if a is not None]
@@ -540,8 +531,15 @@ def freshness_items(now: datetime = None) -> list:
          "graceH": 0, "maxAgeH": REDDIT_MAX_AGE_H},
         {"name": "news", "inputAgeH": None, "servedAgeH": _age_h(d["updated"]["news"], now),
          "graceH": 0, "maxAgeH": NEWS_MAX_AGE_H},
-        {"name": "am-reads", "inputAgeH": None, "servedAgeH": newest(rith),
-         "graceH": 0, "maxAgeH": am_reads_max_age_h(now)},
+        # input = newest post ON ritholtz.com (as the producer last saw it); served = newest
+        # post the page shows. No cap on the post age: a skipped day is not stale.
+        {"name": "am-reads", "inputAgeH": _age_h(src.get("source_newest_ts"), now),
+         "servedAgeH": newest(rith), "graceH": AM_READS_GRACE_H},
+        # The producer itself: age of its last successful source check, capped, so a
+        # dead producer (no runs = no new input seen) still goes red.
+        {"name": "am-reads-check", "inputAgeH": None,
+         "servedAgeH": _age_h(src.get("checked_at"), now), "graceH": 0,
+         "maxAgeH": AM_READS_CHECK_MAX_H},
         # SatPost has had no new issue since 26 Jun 2026 (the feed itself), so no cap:
         # its age is shown, not graded.
         {"name": "satpost", "inputAgeH": None, "servedAgeH": newest(satpost), "graceH": 0},

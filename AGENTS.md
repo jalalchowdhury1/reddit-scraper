@@ -366,10 +366,14 @@ post and extract articles.
   `reddit-monthly` / `reddit-yearly` (age of the OLDEST list the tab shows: its newest save
   in `reddit_browser.json` `lists` or `reddit_github.json`, both shipped in the same commit as
   the CSV; **never `checked`**, which the Mac writes even when it kept the old file; cap 52 h),
-  `news` (newest `scraped_at`, cap 38 h), `am-reads` (newest served Ritholtz `pub_date`; cap =
-  hours since the latest Mon-Sat 06:30 ET slot that is 6 h past due, + 1 h, US DST rule built
-  in, so a missed weekday is red the next morning and Saturday's Weekend Reads carry Sunday),
-  `satpost` (shown, no cap: the feed has had no issue since 26 Jun 2026), `github-trending`
+  `news` (newest `scraped_at`, cap 38 h), `am-reads` (3 Oct 2026: graded against the SOURCE,
+  not his calendar: `inputAgeH` = newest post on ritholtz.com as the producer last saw it,
+  `servedAgeH` = newest served `pub_date`, `graceH` 4 (06:30 post -> 07:00/08:30/10:00 ET runs),
+  no cap, so a holiday/vacation day he skips stays green), `am-reads-check` (age of the
+  producer's last successful source read, cap 26 h, so a dead producer is red; both come from
+  `data/ritholtz/source.json` = `{source_newest_ts, checked_at}`, which `core/scrape_ritholtz.py`
+  rewrites on EVERY run that reads the newest post, even when the list is unchanged, so every
+  AM Reads run now commits; the endpoint never fetches ritholtz.com itself), `satpost` (shown, no cap: the feed has had no issue since 26 Jun 2026), `github-trending`
   (`scraped_at`, cap 18 h). Items carry `pub_ts` on AM Reads/SatPost cards for this (not `ts`,
   which the card would render as "3h ago"). fleet-health's `freshness` probe judges it; the
   app never grades itself. Tests: `tests/test_freshness.py` (producer-written fixtures).

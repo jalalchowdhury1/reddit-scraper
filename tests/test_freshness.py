@@ -23,6 +23,7 @@ import scrape_github_trending as gt
 from fastapi.testclient import TestClient
 from scrape_reddit_browser import rows_from_page, update_meta, write_list
 from scrape_top import stamp_github_meta
+import scrape_ritholtz as rt
 
 NOW = datetime(2026, 10, 2, 22, 0, tzinfo=timezone.utc)   # Friday 18:00 EDT
 
@@ -35,7 +36,7 @@ def judge(item):
     inp, srv, grace, cap = item["inputAgeH"], item["servedAgeH"], item["graceH"], item.get("maxAgeH")
     if inp is not None and inp > grace and (srv is None or srv > inp + 0.25):
         return False
-    if cap is not None and srv is not None and srv > cap:
+    if cap is not None and (srv is None or srv > cap):
         return False
     return True
 
@@ -74,6 +75,9 @@ def site(tmp_path, monkeypatch):
          "pub_date": "2026-10-02T06:30:08-04:00", "author": "X",
          "source_post": "https://ritholtz.com/2026/10/10-friday-am-reads-518/",
          "scraped_at": "2026-10-02T11:00:59.308056"} for i in range(3)])
+    # the 11:30 ET backstop run saw the same Friday post on ritholtz.com
+    rt.write_source_meta("2026-10-02T06:30:08-04:00", path=str(data / "ritholtz/source.json"),
+                         now=NOW - timedelta(hours=6, minutes=30))
     write_csv(data / "googlenews/articles.csv", NEWS_COLS, [
         {"article_id": "n1", "title": "Headline", "url": "https://ex.com/n", "description": "",
          "pub_date": "2026-10-02T05:00:00+00:00", "author": "BSS", "category": "Bangladesh Economy",
@@ -94,10 +98,12 @@ def items(now=NOW):
 
 def test_healthy_site_is_green_on_every_tab(site):
     got = items()
-    assert set(got) == {"reddit-monthly", "reddit-yearly", "news", "am-reads", "satpost", "github-trending"}
+    assert set(got) == {"reddit-monthly", "reddit-yearly", "news", "am-reads", "am-reads-check",
+                        "satpost", "github-trending"}
     assert got["reddit-monthly"]["servedAgeH"] == 2.4 and got["reddit-yearly"]["servedAgeH"] == 2.4
     assert got["news"]["servedAgeH"] == 12.7
     assert got["am-reads"]["servedAgeH"] == 11.5      # Friday 06:30:08 EDT -> 18:00 EDT
+    assert got["am-reads"]["inputAgeH"] == 11.5 and got["am-reads-check"]["servedAgeH"] == 6.5
     assert got["github-trending"]["servedAgeH"] == 4.0
     assert all(judge(i) for i in got.values()), got
 
@@ -167,27 +173,92 @@ def test_github_trending_not_refreshed_is_stale(site, monkeypatch):
     assert not judge(items()["github-trending"])
 
 
-def test_am_reads_missed_weekday_is_red_next_morning(site):
-    # Thursday's list still served at Friday 13:00 EDT (Friday's slot is due) -> red
+THU = "2026-10-01T06:30:02-04:00"
+FRI = "2026-10-02T06:30:08-04:00"
+
+
+def serve_post(site, pub_date):
     write_csv(site / "ritholtz/articles.csv", RITHOLTZ_COLS, [
         {"article_id": "a1", "title": "Read", "url": "https://ex.com/1", "description": "",
-         "pub_date": "2026-10-01T06:30:02-04:00", "author": "", "source_post":
-         "https://ritholtz.com/2026/10/10-thursday-am-reads-513/", "scraped_at": "2026-10-01T11:00:00"}])
-    assert judge(items(datetime(2026, 10, 2, 9, 0, tzinfo=timezone.utc))["am-reads"])     # Fri 05:00 EDT
-    assert not judge(items(datetime(2026, 10, 2, 17, 0, tzinfo=timezone.utc))["am-reads"])
+         "pub_date": pub_date, "author": "", "source_post": "https://ritholtz.com/2026/10/x-am-reads/",
+         "scraped_at": "2026-10-01T11:00:00"}])
 
 
-def test_am_reads_weekend_reads_carry_sunday_and_monday_dawn(site):
-    write_csv(site / "ritholtz/articles.csv", RITHOLTZ_COLS, [
-        {"article_id": "a1", "title": "Read", "url": "https://ex.com/1", "description": "",
-         "pub_date": "2026-10-03T06:30:00-04:00", "author": "", "source_post":
-         "https://ritholtz.com/2026/10/10-weekend-reads-110/", "scraped_at": "2026-10-03T11:00:00"}])
-    assert judge(items(datetime(2026, 10, 4, 23, 0, tzinfo=timezone.utc))["am-reads"])    # Sunday night
-    assert judge(items(datetime(2026, 10, 5, 9, 0, tzinfo=timezone.utc))["am-reads"])     # Mon 05:00 EDT
-    assert not judge(items(datetime(2026, 10, 5, 17, 0, tzinfo=timezone.utc))["am-reads"])  # Monday missed
+def source_saw(site, pub_date, checked):
+    rt.write_source_meta(pub_date, path=str(site / "ritholtz/source.json"), now=checked)
 
 
-def test_am_reads_cap_follows_dst():
-    # 09 Nov 2026 is EST: Monday 13:00 EST = 18:00 UTC -> Monday's 06:30 slot due, 6.5 h + 1
-    assert server.am_reads_max_age_h(datetime(2026, 11, 9, 18, 0, tzinfo=timezone.utc)) == 7.5
-    assert server.am_reads_max_age_h(datetime(2026, 10, 5, 17, 0, tzinfo=timezone.utc)) == 7.5
+def test_am_reads_holiday_skip_is_green(site):
+    # Ritholtz posted nothing Friday: the source's newest is still Thursday's, which is
+    # what we serve. 40 h old at Fri 22:30 EDT, producer checked 30 min ago -> green.
+    serve_post(site, THU)
+    now = datetime(2026, 10, 3, 2, 30, tzinfo=timezone.utc)
+    source_saw(site, THU, now - timedelta(minutes=30))
+    got = items(now)
+    assert got["am-reads"]["inputAgeH"] == 40.0 and got["am-reads"]["servedAgeH"] == 40.0
+    assert judge(got["am-reads"]) and judge(got["am-reads-check"]), got
+
+
+def test_am_reads_new_source_post_not_served_is_red(site):
+    # Friday's post is on ritholtz.com (8 h old) but the page still serves Thursday's.
+    serve_post(site, THU)
+    now = datetime(2026, 10, 2, 14, 30, 8, tzinfo=timezone.utc)   # Fri 10:30 EDT
+    source_saw(site, FRI, now - timedelta(minutes=30))
+    got = items(now + timedelta(hours=4))                          # FRI post 8 h old
+    assert got["am-reads"]["inputAgeH"] == 8.0
+    assert not judge(got["am-reads"])
+    # ...and inside the producer's grace it is not red yet
+    assert judge(items(now - timedelta(hours=1))["am-reads"])
+
+
+def test_am_reads_dead_producer_is_red(site):
+    # Source and served agree, but nobody has checked the source in 30 h.
+    now = datetime(2026, 10, 3, 22, 0, tzinfo=timezone.utc)
+    source_saw(site, FRI, now - timedelta(hours=30))
+    got = items(now)
+    assert judge(got["am-reads"]) and not judge(got["am-reads-check"])
+
+
+def test_am_reads_missing_source_meta_is_red(site):
+    (site / "ritholtz/source.json").unlink()
+    got = items()
+    assert got["am-reads"]["inputAgeH"] is None and not judge(got["am-reads-check"])
+
+
+class FakeResp:
+    def __init__(self, body):
+        self.content = body.encode()
+
+    def raise_for_status(self):
+        pass
+
+
+class FakeSession:
+    headers = {}
+
+    def __init__(self, pages):
+        self.pages = pages
+
+    def get(self, url, timeout=None):
+        return FakeResp(self.pages[url])
+
+
+def test_producer_records_source_newest_even_when_nothing_new(tmp_path, monkeypatch):
+    post = "https://ritholtz.com/2026/10/10-friday-am-reads-518/"
+    pages = {rt.CATEGORY_URL: f'<a href="{post}">10 Friday AM Reads</a>',
+             post: '<meta property="article:published_time" content="2026-10-02T10:30:08+00:00">'
+                   '<div class="entry-content"><ul><li><a href="https://ex.com/1">WSJ</a> '
+                   'A title : a blurb</li></ul></div>'}
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(rt.requests, "Session", lambda: FakeSession(pages))
+    monkeypatch.setattr(rt.time, "sleep", lambda s: None)
+    rt.save_articles(rt.scrape_am_reads())
+    first = (tmp_path / rt.SOURCE_FILE).read_text()
+    (tmp_path / rt.SOURCE_FILE).unlink()
+    rt.save_articles(rt.scrape_am_reads())     # 2nd run: same post, CSV unchanged
+    meta = __import__("json").loads((tmp_path / rt.SOURCE_FILE).read_text())
+    assert first and meta["source_newest_ts"] == "2026-10-02T06:30:08-04:00"
+    assert meta["checked_at"].endswith("Z")
+    # served pub_date and source_newest_ts are the same stamp -> same age
+    import pandas as pd
+    assert pd.read_csv(tmp_path / "data/ritholtz/articles.csv")["pub_date"][0] == meta["source_newest_ts"]
