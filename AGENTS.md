@@ -360,6 +360,20 @@ post and extract articles.
   an oldest-stamp check can't see those),
   `tracked_subs` (13; `null` means the `core` import failed on Vercel), `updated`, `counts`.
 
+- `GET /api/freshness` → **Freshness endpoint** (contract v1, 2 Oct 2026; no auth,
+  `Cache-Control: no-store`, ages in hours + names only, 500 `{"error"}` if building fails).
+  Built from `get_data()`, i.e. exactly what the page renders, one item per tab:
+  `reddit-monthly` / `reddit-yearly` (age of the OLDEST list the tab shows: its newest save
+  in `reddit_browser.json` `lists` or `reddit_github.json`, both shipped in the same commit as
+  the CSV; **never `checked`**, which the Mac writes even when it kept the old file; cap 52 h),
+  `news` (newest `scraped_at`, cap 38 h), `am-reads` (newest served Ritholtz `pub_date`; cap =
+  hours since the latest Mon-Sat 06:30 ET slot that is 6 h past due, + 1 h, US DST rule built
+  in, so a missed weekday is red the next morning and Saturday's Weekend Reads carry Sunday),
+  `satpost` (shown, no cap: the feed has had no issue since 26 Jun 2026), `github-trending`
+  (`scraped_at`, cap 18 h). Items carry `pub_ts` on AM Reads/SatPost cards for this (not `ts`,
+  which the card would render as "3h ago"). fleet-health's `freshness` probe judges it; the
+  app never grades itself. Tests: `tests/test_freshness.py` (producer-written fixtures).
+
 **Failure behavior (robustness, 26 Sep 2026):** every CSV goes through `read_csv_safe()` and
 every tab is built inside its own `try`. A missing, empty or broken file costs only its own tab,
 never the others; one odd Reddit row (e.g. an `inf` number) costs only that row
@@ -390,7 +404,7 @@ python3 core/scrape_reddit_browser.py --only LifeProTips --visible   # needs Pla
 ```
 
 ### Tests
-- **`.venv/bin/python -m pytest tests -q`** — 86 tests, under a minute, no network:
+- **`.venv/bin/python -m pytest tests -q`** — 100 tests, under a minute, no network:
   - `tests/test_am_reads.py`: AM Reads cleanup/dedup helpers.
   - `tests/test_feeds.py`: RSS parsing + honest scores, the News retry (503/404), the live API's
     honesty/no-repeats rules on the committed data, the Mac scraper's rows and CSV round trip,
@@ -558,7 +572,7 @@ python3 core/scrape_reddit_browser.py --only LifeProTips --visible   # needs Pla
 ## 7. File / module map
 
 **Live production path:**
-- `server.py` — FastAPI: `/`, `/api/data`, `/api/status`, PWA files (§3).
+- `server.py` — FastAPI: `/`, `/api/data`, `/api/status`, `/api/freshness`, PWA files (§3).
 - `templates/index.html` — the whole page (plain CSS tokens + Phosphor icons + Firebase; no
   Tailwind, no build step). 6 tabs with unread counts: header chips on wide screens, a
   glass **bottom tab bar** (`#tabbar`, icon + label + badge) on phones (<=700 px) where the chips

@@ -336,6 +336,7 @@ def get_data():
                         # date = the day Ritholtz PUBLISHED the list (US/Eastern). The
                         # frontend shows only today's list; older ones stay hidden.
                         "date": post_date,
+                        "pub_ts": str(row.get('pub_date', '')),  # full publish time, for /api/freshness (not "ts": the card would show "3h ago")
                         "kind": label,
                         "mins": read_time,
                     })
@@ -368,6 +369,7 @@ def get_data():
                         "source": "SatPost",
                         "domain": domain_of(row['url']),
                         "date": str(row.get('pub_date', ''))[:10],
+                        "pub_ts": str(row.get('pub_date', '')),
                         "kind": "SATPOST",
                         "mins": read_time,
                     })
@@ -457,3 +459,103 @@ def status():
         "updated": d["updated"],
         "counts": {k: len(d[k]) for k in ("monthly", "yearly", "news", "ritholtz", "github")},
     }
+
+
+# ---------- /api/freshness: what the SCREEN serves, contract v1 (2 Oct 2026) ----------
+# fleet-health judges it (probe "freshness"). Built from get_data(), the exact answer
+# the page renders, never from a writer's own "I ran" stamp. Ages in hours only.
+REDDIT_MAX_AGE_H = 52   # Mac every 12 h; dead Mac -> GitHub backup after 36 h, 6 lists / 3 h
+NEWS_MAX_AGE_H = 38     # 03:00 UTC + 09:00 retry; worst seen 32.5 h (25-26 Sep), + GHA lag
+GITHUB_MAX_AGE_H = 18   # every 6 h + morning kicks; worst seen 8.9 h
+AM_READS_LAG_H = 6      # Ritholtz posts ~06:00-06:30 ET Mon-Sat (Sat = Weekend Reads, no Sunday)
+
+
+def _age_h(stamp, now):
+    """Hours since an ISO stamp (naive = UTC, like the GitHub runners write), or None."""
+    when = pd.to_datetime(str(stamp or ""), utc=True, errors="coerce")
+    if pd.isna(when):
+        return None
+    return round((now - when.to_pydatetime()).total_seconds() / 3600, 1)
+
+
+def _eastern_offset_h(utc: datetime) -> int:
+    """US/Eastern offset (-4 EDT / -5 EST) by the US DST rule, no tz database needed."""
+    def nth_sunday(month, n):
+        d = datetime(utc.year, month, 1, tzinfo=timezone.utc)
+        d += timedelta(days=(6 - d.weekday()) % 7)
+        return d + timedelta(weeks=n - 1)
+    start = nth_sunday(3, 2) + timedelta(hours=7)   # 2:00 EST
+    end = nth_sunday(11, 1) + timedelta(hours=6)    # 2:00 EDT
+    return -4 if start <= utc < end else -5
+
+
+def am_reads_max_age_h(now: datetime) -> float:
+    """Hours since the latest Ritholtz slot (Mon-Sat 06:30 ET) that is due by now
+    (slot + AM_READS_LAG_H), + 1 h because posts land 06:00-06:30. The served list
+    must be at least that new: a missed weekday turns red the next morning, while
+    Sunday and Monday 05:00 still accept Saturday's Weekend Reads."""
+    off = timedelta(hours=_eastern_offset_h(now))
+    et = now + off
+    for back in range(0, 9):
+        day = (et - timedelta(days=back)).date()
+        if day.weekday() == 6:     # Sunday: no post
+            continue
+        slot_et = datetime(day.year, day.month, day.day, 6, 30, tzinfo=timezone.utc)
+        if slot_et + timedelta(hours=AM_READS_LAG_H) <= et:
+            return round((et - slot_et).total_seconds() / 3600 + 1, 1)
+    return 48.0  # not reached: some Mon-Sat slot is always due within 8 days
+
+
+def served_reddit_age(items, suffix, saved, github, now):
+    """Age of the OLDEST list the tab is showing: each list's newest save, by the Mac
+    (data/reddit_browser.json lists) or GitHub's RSS backup (reddit_github.json),
+    both shipped in the same commit as the CSV. `checked` is NOT used: the Mac writes
+    it even when it kept the old file."""
+    ages = []
+    for sub in {i["source"][2:] for i in items if str(i.get("source", "")).startswith("r/")}:
+        key = f"r_{sub}{suffix}"
+        stamp = max(saved.get(key, ""), github.get(key, ""))
+        if stamp:
+            ages.append(_age_h(stamp, now))
+    ages = [a for a in ages if a is not None]
+    return max(ages) if ages else None
+
+
+def freshness_items(now: datetime = None) -> list:
+    now = now or datetime.now(timezone.utc)
+    d = get_data()
+    saved, github = reddit_list_stamps("lists"), reddit_list_stamps("lists", GITHUB_META)
+    rith = [i for i in d["ritholtz"] if i.get("kind") != "SATPOST"]
+    satpost = [i for i in d["ritholtz"] if i.get("kind") == "SATPOST"]
+
+    def newest(items):
+        ages = [a for a in (_age_h(i.get("pub_ts"), now) for i in items) if a is not None]
+        return min(ages) if ages else None
+    return [
+        {"name": "reddit-monthly", "inputAgeH": None,
+         "servedAgeH": served_reddit_age(d["monthly"], "", saved, github, now),
+         "graceH": 0, "maxAgeH": REDDIT_MAX_AGE_H},
+        {"name": "reddit-yearly", "inputAgeH": None,
+         "servedAgeH": served_reddit_age(d["yearly"], "_yearly", saved, github, now),
+         "graceH": 0, "maxAgeH": REDDIT_MAX_AGE_H},
+        {"name": "news", "inputAgeH": None, "servedAgeH": _age_h(d["updated"]["news"], now),
+         "graceH": 0, "maxAgeH": NEWS_MAX_AGE_H},
+        {"name": "am-reads", "inputAgeH": None, "servedAgeH": newest(rith),
+         "graceH": 0, "maxAgeH": am_reads_max_age_h(now)},
+        # SatPost has had no new issue since 26 Jun 2026 (the feed itself), so no cap:
+        # its age is shown, not graded.
+        {"name": "satpost", "inputAgeH": None, "servedAgeH": newest(satpost), "graceH": 0},
+        {"name": "github-trending", "inputAgeH": None, "servedAgeH": _age_h(d["updated"]["github"], now),
+         "graceH": 0, "maxAgeH": GITHUB_MAX_AGE_H},
+    ]
+
+
+@app.get("/api/freshness")
+def freshness():
+    try:
+        body, code = {"app": "reddit-scraper", "v": 1, "items": freshness_items()}, 200
+    except Exception as e:
+        log.exception("freshness failed")
+        body, code = {"error": type(e).__name__}, 500
+    return Response(json.dumps(body), status_code=code, media_type="application/json",
+                    headers={"Cache-Control": "no-store"})
