@@ -1,6 +1,6 @@
 # Daily Reader
 
-One page for the day's reading: the top posts from 13 subreddits, Bangladesh news, the
+One page for the day's reading: the top posts from 11 subreddits, Bangladesh news, the
 Ritholtz AM Reads + SatPost newsletters, and GitHub's trending top 10. Read/favorite state syncs across devices.
 
 **Live:** https://reddit-scraper-lyart.vercel.app · **Health:** `/api/status`
@@ -43,9 +43,9 @@ headless browser → Reddit         News, AM Reads, SatPost, Reddit backup, GitH
 - **Order:** Monthly and Yearly have a Mixed / Most upvotes switch. Most upvotes re-sorts the
   same 50 posts high to low; which posts make the list never changes. Chips under it show
   one subreddit at a time (TIL, ELI5, ...); tap the chosen chip again for All.
-- **The 13 subs** live in `core/reddit_common.py`: dataisbeautiful, todayilearned, bestof,
-  getmotivated, UnethicalLifeProTips, LifeProTips, TrueReddit, UpliftingNews, lifehacks,
-  Productivity, PersonalFinance, explainlikeimfive, AskHistorians.
+- **The 11 subs** live in `core/reddit_common.py`: dataisbeautiful, todayilearned, bestof,
+  getmotivated, UnethicalLifeProTips, LifeProTips, UpliftingNews, lifehacks,
+  Productivity, PersonalFinance, explainlikeimfive.
 
 ## Commands
 

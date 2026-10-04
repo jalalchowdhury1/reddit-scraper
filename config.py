@@ -59,7 +59,6 @@ SUBREDDITS = [
     {"name": "getmotivated", "display_name": "Get Motivated!"},
     {"name": "UnethicalLifeProTips", "display_name": "Unethical Life Pro Tips"},
     {"name": "LifeProTips", "display_name": "Life Pro Tips"},
-    {"name": "TrueReddit", "display_name": "TrueReddit"},
     {"name": "UpliftingNews", "display_name": "Uplifting News"},
     {"name": "lifehacks", "display_name": "Lifehacks"},
     {"name": "Productivity", "display_name": "Productivity"},

@@ -11,8 +11,8 @@ from pathlib import Path
 SUBREDDITS = [
     "dataisbeautiful", "todayilearned", "bestof",
     "getmotivated", "UnethicalLifeProTips", "LifeProTips",
-    "TrueReddit", "UpliftingNews", "lifehacks", "Productivity",
-    "PersonalFinance", "explainlikeimfive", "AskHistorians"
+    "UpliftingNews", "lifehacks", "Productivity",
+    "PersonalFinance", "explainlikeimfive"
 ]
 
 # Tiered priority for the made-up ORDERING scores (RSS/HTML fallbacks and the Mac
@@ -22,10 +22,8 @@ SUBREDDIT_TIERS = {
     "bestof": (75000, 100000),
     "explainlikeimfive": (75000, 100000),
     "todayilearned": (75000, 100000),
-    "AskHistorians": (75000, 100000),
 
     # Tier 2: High Signal
-    "TrueReddit": (40000, 70000),
     "dataisbeautiful": (40000, 70000),
     "PersonalFinance": (40000, 70000),
 

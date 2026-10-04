@@ -366,14 +366,14 @@ def test_github_backup_takes_stalest_lists_first_and_skips_its_own_recent_ones()
     mac = {k: "2026-09-27T07:35:00Z" for k in all_keys}                          # Mac fine...
     mac["r_bestof"] = "2026-09-20T07:35:00Z"                                     # ...except these two
     mac["r_lifehacks_yearly"] = "2026-09-22T07:35:00Z"
-    del mac["r_AskHistorians"]                                                   # never saved
+    del mac["r_getmotivated"]                                                   # never saved
     todo = scrape_top.stale_lists(mac, {}, now)
-    assert todo == [("AskHistorians", "month"), ("bestof", "month"), ("lifehacks", "year")]
+    assert todo == [("getmotivated", "month"), ("bestof", "month"), ("lifehacks", "year")]
     # This backup refreshed r/bestof 2 h ago: it waits, the next stalest goes first.
     assert scrape_top.stale_lists(mac, {"r_bestof": "2026-09-27T10:00:00Z"}, now) == [
-        ("AskHistorians", "month"), ("lifehacks", "year")]
+        ("getmotivated", "month"), ("lifehacks", "year")]
     # Refreshed 13 h ago: due again, but after lists nobody has touched for longer.
-    assert scrape_top.stale_lists(mac, {"r_AskHistorians": "2026-09-26T23:00:00Z"}, now)[-1] == ("AskHistorians", "month")
+    assert scrape_top.stale_lists(mac, {"r_getmotivated": "2026-09-26T23:00:00Z"}, now)[-1] == ("getmotivated", "month")
 
 
 def test_github_backup_stamps_its_own_file(tmp_path):
@@ -409,7 +409,7 @@ def test_github_backup_refreshes_a_batch_and_says_how_many(tmp_path, monkeypatch
     monkeypatch.setattr(sys, "argv", ["scrape_top.py", "--max-lists", "3"])
     scrape_top.main()                                                            # no Mac json at all
     out = capsys.readouterr().out
-    assert len(got) == 3 and "REDDIT BACKUP: refreshed 2 of 26 lists that needed it (tried 3)" in out
+    assert len(got) == 3 and "REDDIT BACKUP: refreshed 2 of 22 lists that needed it (tried 3)" in out
     assert "GITHUB REDDIT CHECK" not in out
     assert len(scrape_top.load_github_meta(tmp_path / "data/reddit_github.json")) == 2
 

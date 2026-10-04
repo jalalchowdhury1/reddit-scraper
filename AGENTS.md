@@ -12,7 +12,7 @@ Repo: `github.com/jalalchowdhury1/reddit-scraper` (public) · Python + vanilla J
 
 ## 1. What this is
 
-A **zero-cost personal reading page**. It pulls the top posts from 13 subreddits, Bangladesh
+A **zero-cost personal reading page**. It pulls the top posts from 11 subreddits, Bangladesh
 news, two newsletters and GitHub's trending top 10 into one page, and syncs "read" / "favorite" across devices with
 Firebase.
 
@@ -115,7 +115,7 @@ asked for, trusted only when the page or JSON also saw that list short, because 
 looks the same). That last rule is how r/lifehacks (6-8 posts in Sep 2026) now gets saved.
 
 What one run does (~5–6 min):
-- Warm-up load of reddit.com, then for each of the 13 subs × `month`/`year`: open
+- Warm-up load of reddit.com, then for each of the 11 subs × `month`/`year`: open
   `/r/<sub>/top/?t=<month|year>`, scroll like a person until 50 posts (max 10 scrolls, stops after
   3 scrolls with nothing new), read the attributes. Videos are skipped (it's a reading list).
 - The page gets one retry after a fresh warm-up (not when it was merely short, and not once it
@@ -238,8 +238,8 @@ a real browser gets "You've been blocked by network security", old.reddit is 403
 When there's no real score it **synthesizes one for ORDERING ONLY** ("Tiered Priority
 Exponential Decay"), so high-signal subs float up:
 - Base = `random.randint(*SUBREDDIT_TIERS[sub])` (fallback `"default"`):
-  - **Tier 1** `(75k–100k)`: `bestof`, `explainlikeimfive`, `todayilearned`, `AskHistorians`
-  - **Tier 2** `(40k–70k)`: `TrueReddit`, `dataisbeautiful`, `PersonalFinance`
+  - **Tier 1** `(75k–100k)`: `bestof`, `explainlikeimfive`, `todayilearned`
+  - **Tier 2** `(40k–70k)`: `dataisbeautiful`, `PersonalFinance`
   - **default** `(15k–35k)`: everything else
 - Post at index `i`: `score = int(base * (0.88 ** i)) + random.randint(100, 999)`.
 - **Do NOT change this math without the owner's permission.**
@@ -248,10 +248,10 @@ Exponential Decay"), so high-signal subs float up:
   every "82.4k upvotes" on the site was invented.
 - Between subreddits: `time.sleep(random.uniform(6.5, 12.5))` (human jitter, see §5).
 
-**The 13 tracked subs** (`core/reddit_common.py:SUBREDDITS`, NOT `config.py`):
+**The 11 tracked subs** (`core/reddit_common.py:SUBREDDITS`, NOT `config.py`):
 `dataisbeautiful, todayilearned, bestof, getmotivated, UnethicalLifeProTips, LifeProTips,
-TrueReddit, UpliftingNews, lifehacks, Productivity, PersonalFinance, explainlikeimfive,
-AskHistorians`. To add/remove one, edit `SUBREDDITS` (and `SUBREDDIT_TIERS` for a non-default
+UpliftingNews, lifehacks, Productivity, PersonalFinance, explainlikeimfive`
+(r/AskHistorians + r/TrueReddit removed 4 Oct 2026 — he never read them). To add/remove one, edit `SUBREDDITS` (and `SUBREDDIT_TIERS` for a non-default
 base). **Removing a sub? Also `git rm -r data/r_<sub> data/r_<sub>_yearly`.** `server.py` now
 ignores untracked subs anyway, but the dead files would sit in every deploy.
 
