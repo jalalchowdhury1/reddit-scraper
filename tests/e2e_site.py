@@ -23,6 +23,14 @@ def check(name, ok, detail=""):
 async def main():
     async with async_playwright() as p:
         b = await p.chromium.launch(headless=True)
+        # Every test browser gets a "ZZ…" sync key: the Mac's podcast puller ignores those, so a
+        # request a test leaves behind can never land in the real podcast queue (10 Oct 2026).
+        _new_context = b.new_context
+        async def new_context(**kw):
+            ctx = await _new_context(**kw)
+            await ctx.add_init_script("if (!localStorage.getItem('dailyReaderSyncKey')) localStorage.setItem('dailyReaderSyncKey', 'ZZE2E' + Math.random().toString(36).slice(2, 5).toUpperCase())")
+            return ctx
+        b.new_context = new_context
 
         # ---------- phone ----------
         ctx = await b.new_context(viewport={"width": 390, "height": 844}, has_touch=True, is_mobile=True, color_scheme="dark")
