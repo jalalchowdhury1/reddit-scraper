@@ -59,8 +59,8 @@ Deploy = push to `main` (Vercel). Tests also run on GitHub for every code push.
 
 ## Rules that break production if ignored
 
-1. Keep `requirements.txt` minimal (Vercel's 250 MB limit). Scraper libraries go in
-   `requirements-scraper.txt`.
+1. Keep `requirements.txt` minimal (Vercel's 250 MB limit; no pandas/numpy since 10 Oct 2026,
+   see AGENTS.md §3). Scraper libraries go in `requirements-scraper.txt`.
 2. `vercel.json` uses the legacy `builds` API; bundled folders go in `config.includeFiles`.
 3. `server.py` builds every path from `BASE_DIR`, and calls `TemplateResponse` with keyword args.
 4. Files under `data/` must be added with `git add -f` (the folder is gitignored).

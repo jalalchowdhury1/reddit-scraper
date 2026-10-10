@@ -411,6 +411,17 @@ Helpers: `format_score` (`82450 → 82.4k`), `calculate_reading_time` (~200 wpm)
 (`html.unescape`, NaN-safe, fixes scraped spacing), `short_text` (500 chars at a word boundary),
 `domain_of`, `title_key`, `newest_scrape`.
 
+**No pandas on the site (10 Oct 2026).** pandas + numpy were ~85% of the Vercel function
+(~60 MB per deployment, and Vercel keeps every retained deployment's function: this site alone
+filled ~7 of the account's 10 GB "Functions Storage", which blocks deploys when full).
+`server.py` reads the CSVs through `core/frames.py` (stdlib), which reproduces pandas 2.1.4's
+rules down to what a card can show: NA strings, column types, `concat` casts, and numpy's
+(unstable) quicksort tie order for the News sorts (a stable sort changed 69 of 918 historical
+answers). Proof when it landed: the old and new `get_data()` / `/api/status` / `/api/freshness`
+were byte-identical on all 459 historical `data/` commits (two clock times each), with pandas
+blocked from importing. `tests/test_frames.py` pins the rules and fuzzes against pandas 2.x.
+Don't add pandas/numpy back to `requirements.txt`; the scrapers keep them.
+
 ---
 
 ## 4. Run / test / deploy
@@ -430,7 +441,7 @@ python3 core/scrape_reddit_browser.py --only LifeProTips --visible   # needs Pla
 ```
 
 ### Tests
-- **`.venv/bin/python -m pytest tests -q`** — 121 tests, under a minute, no network (`tests/test_top_comments.py`: the comment picker, spoilers, hidden scores, cache/prune/backoff rules, the server attaching them):
+- **`.venv/bin/python -m pytest tests -q`** — 141 tests, under a minute, no network (`tests/test_frames.py`: the pandas stand-in, §3; its 2 pandas-parity fuzz tests skip unless pandas 2.x is installed, e.g. the owner's pandas-3 venv; CI runs them; `tests/test_top_comments.py`: the comment picker, spoilers, hidden scores, cache/prune/backoff rules, the server attaching them):
   - `tests/test_am_reads.py`: AM Reads cleanup/dedup helpers.
   - `tests/test_feeds.py`: RSS parsing + honest scores, the News retry (503/404), the live API's
     honesty/no-repeats rules on the committed data, the Mac scraper's rows and CSV round trip,
@@ -523,9 +534,10 @@ python3 core/scrape_reddit_browser.py --only LifeProTips --visible   # needs Pla
   timeout 10 min, commits `data/github_trending/` only on change, same 3-try rebase loop.
 
 ### Dependency split (keep it, see §5)
-- `requirements.txt` — Vercel minimal: `fastapi, uvicorn, Jinja2, pydantic, pandas==2.1.4,
-  numpy==1.26.4`.
-- `requirements-scraper.txt` — `-r requirements.txt` + `requests, beautifulsoup4, lxml`.
+- `requirements.txt` — Vercel minimal: `fastapi, uvicorn, Jinja2, pydantic` (no pandas since
+  10 Oct 2026, §3).
+- `requirements-scraper.txt` — `-r requirements.txt` + `pandas==2.1.4, numpy==1.26.4, requests,
+  beautifulsoup4, lxml` (every workflow and CI install this one).
 - `requirements-dev.txt` — `-r requirements-scraper.txt` + `streamlit` (legacy dashboard only).
 - The Mac scraper needs only Python 3 + Playwright (`/opt/homebrew/bin/python3` has it).
 
@@ -542,8 +554,10 @@ python3 core/scrape_reddit_browser.py --only LifeProTips --visible   # needs Pla
 
 ## 5. Gotchas / hard rules (highest-value section)
 
-1. **Vercel 250 MB lambda limit — keep `requirements.txt` minimal.** No `streamlit`, `lxml`,
-   `beautifulsoup4`, `playwright` there. Scraper deps → `requirements-scraper.txt`.
+1. **Keep `requirements.txt` minimal** (Vercel's 250 MB function limit, and every retained
+   deployment's function counts toward the account's 10 GB Functions Storage). No `pandas`,
+   `numpy`, `streamlit`, `lxml`, `beautifulsoup4`, `playwright` there. Scraper deps →
+   `requirements-scraper.txt`.
 2. **`vercel.json` must use the legacy `builds` API.** No top-level `functions` (schema
    conflict). Extra bundled files go in `config.includeFiles` **inside the `builds` entry**. A new
    folder `server.py` imports from (like `core/`) must be added there or it's missing on Vercel.
@@ -716,6 +730,7 @@ python3 core/scrape_reddit_browser.py --only LifeProTips --visible   # needs Pla
 - `server_assets/icon.png` — app icon.
 - `core/reddit_common.py` — `SUBREDDITS`, tiers, freshness handshake (shared, stdlib only).
 - `core/live_data.py` — on Vercel, serves `data/` from GitHub's newest commit (stdlib only; §4 Deploy).
+- `core/frames.py` — the site's pandas stand-in: CSV reading, concat, sorting, dates (stdlib only; §3).
 - `.github/workflows/deploy.yml` — the ONLY auto-deploy: code pushes → Vercel deploy hook (§4 Deploy).
 - `core/scrape_reddit_browser.py` — the real Reddit source (Mac mini).
 - `mac/reddit-browser.sh` + `mac/com.jalal.reddit-browser.plist` — its launchd job.

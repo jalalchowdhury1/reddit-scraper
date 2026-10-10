@@ -1,7 +1,6 @@
 import html
 import re
 from pathlib import Path
-import pandas as pd
 from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse, FileResponse, Response
 import json
@@ -11,6 +10,10 @@ from fastapi.templating import Jinja2Templates
 import glob
 import logging
 import math
+
+# pandas' rules in plain Python (core/frames.py): pandas + numpy were ~85% of this
+# function's size on Vercel (10 Oct 2026). The scrapers still use pandas.
+from core import frames
 
 BASE_DIR = Path(__file__).resolve().parent
 # Warnings reach Vercel's runtime logs. A broken file used to vanish in a bare
@@ -65,7 +68,7 @@ app = FastAPI()
 templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
 
 def clean_text(text) -> str:
-    if pd.isna(text) or not text: return ""
+    if frames.is_missing(text) or not text: return ""
     # Ritholtz blurbs end with an empty "( )" where the source link was.
     t = re.sub(r"\s*\(\s*\)", "", html.unescape(str(text)))
     # Scraped text nodes get joined with spaces: "eudaemonia , which means “ good spirit .”"
@@ -101,11 +104,13 @@ def title_key(title) -> str:
     """Same headline from two outlets -> same key ("PM's" == "PMs")."""
     return re.sub(r"[^a-z0-9]", "", clean_text(title).lower())[:70]
 
-def newest_scrape(df) -> str:
-    """Latest scraped_at in a CSV (UTC on the GitHub runner), as ISO with Z."""
-    if "scraped_at" not in df.columns:
+def newest_scrape(table, rows=None) -> str:
+    """Latest scraped_at in a CSV (UTC on the GitHub runner), as ISO with Z.
+    `rows` = the table's rows left after a filter (default: all of them)."""
+    if "scraped_at" not in table.columns:
         return ""
-    vals = [v for v in df["scraped_at"].astype(str) if v[:2] == "20"]
+    vals = [v for v in (frames.to_text(r["scraped_at"]) for r in (table.rows if rows is None else rows))
+            if v[:2] == "20"]
     return (max(vals)[:19] + "Z") if vals else ""
 
 def calculate_reading_time(text: str) -> int:
@@ -152,7 +157,7 @@ def github_item(row) -> dict:
     page gave them (never invented)."""
     repo = str(row["repo"]).strip()
     lang = str(row.get("language", "")).strip()
-    num = lambda k: pd.to_numeric(row.get(k, ""), errors="coerce")
+    num = lambda k: frames.to_number(row.get(k, ""))
     stars, today, rank = num("stars"), num("stars_today"), int(row["rank"])
     return {
         "id": github_id(repo),
@@ -163,8 +168,8 @@ def github_item(row) -> dict:
         "source": f"GitHub · {lang}" if lang else "GitHub",
         "domain": "github.com",
         "rank": rank,
-        "stars": format_score(int(stars)) if pd.notna(stars) and math.isfinite(stars) else "",
-        "stars_today": f"{int(today):,}" if pd.notna(today) and math.isfinite(today) else "",
+        "stars": format_score(int(stars)) if not frames.is_missing(stars) and math.isfinite(stars) else "",
+        "stars_today": f"{int(today):,}" if not frames.is_missing(today) and math.isfinite(today) else "",
         "language": lang,
     }
 
@@ -174,13 +179,13 @@ def is_tracked(sub: str) -> bool:
 
 
 def read_csv_safe(path):
-    """A CSV as a DataFrame, or None (logged) when it is missing, empty or broken."""
+    """A CSV as a frames.Table, or None (logged) when it is missing, empty or broken."""
     try:
-        df = pd.read_csv(path)
+        table = frames.read_csv(path)
     except Exception as e:
         log.warning("skipping %s: %s", path, e)
         return None
-    return None if df.empty else df
+    return None if len(table) == 0 else table
 
 
 def reddit_list_stamps(field: str = "lists", path: Path = None) -> dict:
@@ -199,7 +204,7 @@ def reddit_list_stamps(field: str = "lists", path: Path = None) -> dict:
 
 
 def load_reddit_frames() -> list:
-    """One DataFrame per tracked data/r_<sub>[_yearly]/posts.csv, tagged with its
+    """One table per tracked data/r_<sub>[_yearly]/posts.csv, tagged with its
     sub, tab and rank (the post's place in that sub's own top list)."""
     dfs = []
     for f in sorted(glob.glob(str(data_dir() / "data/r_*/posts.csv"))):
@@ -211,9 +216,14 @@ def load_reddit_frames() -> list:
         df = read_csv_safe(f)
         if df is None or not {"id", "title"}.issubset(df.columns):
             continue
-        df['subreddit'] = sub
-        df['time_filter'] = 'yearly' if yearly else 'monthly'
-        df['rank'] = range(1, len(df) + 1)
+        for rank, row in enumerate(df.rows, 1):
+            row['subreddit'] = sub
+            row['time_filter'] = 'yearly' if yearly else 'monthly'
+            row['rank'] = rank
+        for col, kind in (('subreddit', 'O'), ('time_filter', 'O'), ('rank', 'i')):
+            if col not in df.columns:
+                df.columns.append(col)
+            df.kinds[col] = kind
         dfs.append(df)
     return dfs
 
@@ -222,16 +232,16 @@ def shown_upvotes(row) -> str:
     """Reddit's own number, or "" (the card then shows the rank instead).
     `upvotes` column = real (Mac browser); else `score`, only if `score_real`
     (old JSON rows). Never the made-up tier number that orders the list."""
-    up = pd.to_numeric(row.get('upvotes', ''), errors='coerce')
-    if pd.notna(up) and math.isfinite(up):
+    up = frames.to_number(row.get('upvotes', ''))
+    if not frames.is_missing(up) and math.isfinite(up):
         return format_score(int(up))
     return format_score(int(row['score'])) if row['score_real'] else ""
 
 
 def shown_comments(row) -> str:
     """Reddit's comment count ("1.2k"), or "" when the list came without one (RSS)."""
-    c = pd.to_numeric(row.get('comments', ''), errors='coerce')
-    return format_score(int(c)) if pd.notna(c) and math.isfinite(c) and c >= 0 else ""
+    c = frames.to_number(row.get('comments', ''))
+    return format_score(int(c)) if not frames.is_missing(c) and math.isfinite(c) and c >= 0 else ""
 
 
 def reddit_item(row):
@@ -299,25 +309,26 @@ def get_data():
     try:
         dfs = load_reddit_frames()
         if dfs:
-            combined = pd.concat(dfs, ignore_index=True)
+            combined = frames.concat(dfs)
             # score_real = "is `score` a number Reddit gave?" Only the old JSON path's
             # were. The RSS/HTML fallbacks and the Mac browser put a made-up tier
             # number there for ORDERING (the Mac's real number is in `upvotes`).
             # CSVs without the flag count as not real.
-            if 'score_real' not in combined.columns:
-                combined['score_real'] = False
-            combined['score_real'] = combined['score_real'].astype(str).str.lower().isin(['true', '1'])
-            combined = combined.fillna("")
-            combined['id'] = combined['id'].astype(str)
-            combined = combined.drop_duplicates(subset=["id", "time_filter"], keep="first")
-            score = pd.to_numeric(combined['score'], errors='coerce')
-            combined['score'] = score.where(score.abs() < 1e12, 0).astype(int)  # junk/inf/NaN -> 0
+            for row in combined.rows:
+                row['score_real'] = frames.to_text(row.get('score_real')).lower() in ('true', '1')
+            rows = combined.fillna("").rows
+            for row in rows:
+                row['id'] = str(row['id'])
+            rows = frames.drop_duplicates(rows, ["id", "time_filter"])
+            for row in rows:
+                score = frames.to_number(row['score'])
+                row['score'] = int(score) if abs(score) < 1e12 else 0  # junk/inf/NaN -> 0
             # Order by `score` (the tier mix). The Mac browser's CSVs carry the real
             # number separately in `upvotes`; old JSON rows have it in `score`.
-            combined = combined.sort_values("score", ascending=False, kind="stable")
+            rows = frames.sort_rows(rows, "score", ascending=False, stable=True)
         
             bad_rows = 0
-            for _, row in combined.iterrows():
+            for row in rows:
                 try:  # one odd row costs that row, not both tabs
                     item = reddit_item(row)
                 except Exception as e:
@@ -342,21 +353,24 @@ def get_data():
     news_df = read_csv_safe(data_dir() / "data/googlenews/articles.csv")
     if news_df is not None:
         try:
-            news_df = news_df.fillna("")
+            news_df.fillna("")
             if {"article_id", "title", "pub_date"}.issubset(news_df.columns):
-                news_df = news_df.drop_duplicates(subset=["article_id", "category"], keep="first")
-                updated["news"] = newest_scrape(news_df)
+                rows = frames.drop_duplicates(news_df.rows, ["article_id", "category"])
+                updated["news"] = newest_scrape(news_df, rows)
                 # Google News often lists one story from 2-3 outlets, days apart.
                 # Keep the EARLIEST copy: its id never changes, so a story already
                 # marked read can't come back as "new" when a later copy lands.
-                news_df = news_df.assign(_key=news_df["title"].map(title_key))
-                news_df = news_df.sort_values("pub_date").drop_duplicates(subset=["_key"], keep="first")
+                # (Same-minute copies: whichever pandas' quicksort put first, see frames.)
+                for row in rows:
+                    row["_key"] = title_key(row["title"])
+                rows = frames.drop_duplicates(frames.sort_rows(rows, "pub_date"), ["_key"])
                 # News = every story from the last NEWS_DAYS days, no count cap, so
                 # the tab's number is the real volume (it was a flat 50 until 26 Sep 2026).
-                when = pd.to_datetime(news_df["pub_date"], utc=True, errors="coerce")
-                news_df = news_df[when >= pd.Timestamp.now(tz="UTC") - pd.Timedelta(days=NEWS_DAYS)]
-                news_df = news_df.sort_values("pub_date", ascending=False)
-                for _, row in news_df.iterrows():
+                cutoff = datetime.now(timezone.utc) - timedelta(days=NEWS_DAYS)
+                when = frames.to_datetime([row["pub_date"] for row in rows])
+                rows = [row for row, w in zip(rows, when) if w is not None and w >= cutoff]
+                rows = frames.sort_rows(rows, "pub_date", ascending=False)
+                for row in rows:
                     pid = f"gn_{row['article_id']}"
                     publisher = str(row.get('author', 'NEWS')).upper()
                     description = str(row.get('description', ''))
@@ -383,11 +397,10 @@ def get_data():
     rith_df = read_csv_safe(data_dir() / "data/ritholtz/articles.csv")
     if rith_df is not None:
         try:
-            rith_df = rith_df.fillna("")
+            rith_df.fillna("")
             if {"article_id", "title", "url"}.issubset(rith_df.columns):
                 updated["ritholtz"] = newest_scrape(rith_df)
-                rith_df = rith_df.drop_duplicates(subset=["article_id"], keep="first")
-                for _, row in rith_df.iterrows():
+                for row in frames.drop_duplicates(rith_df.rows, ["article_id"]):
                     pid = f"rth_{row['article_id']}"
                     post_date = str(row.get('pub_date', ''))[:10]
                     label = "WEEKEND READS" if "weekend-reads" in str(row.get('source_post', '')) else "AM READS"
@@ -417,14 +430,13 @@ def get_data():
     trung_df = read_csv_safe(data_dir() / "data/trung/articles.csv")
     if trung_df is not None:
         try:
-            trung_df = trung_df.fillna("")
+            trung_df.fillna("")
             if {"article_id", "title", "url", "pub_date"}.issubset(trung_df.columns):
-                trung_df = trung_df.drop_duplicates(subset=["article_id"], keep="first")
+                rows = frames.drop_duplicates(trung_df.rows, ["article_id"])
                 # The RSS feed holds ~20 back issues (January onward). Only the last
                 # week's issue belongs next to today's AM Reads.
                 cutoff = (datetime.now(timezone.utc) - timedelta(days=7)).strftime("%Y-%m-%d")
-                trung_df = trung_df[trung_df["pub_date"].astype(str).str[:10] >= cutoff]
-                for _, row in trung_df.iterrows():
+                for row in [r for r in rows if frames.to_text(r["pub_date"])[:10] >= cutoff]:
                     pid = f"trg_{row['article_id']}"
                     description = str(row.get('description', ''))
                     read_time = calculate_reading_time(description)
@@ -451,15 +463,16 @@ def get_data():
     gh_df = read_csv_safe(data_dir() / "data/github_trending/repos.csv")
     if gh_df is not None:
         try:
-            gh_df = gh_df.fillna("")
+            gh_df.fillna("")
             if {"repo", "rank"}.issubset(gh_df.columns):
                 updated["github"] = newest_scrape(gh_df)
-                gh_df = gh_df[gh_df["repo"].astype(str).str.count("/") == 1]
-                gh_df = gh_df.assign(rank=pd.to_numeric(gh_df["rank"], errors="coerce"))
-                gh_df = gh_df.dropna(subset=["rank"]).sort_values("rank", kind="stable")
-                gh_df = gh_df.drop_duplicates(subset=["repo"], keep="first")
-                github_pool = len(gh_df)
-                for _, row in gh_df.iterrows():
+                rows = [r for r in gh_df.rows if frames.to_text(r["repo"]).count("/") == 1]
+                for row in rows:
+                    row["rank"] = frames.to_number(row["rank"])
+                rows = [r for r in rows if not frames.is_missing(r["rank"])]
+                rows = frames.drop_duplicates(frames.sort_rows(rows, "rank", stable=True), ["repo"])
+                github_pool = len(rows)
+                for row in rows:
                     try:  # one odd row costs that row
                         data["github"].append(github_item(row))
                     except Exception as e:
@@ -555,10 +568,10 @@ SOURCE_META = "data/ritholtz/source.json"
 
 def _age_h(stamp, now):
     """Hours since an ISO stamp (naive = UTC, like the GitHub runners write), or None."""
-    when = pd.to_datetime(str(stamp or ""), utc=True, errors="coerce")
-    if pd.isna(when):
+    when = frames.parse_stamp(str(stamp or ""))
+    if when is None:
         return None
-    return round((now - when.to_pydatetime()).total_seconds() / 3600, 1)
+    return round((now - when).total_seconds() / 3600, 1)
 
 
 def am_reads_source_meta() -> dict:
