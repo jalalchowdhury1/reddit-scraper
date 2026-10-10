@@ -457,7 +457,7 @@ python3 core/scrape_reddit_browser.py --only LifeProTips --visible   # needs Pla
     deadline and block messages once), the stuck-profile fallback, the
     `METHOD CHECK` line, and GitHub's side (stalest first, own stamps, the RSS check line, only
     a real top list saved, and that `python core/scrape_top.py` really runs `main()`).
-- **`python3 tests/e2e_site.py [base_url]`** — 112 real-browser checks (~180 s; then 11 = quiet subs + Skip, last 23 = top comment, Later/snooze incl. a real Firestore round trip on a throwaway sync key, Podcast this): every tab shows
+- **`python3 tests/e2e_site.py [base_url]`** — 116 real-browser checks (~180 s; then 11 = quiet subs + Skip, last 27 = top comment, Later/snooze incl. a real Firestore round trip on a throwaway sync key, Podcast this + the paywalled paste box): every tab shows
   all the API's posts with the right label, the GitHub tab (API's top 10 in GitHub's order,
   "top 10 of N", GitHub's star counts, read + Undo, keys 5/6, its 24 h stale notice), real upvotes on cards, opening ≠ reading, the
   "Done with X?" prompt, undo, keys, stale notices (News 36 h, Reddit 48 h), footer stamps,
@@ -695,7 +695,7 @@ python3 core/scrape_reddit_browser.py --only LifeProTips --visible   # needs Pla
   tap again = take it back. The Mac mini's `com.jalal.podcast-requests` (:05/:35,
   `~/PycharmProjects/podcast-factory/favorites-queue/pull_requests.py`, log
   `~/Library/Logs/podcast-requests.log`, line `PODCAST REQUESTS: N new`) appends new urls to that
-  folder's `queue.json` as `todo` (paywalled domains `needs-paste`; slugs never reuse an `episodes/` folder; every request is re-checked each run and a row another writer dropped is put back; no button without an http link), stamps `pulled` (the
+  folder's `queue.json` and gets the article with `fetch_article.py` (real Chrome off-screen, JS off then on, then the Wayback Machine; headless is bot-walled everywhere) → `todo`; a paywall it can't pass → `needs-paste` and doc `state: needs-paste`: the card shows removepaywall.com's **Option 3** link (`https://archive.is/oldest/<url>`; archive.today shows this Mac a reCAPTCHA even in the Kaiser profile, never automated) + a **Paste article** box (≥150 words) that writes `{text, pastedAt, state: 'pasted'}`; the next run writes `texts/<slug>.txt`, row → `todo`, `state: ready`, `text` cleared. Slugs never reuse an `episodes/` folder; every request is re-checked each run and a row another writer dropped is put back; no button without an http link. It stamps `pulled` (the
   button then reads "In the podcast queue", disabled) and pings the alerts thread. Nothing is
   made automatically: episodes are made when the owner asks.
 - `manifest.json` + `sw.js` — PWA; network-first service worker (cache `daily-reader-v2`, only

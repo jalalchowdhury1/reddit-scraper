@@ -160,6 +160,12 @@
         .mini-btn.on { color: var(--accent); border-color: var(--accent); background: var(--accent-soft); }
         .mini-btn:disabled { opacity: .8; cursor: default; }
         .snooze-menu .mini-btn { color: var(--text); }
+        /* Paywalled podcast request: Option 3 link + paste box (10 Oct 2026). */
+        .paste-box { flex-basis: 100%; font-size: .78rem; color: var(--muted); line-height: 1.5; }
+        .paste-box a { color: var(--accent); }
+        .paste-box textarea { display: block; width: 100%; min-height: 120px; margin: 6px 0; padding: 8px; border-radius: 10px;
+                              border: 1px solid var(--line); background: var(--surface-2); color: var(--text); font: inherit; font-size: .85rem; }
+        .paste-box .row { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
         .actions { display: flex; flex-direction: column; gap: 2px; flex-shrink: 0; }
         .actions .icon-btn { width: 38px; height: 38px; font-size: 1.15rem; color: var(--faint); }
         .actions .icon-btn.fav-on { color: var(--accent); }
@@ -312,6 +318,8 @@ let snoozed = {};
 // mini pulls them into podcast-factory's queue (favorites-queue/pull_requests.py)
 // and stamps `pulled`, so the button can say "In the queue".
 let podcastReq = {};
+let pasteOpen = null;      // id of the AM Read whose paste box is open
+const pasteDraft = {};     // its text so far (a re-render must not wipe a half-done paste)
 let syncKey = store.raw('dailyReaderSyncKey');
 { const c = store.get('dr_snoozed', null); if (c && c.key === syncKey && c.data && typeof c.data === 'object') snoozed = c.data; }   // no flash of snoozed cards on load
 
@@ -521,10 +529,23 @@ let showSnoozed = false;
 // ---------- Podcast this (AM Reads) ----------
 const isAmRead = (item) => /^(rth|trg)_/.test(String(item.id));
 const podcastDoc = (item) => podcastReq[getSafeId(item)];
+// The Mac mini's word on a pulled request: ready (it has the text), needs-paste (paywall it
+// couldn't get past: Option 3 on the phone + paste), pasted (waiting for the next :05/:35 run).
+const ARCHIVE = (url) => 'https://archive.is/oldest/' + url;   // removepaywall.com's "Option 3"
+function pasteSave(item) {
+    const id = String(item.id), text = (pasteDraft[id] || '').trim(), words = text ? text.split(/\s+/).length : 0;
+    if (words < 150) { toast(words ? `Only ${words} words: copy the whole article` : 'Paste the article first'); return; }
+    const doc = { text: text.slice(0, 200000), pastedAt: new Date().toISOString(), state: 'pasted' };
+    podcastReq[getSafeId(item)] = { ...(podcastDoc(item) || {}), ...doc };
+    col('podcast_requests').doc(getSafeId(item)).set(doc, { merge: true }).catch(syncFailed);
+    pasteOpen = null; delete pasteDraft[id];
+    buzz(); render();
+    toast(`Got ${words} words. The Mac mini picks it up within 30 min`);
+}
 function podcastItem(item) {
     const ref = col('podcast_requests').doc(getSafeId(item));
     const cur = podcastDoc(item);
-    if (cur && cur.pulled) { toast('Already in the podcast queue'); return; }
+    if (cur && cur.pulled) { toast(cur.state === 'needs-paste' ? 'Paywalled: open Option 3, then paste the article' : 'Already in the podcast queue'); return; }
     if (cur) {
         delete podcastReq[getSafeId(item)];
         ref.delete().catch(syncFailed);
@@ -1083,9 +1104,20 @@ function extrasHTML(item) {
     if (item._snoozed) out.push(`<button class="mini-btn on" data-act="wake" title="Bring it back now"><i class="ph ph-alarm"></i>Back ${esc(snoozeWhen(item._snoozed))} · Wake now</button>`);
     else if (canSnooze(item)) out.push(`<button class="mini-btn" data-act="later" aria-label="Snooze: show me later" title="Snooze: show me later (l)"><i class="ph ph-alarm"></i>Later</button>`);
     if (isAmRead(item) && /^https?:\/\//.test(item.url || '')) {
-        const d = podcastDoc(item);
-        out.push(d ? `<button class="mini-btn on" data-act="podcast" ${d.pulled ? 'disabled' : ''} title="${d.pulled ? 'The Mac mini has it in the podcast queue' : 'Requested; tap to take it back'}"><i class="ph-fill ph-headphones"></i>${d.pulled ? 'In the podcast queue' : 'Podcast requested'}</button>`
-                   : `<button class="mini-btn" data-act="podcast" title="Add this article to the podcast queue"><i class="ph ph-headphones"></i>Podcast this</button>`);
+        const d = podcastDoc(item), st = d && d.pulled ? (d.state || 'ready') : '';
+        if (st === 'needs-paste' || st === 'paste-too-short') {
+            const open = pasteOpen === id;
+            out.push(`<div class="paste-box" data-act="pastebox"><i class="ph ph-lock-simple"></i> ${st === 'paste-too-short' ? 'That paste was too short. ' : ''}Paywalled: the Mac mini couldn't get the article.
+                <a href="${esc(ARCHIVE(item.url))}" target="_blank" rel="noopener">Open Option 3</a>, copy the whole article, then paste it here.
+                ${open ? `<textarea data-paste="${esc(id)}" placeholder="Paste the article text">${esc(pasteDraft[id] || '')}</textarea>
+                    <div class="row"><button class="mini-btn on" data-act="pastesave"><i class="ph ph-check"></i>Send to the podcast queue</button>
+                    <button class="mini-btn" data-act="pastecancel">Cancel</button></div>`
+                       : `<div class="row"><button class="mini-btn on" data-act="pasteopen"><i class="ph ph-clipboard-text"></i>Paste article</button></div>`}</div>`);
+        } else {
+            const label = !d ? 'Podcast this' : st === 'pasted' ? 'Pasted · Mac picks it up soon' : st ? 'In the podcast queue' : 'Podcast requested';
+            out.push(d ? `<button class="mini-btn on" data-act="podcast" ${st ? 'disabled' : ''} title="${st ? 'The Mac mini has it' : 'Requested; tap to take it back'}"><i class="ph-fill ph-headphones"></i>${label}</button>`
+                       : `<button class="mini-btn" data-act="podcast" title="Add this article to the podcast queue"><i class="ph ph-headphones"></i>Podcast this</button>`);
+        }
     }
     return out.length ? `<div class="extras">${out.join('')}</div>` : '';
 }
@@ -1452,6 +1484,9 @@ const onTabClick = (e) => {
 document.getElementById('tabs').addEventListener('click', onTabClick);
 document.getElementById('tabbar').addEventListener('click', onTabClick);
 
+document.getElementById('feed').addEventListener('input', (e) => {
+    if (e.target.dataset && e.target.dataset.paste) pasteDraft[e.target.dataset.paste] = e.target.value;
+});
 document.getElementById('feed').addEventListener('click', (e) => {
     const act = e.target.closest('[data-act]');
     if (act) {
@@ -1488,7 +1523,10 @@ document.getElementById('feed').addEventListener('click', (e) => {
         if (a === 'snoozeat') snoozeItem(item, new Date(act.dataset.at));
         if (a === 'wake') wakeItem(item);
         if (a === 'podcast') podcastItem(item);
-        return;
+        if (a === 'pasteopen') { pasteOpen = String(item.id); render(); const t = document.querySelector(`textarea[data-paste="${CSS.escape(pasteOpen)}"]`); if (t) t.focus(); }
+        if (a === 'pastecancel') { pasteOpen = null; render(); }
+        if (a === 'pastesave') pasteSave(item);
+        return;   // incl. 'pastebox': taps inside the paste box never open/expand the card
     }
     const card = e.target.closest('.item');
     if (card && card.dataset.swiped) { e.preventDefault(); delete card.dataset.swiped; return; }
@@ -1530,6 +1568,7 @@ document.getElementById('feed').addEventListener('auxclick', (e) => {
     let card = null, inner = null, bg = null, x0 = 0, y0 = 0, dx = 0, mode = null;
     const LIMIT = 84;
     feed.addEventListener('touchstart', (e) => {
+        if (e.target.closest('.paste-box')) { card = null; return; }   // scrolling a paste isn't a swipe
         card = e.target.closest('.item'); if (!card) return;
         inner = card.querySelector('.item-inner'); bg = card.querySelector('.swipe-bg');
         x0 = e.touches[0].clientX; y0 = e.touches[0].clientY; dx = 0; mode = null;
@@ -1607,7 +1646,7 @@ window.addEventListener('scroll', () => {
     };
     document.addEventListener('touchstart', (e) => {
         y0 = null;
-        if (busy || window.scrollY > 0 || e.touches.length !== 1 || e.target.closest('.tabbar, .toast, input')) return;
+        if (busy || window.scrollY > 0 || e.touches.length !== 1 || e.target.closest('.tabbar, .toast, input, textarea')) return;
         y0 = e.touches[0].clientY; x0 = e.touches[0].clientX; pull = 0; pulling = false;
     }, { passive: true });
     document.addEventListener('touchmove', (e) => {
