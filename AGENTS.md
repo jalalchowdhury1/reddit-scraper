@@ -50,7 +50,7 @@ GitHub Actions, every 6 h (github_trending.yml)
                                   ▼  Vercel auto-deploys every push to main
 Browser ─▶ server.py (FastAPI on Vercel) ─▶ GET /api/data
               ▼
-   { monthly, yearly, news, ritholtz, github, totals, reddit_subs, updated }
+   { monthly, yearly, monthly_reserve, yearly_reserve, news, ritholtz, github, totals, reddit_subs, updated }
               ▼
 index.html: 6 tabs (Monthly / Yearly / News / AM Reads / GitHub / ★ Favorites)
    read + favorite state ↔ localStorage ↔ Firebase Firestore (cross-device)
@@ -325,7 +325,7 @@ post and extract articles.
 - `GET /manifest.json`, `/sw.js`, `/icon.png` (`server_assets/icon.png`) — the PWA files.
   `vercel.json` routes everything to FastAPI, so these need their own routes (all three 404'd
   before 26 Sep 2026).
-- `GET /api/data` → `{monthly, yearly, news, ritholtz, github, totals, reddit_subs, updated}`:
+- `GET /api/data` → `{monthly, yearly, monthly_reserve, yearly_reserve, news, ritholtz, github, totals, reddit_subs, updated}`:
   - **Reddit** = every `data/r_*/posts.csv` whose sub is in `SUBREDDITS` (imported from
     `core/reddit_common.py`; `vercel.json` bundles `core/**` for this). Folder `_yearly` → Yearly,
     else Monthly. CSVs without `id`/`title` are skipped. Dedup on `(id, time_filter)`, sorted by
@@ -348,6 +348,10 @@ post and extract articles.
     per id and a slash would split the path), `rank`, `stars` ("87.5k"), `stars_today`
     ("2,608"), `language`; numbers blank when the page didn't give them. `totals.github` = repos
     on the page ("top 10 of 15").
+  - **`monthly_reserve` / `yearly_reserve`** (9 Oct 2026) = the next `RESERVE = 50` posts after
+    each top 50, same tier-mix order. Only the page's "quiet subs" uses them: it refills the 50
+    slots a quieted sub gives up, so the tab never shrinks. Reddit cards also carry
+    `comments` ("451", "" when the list came from RSS), shown as "· 451 comments".
   - **`reddit_subs`** = the tracked subs (sorted). The page forgets kept unread posts whose sub
     isn't in it, so removing a sub also clears it from every device's kept list.
   - **`updated`** = `{news, ritholtz, reddit, github}` (UTC ISO): the newest `scraped_at` in each
@@ -436,7 +440,7 @@ python3 core/scrape_reddit_browser.py --only LifeProTips --visible   # needs Pla
     deadline and block messages once), the stuck-profile fallback, the
     `METHOD CHECK` line, and GitHub's side (stalest first, own stamps, the RSS check line, only
     a real top list saved, and that `python core/scrape_top.py` really runs `main()`).
-- **`python3 tests/e2e_site.py [base_url]`** — 78 real-browser checks (~100 s): every tab shows
+- **`python3 tests/e2e_site.py [base_url]`** — 85 real-browser checks (~110 s; the last 7 = quiet subs): every tab shows
   all the API's posts with the right label, the GitHub tab (API's top 10 in GitHub's order,
   "top 10 of N", GitHub's star counts, read + Undo, keys 5/6, its 24 h stale notice), real upvotes on cards, opening ≠ reading, the
   "Done with X?" prompt, undo, keys, stale notices (News 36 h, Reddit 48 h), footer stamps,
@@ -629,7 +633,29 @@ python3 core/scrape_reddit_browser.py --only LifeProTips --visible   # needs Pla
   (`READ_GRACE_DAYS`, so a reload right after marking read can't lose it before Undo), or at once
   when it's live in the OTHER tab (the server moves posts between Monthly and Yearly) or its sub
   is no longer in `/api/data`'s `reddit_subs`. Kept posts only appear once the cloud read list
-  has loaded (or sync failed), so read posts never flash up as unread. **Warning cards:** News
+  has loaded (or sync failed), so read posts never flash up as unread. **Quiet subs** (9 Oct 2026,
+  the owner's ask: "slow down the subs I let linger"). `dr_qlog` (per device) logs every
+  Monthly/Yearly post the page SHOWS: sub + first-shown day (`e` = day opened or favorited). 3 days
+  later (`QUIET_MATURE`) a post counts as *engaged* (opened, favorited, or ticked read one by one
+  in those 3 days; read state is the synced `readAt`) or *lingered* (still unread, read later, or
+  cleared by a sweep = 4+ ticks in the same second, i.e. Mark all read). Once a day (Eastern, when
+  the read list is in: `scoreQuiet`, so the list never reshuffles mid-read) each sub with 8+
+  matured posts in the last 30 days gets a level: **2** if it lingers ≥95%, or ≥80% and 15+ pts
+  over the all-subs rate; **1** if ≥85%, or ≥60% and 10+ pts over; a quieted sub stays at 1 until
+  under 50% (no flip-flop). The bar is relative to the FEED, not the sub's whole list (the tier mix
+  already shows only each sub's top ~11 of 50, all above the sub's own median, so a sub-wide
+  median would hide nothing): level 1 = the median upvotes of that sub's posts in today's top 50
+  (keeps the top half of its slots), level 2 = the 75th percentile (top quarter); always at least
+  1 post; by rank when the list has no upvotes (RSS). `applyQuiet` builds `allData` from
+  `rawData`: drops posts under the bar, refills to the server's count from the reserve (Yearly
+  skips posts now in Monthly). Shown, never silent: the progress row says "· 8 quieted", the chip
+  gets a speaker icon, and a "Quieted for you · 8" section at the bottom says why per sub
+  ("needs 24k+ upvotes … 23 of your last 23 sat unread 3+ days"), with Show/Hide and "Stop for 14
+  days" (`dr_quiet.off`). Kept posts below a bar stay hidden too; posts that were only fill-ins
+  (`fill` in `dr_kept`) are dropped, not kept, when a quiet ends. It corrects itself: fewer,
+  bigger posts get read, the rate falls, the level goes. **Tab title / app badge:** "(7) Daily
+  Reader" = today's unread AM Reads + unread posts marked New today (`setBadge`; the home-screen
+  icon badge only where the browser allows `setAppBadge`). **Warning cards:** News
   when `updated.news` is 36 h+ old; Monthly/Yearly when `updated.reddit` is 48 h+ old (the Mac
   stopped; lists may be older and show ranks); GitHub when `updated.github` is 24 h+ old (4
   missed runs). Footer: when AM Reads, News, Reddit and GitHub last landed. Sync write failures show a toast + "(offline)". Firebase layout:

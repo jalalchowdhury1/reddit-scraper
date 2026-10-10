@@ -115,6 +115,12 @@
         .cleared-label .pill-btn { height: 32px; padding: 0 14px; font-size: .78rem; margin-left: auto; color: var(--text); }
         .streak-link { font: inherit; color: inherit; text-decoration: underline dotted; text-underline-offset: 3px; }
         .streak-link i { color: var(--muted); font-size: .7rem; }
+        .quiet-label .pill-btn { height: 32px; padding: 0 12px; font-size: .78rem; margin-left: auto; color: var(--text); }
+        .quiet-why { grid-column: 1 / -1; margin: 0 4px 6px; font-size: .78rem; color: var(--muted); line-height: 1.5; }
+        .quiet-why li { margin: 2px 0; }
+        .quiet-why ul { margin: 4px 0; padding-left: 18px; }
+        .quiet-why .text-btn { padding: 0 2px; font-size: .76rem; }
+        .chip .ph-speaker-simple-low { font-size: .82rem; opacity: .8; }
         .kept-label .pill-btn { height: 32px; padding: 0 12px; font-size: .78rem; margin-left: auto; color: var(--text); }
         .item { position: relative; border-radius: var(--radius); overflow: hidden; margin: 2px 0; }
         .swipe-bg { position: absolute; inset: 0; display: flex; justify-content: space-between; align-items: center; padding: 0 22px; font-size: 1.35rem; opacity: 0; }
@@ -311,6 +317,7 @@ function initSync() {
             readLoaded = true;
             syncOk();
             render();
+            refreshQuiet();   // once a day: needs the read list
         }, syncFailed);
     }).catch(syncFailed);
 }
@@ -376,7 +383,7 @@ const TABS = [   // icon = the phone tab bar's Phosphor icon
     { key: 'github', label: 'GitHub', icon: 'github-logo' },
     { key: 'favorites', label: 'Favorites', icon: 'star' },
 ];
-let allData = null, loadError = false, lastLoad = 0;
+let allData = null, rawData = null, loadError = false, lastLoad = 0;
 let currentTab = store.get('dr_tab', 'monthly');
 if (!TABS.some((t) => t.key === currentTab)) currentTab = 'monthly';
 let showRead = store.get('reddit_dash_show_read', false);
@@ -409,6 +416,7 @@ function noteOpened(item) {
     for (const k in opened) if (opened[k] < cutoff) delete opened[k];
     store.set('dr_opened', opened);
     if (!pendingOpened.includes(id)) pendingOpened.push(id);
+    noteEngaged(item);
     const idx = visibleItems.findIndex((i) => String(i.id) === id);
     if (idx >= 0) { focusIndex = idx; focusId = id; }   // so r / f act on it when you come back
     setTimeout(render, 250);          // after the browser has followed the link
@@ -457,12 +465,15 @@ function trackKept() {
     ['monthly', 'yearly'].forEach((k) => {
         const tab = map[k] && typeof map[k] === 'object' ? map[k] : {};
         const here = new Set();
-        (allData[k] || []).forEach((i) => { const id = String(i.id); here.add(id); tab[id] = { item: i }; });
+        // fill = it came from the reserve only because a sub was quieted: when it
+        // leaves (the quiet ended) it goes, it isn't kept as "still unread".
+        const serverTop = new Set(((rawData && rawData[k]) || []).map((i) => String(i.id)));
+        (allData[k] || []).forEach((i) => { const id = String(i.id); here.add(id); tab[id] = { item: i, ...(serverTop.has(id) ? {} : { fill: 1 }) }; });
         for (const id in tab) {
             const e = tab[id];
             if (here.has(id)) continue;
-            // Live in the other tab now, or its sub was removed: forget it here.
-            if (!e || !e.item || live.has(id) || !subOk(e.item)) { delete tab[id]; continue; }
+            // Live in the other tab now, its sub was removed, or a quiet fill-in: forget it here.
+            if (!e || !e.item || live.has(id) || !subOk(e.item) || e.fill) { delete tab[id]; continue; }
             if (!e.gone) e.gone = today;   // the first load without it
             const readAt = Date.parse(cloudReadAt[id] || '');   // NaN (unknown) never prunes
             const readLongAgo = readLoaded && cloudReadPosts.has(id) && readAt < Date.now() - READ_GRACE_DAYS * 864e5;
@@ -480,7 +491,7 @@ function carried(tab, withRead = showRead) {
     if ((tab !== 'monthly' && tab !== 'yearly') || !allData || !(readLoaded || syncBroken)) return [];
     const live = liveIds();
     return Object.entries(kept[tab] || {})
-        .filter(([id, e]) => e && e.item && !live.has(id) && subOk(e.item) && (withRead || !cloudReadPosts.has(id)))
+        .filter(([id, e]) => e && e.item && !live.has(id) && subOk(e.item) && (withRead || !cloudReadPosts.has(id)) && !quietHides(e.item, tab))
         .map(([, e]) => ({ ...e.item, _kept: true }));
 }
 
@@ -517,6 +528,171 @@ function streakHTML() {
                                   : `Clear one to keep your ${streak}-day streak`);
     return parts.join(' · ');
 }
+
+// ============================================================================
+// QUIET SUBS (9 Oct 2026): learn which subs he lets sit, then raise their bar.
+// ============================================================================
+// Every Reddit post this device SHOWS is logged (dr_qlog: id -> sub + the day it
+// was first shown). QUIET_MATURE days later it counts as:
+//   engaged  = opened, favorited, or ticked read one at a time within those days
+//   lingered = still unread, read later, or cleared in a bulk "Mark all read"
+//              (4+ ticks in the same second = a sweep, not reading)
+// A sub that lingers a lot more than the others gets "quieted" (once a day, so the
+// list never reshuffles mid-read): its posts must reach the sub's median upvotes
+// of its posts in this feed (level 1, top half), or their 75th percentile
+// (level 2, top quarter). The 50 slots are refilled from the server's reserve, so the tab keeps
+// its size. Quieting fixes itself: fewer, better posts get read, the rate drops,
+// the bar goes away. Nothing is hidden silently: the progress row counts them and
+// a "Quieted" section at the bottom shows them, says why, and can switch a sub off.
+const QUIET_MATURE = 3, QUIET_WINDOW = 30, QUIET_MIN = 8, QUIET_OFF_DAYS = 14;
+let qlog = store.get('dr_qlog', {});            // id -> { s: sub, d: day shown, e: day engaged }
+let quiet = store.get('dr_quiet', null);        // { day, levels: {sub: 1|2}, stats: {sub: {n, l}}, base, off: {sub: until} }
+if (!quiet || typeof quiet !== 'object' || !quiet.levels) quiet = { day: '', levels: {}, stats: {}, base: 0, off: {} };
+if (!quiet.off) quiet.off = {};
+let showQuieted = false;
+let quietedOut = { monthly: [], yearly: [] };
+const dayDiff = (a, b) => Math.round((Date.parse(b + 'T12:00:00Z') - Date.parse(a + 'T12:00:00Z')) / 864e5);
+const addDays = (iso, n) => { const d = new Date(iso + 'T12:00:00Z'); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
+
+function quietLevel(sub) {
+    if (quiet.off[sub] && quiet.off[sub] >= etDate()) return 0;
+    return quiet.levels[sub] || 0;
+}
+// The bar = the sub's own top threads in this feed. Level 1 keeps the top half of
+// the posts it would have had (needs their median upvotes), level 2 the top
+// quarter (75th percentile). A sub always keeps at least 1 post. Built from the
+// server's list on every load (quietBars), so it moves with Reddit's numbers.
+let quietBars = { monthly: {}, yearly: {} };
+function buildBars() {
+    quietBars = { monthly: {}, yearly: {} };
+    ['monthly', 'yearly'].forEach((tab) => {
+        const by = {};
+        ((rawData && rawData[tab]) || []).forEach((i) => { (by[subKey(i)] = by[subKey(i)] || []).push(i); });
+        for (const sub in by) {
+            const list = by[sub], k = list.length;
+            const ups = list.map(upvoteNum).filter((n) => n >= 0).sort((a, b) => b - a);
+            const ranks = list.map((i) => i.rank || 0).sort((a, b) => a - b);
+            const keep = (lv) => Math.max(1, Math.ceil(k * (lv >= 2 ? 0.25 : 0.5)));
+            const real = ups.length * 2 >= k;   // RSS backup lists have no upvotes: cut by rank
+            quietBars[tab][sub] = { k, real, up: [0, real ? ups[keep(1) - 1] : null, real ? ups[keep(2) - 1] : null],
+                                    rank: [0, ranks[keep(1) - 1], ranks[keep(2) - 1]] };
+        }
+    });
+}
+function quietBar(tab, sub, level) {   // the upvotes needed, or null (cut by rank)
+    const e = quietBars[tab] && quietBars[tab][sub];
+    return e && e.real ? e.up[level] : null;
+}
+function quietHides(item, tab) {
+    const sub = subKey(item), level = quietLevel(sub);
+    if (!level || !isReddit(tab)) return false;
+    const e = quietBars[tab] && quietBars[tab][sub];
+    if (!e) return false;   // not in today's list at all: nothing to compare with
+    const up = upvoteNum(item);
+    if (e.real && up >= 0) return up < e.up[level];
+    return (item.rank || 0) > e.rank[level];
+}
+// rawData -> allData: drop quieted posts, refill each top 50 from the reserve.
+function applyQuiet() {
+    if (!rawData) return;
+    buildBars();
+    const pick = (tab, skip) => {
+        const live = rawData[tab] || [], pool = [...live, ...(rawData[tab + '_reserve'] || [])];
+        const liveIds = new Set(live.map((i) => String(i.id)));
+        const out = [], hidden = [];
+        for (const i of pool) {
+            const id = String(i.id);
+            if (skip.has(id) || out.some((o) => String(o.id) === id)) continue;
+            if (quietHides(i, tab)) { if (liveIds.has(id)) hidden.push(i); continue; }
+            if (out.length < live.length) out.push(i);
+        }
+        return { out, hidden };
+    };
+    const m = pick('monthly', new Set());
+    const y = pick('yearly', new Set(m.out.map((i) => String(i.id))));   // one of each across tabs
+    allData = { ...rawData, monthly: m.out, yearly: y.out };
+    quietedOut = { monthly: m.hidden, yearly: y.hidden };
+}
+// Log what this device showed (after applyQuiet: a quieted post was never shown).
+function logShown() {
+    const today = etDate(), cutoff = addDays(today, -(QUIET_WINDOW + QUIET_MATURE + 5));
+    ['monthly', 'yearly'].forEach((tab) => [...((allData && allData[tab]) || []), ...carried(tab, true)].forEach((i) => {
+        const id = String(i.id), sub = subKey(i);
+        if (!sub || qlog[id]) return;
+        const fs = firstSeen[id];
+        const e = (kept[tab] || {})[id];
+        qlog[id] = { s: sub, d: /^\d{4}-/.test(fs || '') ? fs : (e && e.gone) || today };
+    }));
+    for (const id in qlog) if (!qlog[id] || !(qlog[id].d >= cutoff)) delete qlog[id];
+    store.set('dr_qlog', qlog);
+}
+function noteEngaged(item) {   // opened or favorited
+    const e = qlog[String(item.id)];
+    if (e && !e.e) { e.e = etDate(); store.set('dr_qlog', qlog); }
+}
+// Once a day (Eastern), when the synced read list is in: re-score every sub.
+function scoreQuiet(force = false) {
+    const today = etDate();
+    if (!readLoaded || !rawData || (!force && quiet.day === today)) return false;
+    const perSec = {};
+    for (const t of Object.values(cloudReadAt)) if (t) perSec[t.slice(0, 19)] = (perSec[t.slice(0, 19)] || 0) + 1;
+    const stats = {};
+    let N = 0, L = 0;
+    for (const id in qlog) {
+        const e = qlog[id];
+        const age = dayDiff(e.d, today);
+        if (age < QUIET_MATURE || age > QUIET_WINDOW + QUIET_MATURE) continue;
+        const limit = addDays(e.d, QUIET_MATURE);
+        const t = cloudReadAt[id], rd = etDayOf(t);
+        const sweep = t && perSec[t.slice(0, 19)] >= 4;
+        const engaged = (e.e && e.e <= limit) || (rd && rd <= limit && !sweep);
+        const s = stats[e.s] || (stats[e.s] = { n: 0, l: 0 });
+        s.n++; N++;
+        if (!engaged) { s.l++; L++; }
+    }
+    const base = N ? L / N : 0, levels = {};
+    for (const sub in stats) {
+        const { n, l } = stats[sub];
+        if (n < QUIET_MIN) { if (quiet.levels[sub] && n >= QUIET_MIN / 2) levels[sub] = 1; continue; }
+        const r = l / n, was = quiet.levels[sub] || 0;
+        let lv = 0;
+        if (r >= 0.95 || (r >= 0.8 && r - base >= 0.15)) lv = 2;
+        else if (r >= 0.85 || (r >= 0.6 && r - base >= 0.1)) lv = 1;
+        else if (was && r >= 0.5) lv = 1;   // hysteresis: no flip-flopping around the line
+        if (lv) levels[sub] = lv;
+    }
+    for (const sub in quiet.off) if (quiet.off[sub] < today) delete quiet.off[sub];
+    const changed = JSON.stringify(levels) !== JSON.stringify(quiet.levels);
+    quiet = { day: today, levels, stats, base, off: quiet.off };
+    store.set('dr_quiet', quiet);
+    return changed;
+}
+function refreshQuiet(force = false) {
+    if (!scoreQuiet(force)) return;
+    applyQuiet(); trackFirstSeen(); trackKept(); logShown();
+    render();
+}
+function stopQuiet(sub) {
+    quiet.off[sub] = addDays(etDate(), QUIET_OFF_DAYS);
+    store.set('dr_quiet', quiet);
+    applyQuiet(); trackFirstSeen(); trackKept(); logShown();
+    render();
+    toast(`${subName(sub)} is back to normal for ${QUIET_OFF_DAYS} days`, () => {
+        delete quiet.off[sub]; store.set('dr_quiet', quiet); applyQuiet(); trackKept(); render();
+    });
+}
+const quietedFor = (tab) => (quietedOut[tab] || []).filter((i) => !activeSub(tab) || subKey(i) === activeSub(tab));
+function quietWhyHTML(tab) {
+    const subs = [...new Set(quietedFor(tab).map(subKey))];
+    return `<div class="quiet-why">These subs sit unread more than the rest, so only their bigger posts make your list:<ul>` + subs.map((sub) => {
+        const lv = quietLevel(sub), bar = quietBar(tab, sub, lv), st = quiet.stats[sub] || { n: 0, l: 0 };
+        const need = (bar != null ? `needs ${esc(fmtUp(bar))}+ upvotes` : `rank #${(quietBars[tab][sub] || { rank: [] }).rank[lv]} or better`)
+                   + ` (the top ${lv >= 2 ? 'quarter' : 'half'} of what it would show)`;
+        return `<li><strong>${esc(subName(sub))}</strong>: ${need}. ${st.l} of your last ${st.n} sat unread 3+ days.
+                <button class="text-btn" data-act="unquiet" data-sub="${esc(sub)}">Stop for ${QUIET_OFF_DAYS} days</button></li>`;
+    }).join('') + `</ul></div>`;
+}
+const fmtUp = (n) => n >= 1000 ? (n / 1000).toFixed(n >= 1e4 ? 0 : 1).replace(/\.0$/, '') + 'k' : String(n);
 
 // ============================================================================
 // HELPERS
@@ -566,6 +742,7 @@ function metaHTML(item) {
     if (!isRead(item) && wasOpened(item)) tags.push('<span class="tag"><i class="ph ph-eye" aria-hidden="true"></i> Opened</span>');
     if (item.upvotes) out.push(item.upvotes + ' upvotes');
     else if (item.rank && item.when) out.push(`#${item.rank} this ${item.when}`);
+    if (item.comments && item.comments !== '0') out.push(item.comments + (item.comments === '1' ? ' comment' : ' comments'));
     // GitHub Trending: its place on today's page, then GitHub's own star counts.
     if (item.domain === 'github.com' && item.rank) out.push(`#${item.rank}`);
     if (item.stars_today) out.push(`+${item.stars_today} stars today`);
@@ -610,7 +787,7 @@ function subChipsHTML(tab) {
     // A sub with nothing left to read is a dead end, unless read items are showing (or it's the chosen one).
     const list = [...subs].filter(([k, e]) => e.n || showRead || k === sub).sort((a, b) => b[1].n - a[1].n || a[0].localeCompare(b[0]));
     const total = all.filter((i) => !isRead(i)).length;
-    const chip = (k, label, n) => `<button class="chip ${(sub || '') === k ? 'on' : ''}" data-act="sub" data-sub="${esc(k)}" aria-pressed="${(sub || '') === k}">${esc(label)}${n ? ` <span class="count">${n}</span>` : ''}</button>`;
+    const chip = (k, label, n) => `<button class="chip ${(sub || '') === k ? 'on' : ''}" data-act="sub" data-sub="${esc(k)}" aria-pressed="${(sub || '') === k}">${k && quietLevel(k) ? '<i class="ph ph-speaker-simple-low" title="Quieted: only its bigger posts show" aria-label="quieted"></i>' : ''}${esc(label)}${n ? ` <span class="count">${n}</span>` : ''}</button>`;
     return `<div class="sub-chips" role="group" aria-label="Show one subreddit">${chip('', 'All', total)}${list.map(([k, e]) => chip(k, subName(k, e.item), e.n)).join('')}</div>`;
 }
 
@@ -634,7 +811,7 @@ function itemsFor(tab) {
 function searchAll(q) {
     q = q.toLowerCase();
     const seen = new Set(), out = [];
-    const pools = [...TABS.filter((t) => t.key !== 'favorites').map((t) => [t, [...((allData && allData[t.key]) || []), ...carried(t.key, true)]]),
+    const pools = [...TABS.filter((t) => t.key !== 'favorites').map((t) => [t, [...((allData && allData[t.key]) || []), ...carried(t.key, true), ...(quietedOut[t.key] || [])]]),
                    [TABS.find((t) => t.key === 'favorites'), cloudFavorites]];
     pools.forEach(([t, list]) => list.forEach((i) => {
         const hay = `${i.title} ${i.desc} ${i.meta} ${i.source || ''} ${i.domain || ''}`.toLowerCase();
@@ -662,8 +839,22 @@ function renderTabs() {
             <span class="tb-icon"><i class="${on ? 'ph-fill' : 'ph'} ph-${t.icon}" aria-hidden="true"></i>${n ? `<span class="count">${n > 99 ? '99+' : n}</span>` : ''}</span>
             <span class="tb-label">${t.label}</span></button>`;
     }).join('');
+    setBadge();
     const active = nav.querySelector('.tab.active');
     if (active && active.offsetParent) active.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+}
+
+// "(7) Daily Reader" on the browser tab, and the same number on the home-screen
+// icon where the browser allows it: today's AM Reads + posts new today, unread.
+let lastBadge = -1;
+function setBadge() {
+    if (!allData) return;
+    const n = itemsFor('ritholtz').filter((i) => !isRead(i)).length
+            + ['monthly', 'yearly', 'github'].reduce((a, k) => a + itemsFor(k).filter((i) => isNew(i) && !isRead(i)).length, 0);
+    if (n === lastBadge) return;
+    lastBadge = n;
+    document.title = n ? `(${n}) Daily Reader` : 'Daily Reader';
+    try { if (navigator.setAppBadge) (n ? navigator.setAppBadge(n) : navigator.clearAppBadge()).catch(() => {}); } catch {}
 }
 
 function cardHTML(item) {
@@ -735,7 +926,8 @@ function render() {
     // Kept posts go last, under their own label (and last for j/k too).
     if (!query) shown = [...shown.filter((i) => !i._kept), ...shown.filter((i) => i._kept)];
     const shownOlder = older.filter((i) => showRead || !isRead(i));
-    visibleItems = [...shown, ...shownOlder];
+    const quietList = !query && isReddit(currentTab) ? quietedFor(currentTab).filter((i) => showRead || !isRead(i)) : [];
+    visibleItems = [...shown, ...(showQuieted ? quietList : []), ...shownOlder];
 
     let html = '';
     if (query) {
@@ -784,6 +976,7 @@ function render() {
                 html += `<div class="section-label kept-label"><i class="ph ph-clock-counter-clockwise"></i>${showRead ? 'From earlier lists' : 'Still unread from earlier lists'} · ${keptShown.length}
                          ${keptShown.some((i) => !isRead(i)) ? '<button class="pill-btn" data-act="keptread">Mark these read</button>' : ''}</div>` + keptShown.map(cardHTML).join('');
             }
+            html += quietHTML(quietList);
         }
     }
     // Speak up only when a feed is overdue. The nightly scrape normally lands by
@@ -807,6 +1000,14 @@ function render() {
         html += `<div class="section-label"><i class="ph ph-clock-counter-clockwise"></i>Earlier list · ${esc(etWeekday(shownOlder[0].date || etDate()))}</div>` + shownOlder.map(cardHTML).join('');
     }
     paintFeed(html);
+}
+
+// "Quieted · 6" at the bottom of Monthly/Yearly: why, and a Show/Hide toggle.
+function quietHTML(list) {
+    if (!list.length) return '';
+    return `<div class="section-label quiet-label"><i class="ph ph-speaker-simple-low" aria-hidden="true"></i>Quieted for you · ${list.length}
+                <button class="pill-btn" data-act="quietshow">${showQuieted ? 'Hide' : 'Show'}</button></div>`
+        + quietWhyHTML(currentTab) + (showQuieted ? list.map(cardHTML).join('') : '');
 }
 
 // Puts the feed HTML in place, then the footer stamps and the j/k focus.
@@ -877,6 +1078,8 @@ function setProgress(total, unread) {
         if (totals[currentTab] > nLive) scope = ` · top ${nLive} of ${totals[currentTab]}`;
         if (nKept) scope += ` + ${nKept} kept`;
     }
+    const nQuiet = !query && isReddit(currentTab) ? quietedFor(currentTab).filter((i) => !isRead(i)).length : 0;
+    if (nQuiet) scope += ` · ${nQuiet} quieted`;
     if (!query && total && currentTab === 'news' && totals.news_days) scope = ` · last ${totals.news_days} days`;
     if (!query && total && currentTab === 'github' && totals.github > total) scope = ` · top ${total} of ${totals.github}`;
     document.getElementById('progress-label').textContent = (unread ? `${unread} of ${total} left` : `All ${total} read`) + scope;
@@ -945,6 +1148,10 @@ function findItem(id) {
         const hit = allData && (allData[k] || []).find((i) => String(i.id) === String(id));
         if (hit) return hit;
     }
+    for (const k of ['monthly', 'yearly']) {
+        const q = (quietedOut[k] || []).find((i) => String(i.id) === String(id));
+        if (q) return q;
+    }
     for (const k of ['monthly', 'yearly']) {   // kept posts, e.g. for the "Done with it?" prompt
         const e = (kept[k] || {})[String(id)];
         if (e && e.item) return e.item;
@@ -961,6 +1168,7 @@ function toggleRead(item) {
 
 function favItem(item) {
     const added = toggleFav(item);
+    if (added) noteEngaged(item);
     buzz();
     toast(added ? 'Saved to Favorites' : 'Removed from Favorites', () => toggleFav({ ...item }));
 }
@@ -1015,6 +1223,8 @@ document.getElementById('feed').addEventListener('click', (e) => {
         if (a === 'older') { amShowOlder = true; render(); return; }
         if (a === 'showread') { setShowRead(true); return; }
         if (a === 'keptread') { markKeptRead(); return; }
+        if (a === 'quietshow') { showQuieted = !showQuieted; render(); return; }
+        if (a === 'unquiet') { stopQuiet(act.dataset.sub); return; }
         if (a === 'sub') {
             const k = act.dataset.sub || null;
             subFilter[currentTab] = subFilter[currentTab] === k ? null : k;   // tap the chosen chip again = All
@@ -1286,9 +1496,12 @@ async function loadData(restoreScroll = true) {
             data = await res.json();
         } finally { clearTimeout(timer); }
         const offline = res.headers.get('X-Offline-Copy') === '1';
-        allData = data;
+        rawData = data;
+        applyQuiet();          // yesterday's quiet levels: the list holds still while reading
         trackFirstSeen();
         trackKept();
+        logShown();
+        scoreQuiet() && (applyQuiet(), trackFirstSeen(), trackKept(), logShown());
         if (!offline) lastLoad = Date.now();   // a saved copy: try again on the next return to the app
         loadError = false;
         ok = offline ? 'offline' : 'fresh';

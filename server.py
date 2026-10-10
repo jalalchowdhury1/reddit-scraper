@@ -196,6 +196,12 @@ def shown_upvotes(row) -> str:
     return format_score(int(row['score'])) if row['score_real'] else ""
 
 
+def shown_comments(row) -> str:
+    """Reddit's comment count ("1.2k"), or "" when the list came without one (RSS)."""
+    c = pd.to_numeric(row.get('comments', ''), errors='coerce')
+    return format_score(int(c)) if pd.notna(c) and math.isfinite(c) and c >= 0 else ""
+
+
 def reddit_item(row):
     """One Reddit CSV row -> a card, or None when it has no id/title or it's
     r/AskHistorians on Monthly (that sub lives in Yearly; dropped here, before
@@ -222,7 +228,11 @@ def reddit_item(row):
         "when": "month" if row['time_filter'] == 'monthly' else "year",
         # Shown only when it came from Reddit, never an invented number.
         "upvotes": shown_upvotes(row),
+        "comments": shown_comments(row),
     }
+
+
+RESERVE = 50   # posts past each top 50 the page may refill from (quieted subs)
 
 
 @app.get("/api/data")
@@ -410,6 +420,9 @@ def get_data():
 
     yearly_pool = list(data["yearly"])  # before the cap, so Yearly can backfill
     monthly_pool = len(data["monthly"])
+    # The next RESERVE posts after each top 50: when the page quiets a sub, it
+    # refills the 50 from here (in the same tier-mix order) instead of shrinking.
+    monthly_reserve = data["monthly"][50:50 + RESERVE]
     for k in ("monthly", "ritholtz"):   # News is capped by date instead (NEWS_DAYS)
         data[k] = data[k][:50]
 
@@ -418,6 +431,8 @@ def get_data():
     monthly_ids = {i["id"] for i in data["monthly"]}
     yearly_all = [i for i in yearly_pool if i["id"] not in monthly_ids]
     data["yearly"] = yearly_all[:50]
+    data["monthly_reserve"] = monthly_reserve
+    data["yearly_reserve"] = yearly_all[50:50 + RESERVE]
     # How many posts the top 50 were picked from (the site says "top 50 of 582").
     data["totals"] = {"monthly": monthly_pool, "yearly": len(yearly_all), "news_days": NEWS_DAYS,
                       "github": github_pool}

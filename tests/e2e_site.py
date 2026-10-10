@@ -431,6 +431,46 @@ async def main():
         await pg.evaluate(f"setRead({json.dumps(gone)}, false)")
         check("No JS errors (kept)", not errs3, "; ".join(errs3)[:200])
         await ctx.close()
+
+        # ---------- quiet subs (9 Oct 2026) ----------
+        # Seed a history: every post of the sub with the most Monthly slots sat
+        # unread 6 days, every other sub's post was opened. That sub must get
+        # quieted to level 2: a quarter of its slots, the tab refilled to its size.
+        import math
+        actx = await b.new_context()
+        api = await (await actx.request.get(BASE + "/api/data")).json()
+        await actx.close()
+        subs = {}
+        for i in api["monthly"]:
+            subs.setdefault(i["source"].lower(), []).append(i)
+        big = max(subs, key=lambda k: len(subs[k]))
+        d6 = (datetime.now(timezone.utc).date() - __import__("datetime").timedelta(days=6)).isoformat()
+        qlog = {i["id"]: {"s": i["source"][2:].lower(), "d": d6, **({} if i["source"].lower() == big else {"e": d6})}
+                for tab in ("monthly", "yearly") for i in api[tab]}
+        ctx = await b.new_context(viewport={"width": 390, "height": 844}, service_workers="block")
+        await ctx.add_init_script(f"if(!sessionStorage.qs){{localStorage.setItem('dr_qlog', {json.dumps(json.dumps(qlog))});sessionStorage.qs=1}}")
+        pg = await ctx.new_page()
+        errs4 = []
+        pg.on("pageerror", lambda e: errs4.append(str(e)))
+        await pg.goto(BASE)
+        await pg.wait_for_selector("#feed .item", timeout=20000)
+        await pg.wait_for_selector(".quiet-label", timeout=20000)
+        srcs = await pg.eval_on_selector_all("#feed > .item .src .name", "els => els.map(e => e.textContent.toLowerCase())")
+        want = max(1, math.ceil(len(subs[big]) * 0.25))
+        check(f"Quiet: {big} cut to its top quarter", sum(s.startswith(big) for s in srcs) == want, f"{sum(s.startswith(big) for s in srcs)} vs {want}")
+        check("Quiet: tab refilled to the server's size", len(srcs) == len(api["monthly"]), f"{len(srcs)} vs {len(api['monthly'])}")
+        label = await pg.inner_text("#progress-label")
+        check("Quiet: progress row counts quieted posts", "quieted" in label, label)
+        check("Quiet: the why line names the sub", "sat unread 3+ days" in await pg.inner_text(".quiet-why"))
+        await pg.click("[data-act=quietshow]")
+        check("Quiet: Show reveals them", await pg.locator("#feed > .item").count() == len(srcs) + len(subs[big]) - want)
+        await pg.click("[data-act=unquiet]")
+        await pg.wait_for_timeout(400)
+        check("Quiet: Stop brings the sub back, no kept leftovers",
+              await pg.locator(".quiet-label").count() == 0 and "kept" not in await pg.inner_text("#progress-label"),
+              await pg.inner_text("#progress-label"))
+        check("No JS errors (quiet)", not errs4, "; ".join(errs4)[:200])
+        await ctx.close()
         await b.close()
     print(f"\n{sum(results)}/{len(results)} passed")
     sys.exit(0 if all(results) else 1)
