@@ -17,7 +17,8 @@ news, two newsletters and GitHub's trending top 10 into one page, and syncs "rea
 Firebase.
 
 **In 30 seconds:** robots save lists as CSV files into `data/` and push them to GitHub →
-Vercel redeploys on every push → `server.py` turns the CSVs into one JSON answer → the page
+the running site reads `data/` from GitHub's newest commit (no redeploy, see §4 Deploy) →
+`server.py` turns the CSVs into one JSON answer → the page
 (`templates/index.html`) shows it. Nothing is stored on the server; your read/favorite state
 lives in the browser and in Firebase.
 
@@ -47,7 +48,7 @@ GitHub Actions, 03:00 UTC (+ 09:00 retry)
 GitHub Actions, every 6 h (github_trending.yml)
    └─ core/scrape_github_trending.py → data/github_trending/repos.csv (overwrite, only if list_problem() passes)
                                   │
-                                  ▼  Vercel auto-deploys every push to main
+                                  ▼  site fetches main's tarball ≤ every 5 min (core/live_data.py)
 Browser ─▶ server.py (FastAPI on Vercel) ─▶ GET /api/data
               ▼
    { monthly, yearly, monthly_reserve, yearly_reserve, news, ritholtz, github, totals, reddit_subs, updated }
@@ -326,7 +327,7 @@ post and extract articles.
 - Log lines: `GITHUB TRENDING OK: N repos (top: …)` / `GITHUB TRENDING FAILED: <why>`; the
   workflow prints `GITHUB TRENDING PUSHED: <sha>` or `NO CHANGE`.
 - Runs on GitHub Actions: GitHub doesn't block its own runners. Star counts move every run, so
-  expect a data commit (= a Vercel deploy) every 6 h.
+  expect a data commit every 6 h (no deploy since 10 Oct 2026: the site reads data live).
 - GitHub's order is **not** "most stars today" (e.g. #3 can have fewer than #4). The tab keeps
   GitHub's order on purpose: "top 10" means what github.com/trending shows.
 
@@ -479,7 +480,19 @@ python3 core/scrape_reddit_browser.py --only LifeProTips --visible   # needs Pla
   (`paths-ignore: data/**`), and on PRs. Public repo, so the minutes are free.
 
 ### Deploy (Vercel)
-- **Auto-deploys on every push to `main`** (including the robots' data commits).
+- **Data never deploys (10 Oct 2026).** Vercel's free plan allows 100 deploys/day for ALL
+  of Jalal's projects together; the robots' data commits alone cost ~25/day here and the cap
+  was hit. On Vercel, `core/live_data.py` downloads main's tarball from codeload.github.com
+  (public repo, no token) at most every 5 min per warm instance and `server.data_dir()` reads
+  `data/` from that copy; any failure keeps the last good copy, else the `data/` bundled with
+  the deploy. Off locally/in tests and with env `LIVE_DATA=0`. `/api/status` →
+  `data_source` = `{live, serving: github|bundle, commit, fetchedAgeS, error}`.
+- **Code deploys via `.github/workflows/deploy.yml`, not Vercel's git integration.**
+  `vercel.json` has `"git": {"deploymentEnabled": false}` (never remove it; a skipped
+  Ignored Build Step would still count against the cap). The workflow fires on pushes to
+  main that change anything outside `data/**`, `**.md`, `tests/**`, `.github/**`, waits 90 s
+  (a newer push cancels it, so a burst = one deploy) and POSTs the Vercel deploy hook
+  (secret `VERCEL_DEPLOY_HOOK`). Deploy by hand: Actions → Deploy site → Run workflow.
 - `vercel.json`: legacy `builds` API, `@vercel/python` on `server.py`, `config.includeFiles` =
   `templates/**, data/**, server_assets/**, core/**, manifest.json, sw.js`.
 - Vercel installs only `requirements.txt`.
@@ -702,6 +715,8 @@ python3 core/scrape_reddit_browser.py --only LifeProTips --visible   # needs Pla
   the offline fallback; an offline `/api/data` copy carries `X-Offline-Copy: 1`).
 - `server_assets/icon.png` — app icon.
 - `core/reddit_common.py` — `SUBREDDITS`, tiers, freshness handshake (shared, stdlib only).
+- `core/live_data.py` — on Vercel, serves `data/` from GitHub's newest commit (stdlib only; §4 Deploy).
+- `.github/workflows/deploy.yml` — the ONLY auto-deploy: code pushes → Vercel deploy hook (§4 Deploy).
 - `core/scrape_reddit_browser.py` — the real Reddit source (Mac mini).
 - `mac/reddit-browser.sh` + `mac/com.jalal.reddit-browser.plist` — its launchd job.
 - `core/scrape_top.py` — GitHub's Reddit backup (RSS → JSON, batched, every 3 h).

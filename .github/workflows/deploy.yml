@@ -1,0 +1,44 @@
+name: Deploy site
+
+# Why this exists (10 Oct 2026): Vercel's free plan allows 100 deploys a day for ALL of
+# Jalal's projects together, and that day the cap was hit (151 in 24 h). This site
+# redeployed on every push, and 34 of its 41 deploys that day were robots' data commits.
+# Now the running site reads data/ from GitHub's newest commit (core/live_data.py), Vercel's
+# git auto-deploy is OFF (vercel.json: git.deploymentEnabled false; a skipped "Ignored Build
+# Step" would still count), and this workflow deploys only when something other than data,
+# docs, tests or workflows changed, through a Vercel deploy hook (secret VERCEL_DEPLOY_HOOK,
+# project reddit-scraper, ref main).
+#
+# - Bursts: a newer run cancels a waiting older one, and the hook always builds the newest
+#   commit on main, so several pushes inside 90 s cost ONE deploy.
+# - The robots push with GITHUB_TOKEN, which never starts push workflows anyway.
+# - Manual: Actions → Deploy site → Run workflow.
+
+on:
+  push:
+    branches: [main]
+    paths-ignore: ['data/**', '**.md', 'tests/**', '.github/**']
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: deploy-site
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Wait 90 s so a burst of pushes becomes one deploy
+        if: github.event_name == 'push'
+        run: sleep 90
+
+      - name: Trigger the Vercel deploy hook
+        env:
+          HOOK: ${{ secrets.VERCEL_DEPLOY_HOOK }}
+        run: |
+          set -euo pipefail
+          test -n "$HOOK" || { echo "::error::secret VERCEL_DEPLOY_HOOK is missing"; exit 1; }
+          curl -fsS -m 30 -X POST "$HOOK" -o /dev/null -w 'deploy hook HTTP %{http_code}\n'

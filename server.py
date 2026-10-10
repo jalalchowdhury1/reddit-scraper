@@ -26,9 +26,40 @@ try:
 except Exception as e:  # pragma: no cover - only on a broken deploy
     log.warning("core.reddit_common not importable (%s); showing every data/r_* list", e)
     TRACKED_SUBS = None
-BROWSER_META = BASE_DIR / "data/reddit_browser.json"
-TOP_COMMENTS = BASE_DIR / "data/reddit_comments.json"   # core/top_comments.py (Mac browser job)
-GITHUB_META = BASE_DIR / "data/reddit_github.json"  # GitHub's RSS backup (core/scrape_top.py)
+# data/ comes from the newest commit on GitHub when running on Vercel (core/live_data.py,
+# 10 Oct 2026): robots' data commits no longer redeploy the site (Vercel's 100 deploys/day
+# account cap). Locally, in tests, or if GitHub fails: this checkout / the deployed copy.
+try:
+    from core import live_data
+except Exception as e:  # pragma: no cover - only on a broken deploy
+    log.warning("core.live_data not importable (%s); serving the deployed data/", e)
+    live_data = None
+_BUNDLE_DIR = BASE_DIR
+
+
+def data_dir() -> Path:
+    """The folder whose data/ to read. Tests that point BASE_DIR elsewhere always win."""
+    if BASE_DIR != _BUNDLE_DIR or live_data is None:
+        return BASE_DIR
+    return live_data.root(BASE_DIR)
+
+
+# Tests pin these; None = the file inside data_dir().
+BROWSER_META = None   # data/reddit_browser.json (Mac browser job)
+TOP_COMMENTS = None   # data/reddit_comments.json (core/top_comments.py, Mac browser job)
+GITHUB_META = None    # data/reddit_github.json (GitHub's RSS backup, core/scrape_top.py)
+
+
+def browser_meta() -> Path:
+    return BROWSER_META or data_dir() / "data/reddit_browser.json"
+
+
+def top_comments_file() -> Path:
+    return TOP_COMMENTS or data_dir() / "data/reddit_comments.json"
+
+
+def github_meta() -> Path:
+    return GITHUB_META or data_dir() / "data/reddit_github.json"
 
 app = FastAPI()
 templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
@@ -158,7 +189,7 @@ def reddit_list_stamps(field: str = "lists", path: Path = None) -> dict:
     ("lists"), when it last REACHED its real page, saved or not ("checked"), and
     which method read it ("via": page, json or rss)."""
     try:
-        lists = json.loads((path or BROWSER_META).read_text()).get(field, {})
+        lists = json.loads((path or browser_meta()).read_text()).get(field, {})
     except Exception:
         return {}
     if not isinstance(lists, dict):
@@ -171,7 +202,7 @@ def load_reddit_frames() -> list:
     """One DataFrame per tracked data/r_<sub>[_yearly]/posts.csv, tagged with its
     sub, tab and rank (the post's place in that sub's own top list)."""
     dfs = []
-    for f in sorted(glob.glob(str(BASE_DIR / "data/r_*/posts.csv"))):
+    for f in sorted(glob.glob(str(data_dir() / "data/r_*/posts.csv"))):
         folder = Path(f).parent.name
         yearly = folder.endswith("_yearly")
         sub = folder[2:].removesuffix("_yearly")
@@ -240,7 +271,7 @@ def load_top_comments(path: Path = None) -> dict:
     """{post id: {"body", "ups"}} from data/reddit_comments.json, or {} (missing/broken
     file = cards just show no comment). Only entries with a body."""
     try:
-        posts = json.loads((path or TOP_COMMENTS).read_text(encoding="utf-8")).get("posts", {})
+        posts = json.loads((path or top_comments_file()).read_text(encoding="utf-8")).get("posts", {})
     except Exception:
         return {}
     if not isinstance(posts, dict):
@@ -308,7 +339,7 @@ def get_data():
         data["monthly"], data["yearly"] = [], []
 
     # Load Google News
-    news_df = read_csv_safe(BASE_DIR / "data/googlenews/articles.csv")
+    news_df = read_csv_safe(data_dir() / "data/googlenews/articles.csv")
     if news_df is not None:
         try:
             news_df = news_df.fillna("")
@@ -349,7 +380,7 @@ def get_data():
             data["news"] = []
 
     # Load Ritholtz
-    rith_df = read_csv_safe(BASE_DIR / "data/ritholtz/articles.csv")
+    rith_df = read_csv_safe(data_dir() / "data/ritholtz/articles.csv")
     if rith_df is not None:
         try:
             rith_df = rith_df.fillna("")
@@ -383,7 +414,7 @@ def get_data():
             data["ritholtz"] = []
 
     # Load Read Trung (SatPost)
-    trung_df = read_csv_safe(BASE_DIR / "data/trung/articles.csv")
+    trung_df = read_csv_safe(data_dir() / "data/trung/articles.csv")
     if trung_df is not None:
         try:
             trung_df = trung_df.fillna("")
@@ -417,7 +448,7 @@ def get_data():
 
     # Load GitHub Trending (core/scrape_github_trending.py): today's page, in
     # GitHub's own order. The tab shows the top GITHUB_TOP.
-    gh_df = read_csv_safe(BASE_DIR / "data/github_trending/repos.csv")
+    gh_df = read_csv_safe(data_dir() / "data/github_trending/repos.csv")
     if gh_df is not None:
         try:
             gh_df = gh_df.fillna("")
@@ -481,7 +512,7 @@ def status():
     saved, checked = reddit_list_stamps("lists"), reddit_list_stamps("checked")
     via = reddit_list_stamps("via")  # page, json or rss: which of the Mac's methods saved it
     # GitHub's RSS backup refilled a list after the Mac last saved it: that's what's live.
-    for k, stamp in reddit_list_stamps("lists", GITHUB_META).items():
+    for k, stamp in reddit_list_stamps("lists", github_meta()).items():
         if stamp > saved.get(k, ""):
             via[k] = "github rss"
     # checked = the Mac reached the list's real page (saved or, if too short, not);
@@ -501,6 +532,8 @@ def status():
         "tracked_subs": len(TRACKED_SUBS) if TRACKED_SUBS else None,
         "updated": d["updated"],
         "counts": {k: len(d[k]) for k in ("monthly", "yearly", "news", "ritholtz", "github")},
+        # where data/ came from: GitHub's newest commit (live) or the deployed copy
+        "data_source": live_data.status() if live_data else {"live": False, "serving": "bundle"},
     }
 
 
@@ -531,7 +564,7 @@ def _age_h(stamp, now):
 def am_reads_source_meta() -> dict:
     """data/ritholtz/source.json as the producer wrote it ({} if missing/broken)."""
     try:
-        with open(BASE_DIR / SOURCE_META) as f:
+        with open(data_dir() / SOURCE_META) as f:
             meta = json.load(f)
         return meta if isinstance(meta, dict) else {}
     except Exception:
@@ -557,7 +590,7 @@ def served_reddit_age(items, suffix, saved, github, now):
 def freshness_items(now: datetime = None) -> list:
     now = now or datetime.now(timezone.utc)
     d = get_data()
-    saved, github = reddit_list_stamps("lists"), reddit_list_stamps("lists", GITHUB_META)
+    saved, github = reddit_list_stamps("lists"), reddit_list_stamps("lists", github_meta())
     rith = [i for i in d["ritholtz"] if i.get("kind") != "SATPOST"]
     satpost = [i for i in d["ritholtz"] if i.get("kind") == "SATPOST"]
     src = am_reads_source_meta()

@@ -4,7 +4,14 @@
       "src": "server.py",
       "use": "@vercel/python",
       "config": {
-        "includeFiles": ["templates/**", "data/**", "server_assets/**", "core/**", "manifest.json", "sw.js"]
+        "includeFiles": [
+          "templates/**",
+          "data/**",
+          "server_assets/**",
+          "core/**",
+          "manifest.json",
+          "sw.js"
+        ]
       }
     }
   ],
@@ -13,5 +20,8 @@
       "src": "/(.*)",
       "dest": "server.py"
     }
-  ]
+  ],
+  "git": {
+    "deploymentEnabled": false
+  }
 }
