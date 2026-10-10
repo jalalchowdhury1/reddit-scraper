@@ -440,7 +440,7 @@ python3 core/scrape_reddit_browser.py --only LifeProTips --visible   # needs Pla
     deadline and block messages once), the stuck-profile fallback, the
     `METHOD CHECK` line, and GitHub's side (stalest first, own stamps, the RSS check line, only
     a real top list saved, and that `python core/scrape_top.py` really runs `main()`).
-- **`python3 tests/e2e_site.py [base_url]`** — 85 real-browser checks (~110 s; the last 7 = quiet subs): every tab shows
+- **`python3 tests/e2e_site.py [base_url]`** — 89 real-browser checks (~120 s; the last 11 = quiet subs + Skip): every tab shows
   all the API's posts with the right label, the GitHub tab (API's top 10 in GitHub's order,
   "top 10 of N", GitHub's star counts, read + Undo, keys 5/6, its 24 h stale notice), real upvotes on cards, opening ≠ reading, the
   "Done with X?" prompt, undo, keys, stale notices (News 36 h, Reddit 48 h), footer stamps,
@@ -636,9 +636,12 @@ python3 core/scrape_reddit_browser.py --only LifeProTips --visible   # needs Pla
   has loaded (or sync failed), so read posts never flash up as unread. **Quiet subs** (9 Oct 2026,
   the owner's ask: "slow down the subs I let linger"). `dr_qlog` (per device) logs every
   Monthly/Yearly post the page SHOWS: sub + first-shown day (`e` = day opened or favorited). 3 days
-  later (`QUIET_MATURE`) a post counts as *engaged* (opened, favorited, or ticked read one by one
-  in those 3 days; read state is the synced `readAt`) or *lingered* (still unread, read later, or
-  cleared by a sweep = 4+ ticks in the same second, i.e. Mark all read). Once a day (Eastern, when
+  later (`QUIET_MATURE`) a post counts as *engaged* (opened or favorited in those 3 days),
+  *lingered* (**Skipped**, still unread, or cleared by a sweep = 4+ ticks in the same second,
+  i.e. Mark all read), or *neutral* = left out (ticked read in those 3 days, never opened: the
+  owner ticks mostly to get rid of posts, 9 Oct 2026). **Skip** = the thumbs-down on Reddit
+  cards (key `x`): marks read like the tick, but the Firestore read doc gets `skip: true`
+  (`cloudSkip`), so it syncs and counts against the sub on every device. Once a day (Eastern, when
   the read list is in: `scoreQuiet`, so the list never reshuffles mid-read) each sub with 8+
   matured posts in the last 30 days gets a level: **2** if it lingers ≥95%, or ≥80% and 15+ pts
   over the all-subs rate; **1** if ≥85%, or ≥60% and 10+ pts over; a quieted sub stays at 1 until

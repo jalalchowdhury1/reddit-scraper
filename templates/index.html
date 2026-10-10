@@ -257,7 +257,7 @@
     <footer id="footer">
         <span>Sync key <strong id="sync-key"></strong><span id="sync-state"></span> · <button id="btn-link">Link another device</button></span>
         <span id="updated"></span>
-        <span class="hide-mobile">Keys: <kbd>j</kbd> <kbd>k</kbd> move, <kbd>o</kbd> open, <kbd>r</kbd> read, <kbd>f</kbd> favorite, <kbd>u</kbd> undo</span>
+        <span class="hide-mobile">Keys: <kbd>j</kbd> <kbd>k</kbd> move, <kbd>o</kbd> open, <kbd>r</kbd> read, <kbd>x</kbd> skip, <kbd>f</kbd> favorite, <kbd>u</kbd> undo</span>
     </footer>
 </div>
 <nav class="tabbar" id="tabbar" aria-label="Sections"></nav>
@@ -291,6 +291,7 @@ const store = {
 let cloudFavorites = [];
 let cloudReadPosts = new Set();
 let cloudReadAt = {};   // id -> ISO time it was marked read
+let cloudSkip = new Set();   // ids marked read with Skip ("didn't read, get rid of it")
 let syncKey = store.raw('dailyReaderSyncKey');
 
 const col = (name) => db.collection('sync_groups').doc(syncKey).collection(name);
@@ -312,7 +313,8 @@ function initSync() {
         col('read_posts').onSnapshot((snap) => {
             cloudReadPosts = new Set();
             cloudReadAt = {};
-            snap.forEach((d) => { cloudReadPosts.add(d.id); cloudReadAt[d.id] = (d.data() || {}).readAt || ''; });
+            cloudSkip = new Set();
+            snap.forEach((d) => { const v = d.data() || {}; cloudReadPosts.add(d.id); cloudReadAt[d.id] = v.readAt || ''; if (v.skip) cloudSkip.add(d.id); });
             countReadDays();
             readLoaded = true;
             syncOk();
@@ -351,13 +353,17 @@ function getSafeId(item) { return (item.url || item.title).replace(/[^a-zA-Z0-9]
 const isRead = (item) => cloudReadPosts.has(String(item.id));
 const isFav = (item) => { const s = getSafeId(item); return cloudFavorites.some((f) => getSafeId(f) === s); };
 
-function setRead(ids, value) {
+function setRead(ids, value, skip = false) {
     const b = db.batch();
     ids.forEach((id) => {
         const ref = col('read_posts').doc(String(id));
         const at = new Date().toISOString();
-        if (value) { cloudReadPosts.add(String(id)); cloudReadAt[String(id)] = at; b.set(ref, { readAt: at }); }
-        else { cloudReadPosts.delete(String(id)); delete cloudReadAt[String(id)]; b.delete(ref); }
+        if (value) {
+            cloudReadPosts.add(String(id)); cloudReadAt[String(id)] = at;
+            if (skip) cloudSkip.add(String(id)); else cloudSkip.delete(String(id));
+            b.set(ref, skip ? { readAt: at, skip: true } : { readAt: at });
+        }
+        else { cloudReadPosts.delete(String(id)); cloudSkip.delete(String(id)); delete cloudReadAt[String(id)]; b.delete(ref); }
     });
     countReadDays();   // the "cleared today" line updates now, not when the cloud echoes back
     b.commit().catch(syncFailed);
@@ -534,9 +540,13 @@ function streakHTML() {
 // ============================================================================
 // Every Reddit post this device SHOWS is logged (dr_qlog: id -> sub + the day it
 // was first shown). QUIET_MATURE days later it counts as:
-//   engaged  = opened, favorited, or ticked read one at a time within those days
-//   lingered = still unread, read later, or cleared in a bulk "Mark all read"
-//              (4+ ticks in the same second = a sweep, not reading)
+//   engaged  = opened or favorited within those days
+//   lingered = Skipped (the thumbs-down: "didn't read, get rid of it"), still
+//              unread, or cleared in a bulk "Mark all read" (4+ ticks in the
+//              same second = a sweep)
+//   neutral  = ticked read within those days, never opened. He ticks mostly to
+//              get rid of a post (his words, 9 Oct), so a tick says nothing
+//              either way and the post is left out of the count.
 // A sub that lingers a lot more than the others gets "quieted" (once a day, so the
 // list never reshuffles mid-read): its posts must reach the sub's median upvotes
 // of its posts in this feed (level 1, top half), or their 75th percentile
@@ -645,10 +655,12 @@ function scoreQuiet(force = false) {
         const limit = addDays(e.d, QUIET_MATURE);
         const t = cloudReadAt[id], rd = etDayOf(t);
         const sweep = t && perSec[t.slice(0, 19)] >= 4;
-        const engaged = (e.e && e.e <= limit) || (rd && rd <= limit && !sweep);
-        const s = stats[e.s] || (stats[e.s] = { n: 0, l: 0 });
+        const skipped = cloudSkip.has(id), opened = e.e && e.e <= limit;
+        if (!skipped && !opened && rd && rd <= limit && !sweep) continue;   // a plain tick: neutral
+        const s = stats[e.s] || (stats[e.s] = { n: 0, l: 0, k: 0 });
         s.n++; N++;
-        if (!engaged) { s.l++; L++; }
+        if (skipped || !opened) { s.l++; L++; }
+        if (skipped) s.k = (s.k || 0) + 1;
     }
     const base = N ? L / N : 0, levels = {};
     for (const sub in stats) {
@@ -688,7 +700,7 @@ function quietWhyHTML(tab) {
         const lv = quietLevel(sub), bar = quietBar(tab, sub, lv), st = quiet.stats[sub] || { n: 0, l: 0 };
         const need = (bar != null ? `needs ${esc(fmtUp(bar))}+ upvotes` : `rank #${(quietBars[tab][sub] || { rank: [] }).rank[lv]} or better`)
                    + ` (the top ${lv >= 2 ? 'quarter' : 'half'} of what it would show)`;
-        return `<li><strong>${esc(subName(sub))}</strong>: ${need}. ${st.l} of your last ${st.n} sat unread 3+ days.
+        return `<li><strong>${esc(subName(sub))}</strong>: ${need}. ${st.k ? `You skipped ${st.k} and left ${st.l - st.k} unread 3+ days, of your last ${st.n}.` : `${st.l} of your last ${st.n} sat unread 3+ days.`}
                 <button class="text-btn" data-act="unquiet" data-sub="${esc(sub)}">Stop for ${QUIET_OFF_DAYS} days</button></li>`;
     }).join('') + `</ul></div>`;
 }
@@ -876,6 +888,7 @@ function cardHTML(item) {
             </div>
             <div class="actions">
                 <button class="icon-btn ${fav ? 'fav-on' : ''}" data-act="fav" aria-label="${fav ? 'Remove favorite' : 'Favorite'}" title="Favorite (f)"><i class="${fav ? 'ph-fill' : 'ph'} ph-star"></i></button>
+                ${!read && String(item.source || '').startsWith('r/') ? `<button class="icon-btn" data-act="skip" aria-label="Skip: didn't read, get rid of it" title="Skip: didn't read, get rid of it (x). Teaches the page to show less from this sub."><i class="ph ph-thumbs-down"></i></button>` : ''}
                 <button class="icon-btn ${read ? 'read-on' : ''}" data-act="read" aria-label="${read ? 'Mark unread' : 'Mark read'}" title="${read ? 'Mark unread' : 'Mark read'} (r)"><i class="ph ${read ? 'ph-arrow-counter-clockwise' : 'ph-check'}"></i></button>
             </div>
         </div>
@@ -1166,6 +1179,14 @@ function toggleRead(item) {
     toast(now ? 'Marked read' : 'Marked unread', () => setRead([item.id], !now));
 }
 
+// Skip = "didn't read it, get rid of it": gone like a tick, but the quiet-subs
+// learner counts it against the sub (a plain tick counts for nothing).
+function skipItem(item) {
+    setRead([item.id], true, true);
+    buzz();
+    toast('Skipped · fewer like this', () => setRead([item.id], false));
+}
+
 function favItem(item) {
     const added = toggleFav(item);
     if (added) noteEngaged(item);
@@ -1244,6 +1265,7 @@ document.getElementById('feed').addEventListener('click', (e) => {
         if (!item) return;
         if (a === 'fav') favItem(item);
         if (a === 'read') toggleRead(item);
+        if (a === 'skip') skipItem(item);
         return;
     }
     const card = e.target.closest('.item');
@@ -1472,6 +1494,7 @@ document.addEventListener('keydown', (e) => {
     else if ((e.key === 'o' || e.key === 'Enter') && cur) { noteOpened(cur); window.open(safeUrl(cur.url), '_blank', 'noopener'); }
     else if (e.key === 'u' || e.key === 'z') undoLast();
     else if ((e.key === 'r' || e.key === 'e') && cur) toggleRead(cur);
+    else if (e.key === 'x' && cur && !isRead(cur) && String(cur.source || '').startsWith('r/')) skipItem(cur);
     else if ((e.key === 'f' || e.key === 's') && cur) favItem(cur);
     else if (e.key === '/') { e.preventDefault(); openSearch(); }
     else if (e.key === 'Escape' && viewCleared) closeCleared();

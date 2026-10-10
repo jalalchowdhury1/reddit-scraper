@@ -469,6 +469,27 @@ async def main():
         check("Quiet: Stop brings the sub back, no kept leftovers",
               await pg.locator(".quiet-label").count() == 0 and "kept" not in await pg.inner_text("#progress-label"),
               await pg.inner_text("#progress-label"))
+        # Ticks are neutral, Skips count (9 Oct 2026: he ticks to get rid of posts).
+        sub_ids = [i for i, e in qlog.items() if e["s"] == big[2:]]
+        lv = lambda js: pg.evaluate(f"""(() => {{ const ids = {json.dumps(sub_ids)}; {js};
+                                     scoreQuiet(true); return quiet.levels[{json.dumps(big[2:])}] || 0; }})()""")
+        ticked = await lv(f"cloudSkip = new Set(); ids.forEach((id, n) => cloudReadAt[id] = '{d6}T15:' + String(n).padStart(2, '0') + ':00.000Z')")
+        check("Quiet: a plain tick counts for nothing", ticked == 0, f"level {ticked}")
+        skipped = await lv("ids.forEach((id) => cloudSkip.add(id))")
+        check("Quiet: Skip counts against the sub", skipped == 2, f"level {skipped}")
+        await lv("ids.forEach((id) => { delete cloudReadAt[id]; cloudSkip.delete(id); })")
+        # The Skip button: hides the card, and the skip is saved in the cloud.
+        first_id = await pg.get_attribute("#feed > .item:has([data-act=skip])", "data-id")
+        await pg.click(f"#feed > .item[data-id='{first_id}'] [data-act=skip]")
+        await pg.wait_for_timeout(400)
+        check("Skip: card leaves the list, toast says so",
+              await pg.locator(f"#feed > .item[data-id='{first_id}']").count() == 0 and "Skipped" in await pg.inner_text("#toast-msg"))
+        await pg.wait_for_timeout(2500)
+        await pg.reload()
+        await pg.wait_for_function(f"readLoaded && cloudSkip.has({json.dumps(first_id)})", timeout=20000)
+        check("Skip: saved to the cloud (survives a reload)", True)
+        await pg.evaluate(f"setRead([{json.dumps(first_id)}], false)")
+        await pg.wait_for_timeout(1500)
         check("No JS errors (quiet)", not errs4, "; ".join(errs4)[:200])
         await ctx.close()
         await b.close()
