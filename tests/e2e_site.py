@@ -492,6 +492,91 @@ async def main():
         await pg.wait_for_timeout(1500)
         check("No JS errors (quiet)", not errs4, "; ".join(errs4)[:200])
         await ctx.close()
+
+        # ---------- Top comments, Later (snooze), Podcast this (10 Oct 2026) ----------
+        # A fresh browser = a fresh random sync key, so the cloud writes below land in
+        # a throwaway sync group, never the owner's.
+        ctx = await b.new_context(viewport={"width": 390, "height": 844}, service_workers="block")
+        pg = await ctx.new_page()
+        errs5 = []
+        pg.on("pageerror", lambda e: errs5.append(str(e)))
+        await pg.goto(BASE)
+        await pg.wait_for_function("allData && readLoaded", timeout=20000)
+        withc = [(k, i) for k in ("monthly", "yearly") for i in api[k] if i.get("top_comment")]
+        check("Top comment: the API carries some", bool(withc), f"{len(withc)} cards")
+        if withc:
+            tab, it = withc[0]
+            await pg.click(f'[data-tab="{tab}"]:visible'); await pg.wait_for_timeout(400)
+            tc = pg.locator(f"#feed > .item[data-id='{it['id']}'] .top-comment")
+            got = await tc.inner_text() if await tc.count() else ""
+            check("Top comment: shown on its card", it["top_comment"][:30] in got, got[:60])
+            await tc.click(); await pg.wait_for_timeout(200)
+            check("Top comment: tap opens all of it", "open" in (await tc.get_attribute("class") or ""))
+        # Later: snooze the first card of the Monthly tab.
+        await pg.click('[data-tab="monthly"]:visible'); await pg.wait_for_timeout(400)
+        sid = await pg.get_attribute("#feed > .item:has([data-act=later])", "data-id")
+        before = await pg.locator("#feed > .item").count()
+        await pg.click(f"#feed > .item[data-id='{sid}'] [data-act=later]")
+        opts = await pg.locator(f"#feed > .item[data-id='{sid}'] .snooze-menu [data-act=snoozeat]").all_inner_texts()
+        check("Later: menu offers times", "Tomorrow 7 AM" in opts and any("Saturday" in o for o in opts), ", ".join(opts))
+        await pg.click(f"#feed > .item[data-id='{sid}'] [data-act=snoozeat] >> nth=0")
+        await pg.wait_for_timeout(400)
+        check("Later: card leaves the list, toast says when",
+              await pg.locator(f"#feed > .item[data-id='{sid}']").count() == 0 and "Snoozed till" in await pg.inner_text("#toast-msg"),
+              await pg.inner_text("#toast-msg"))
+        check("Later: 'Snoozed · 1' at the bottom", "Snoozed · 1" in await pg.inner_text(".snoozed-label"))
+        await pg.wait_for_timeout(2500)
+        await pg.reload()
+        await pg.wait_for_function(f"allData && readLoaded && snoozed[{json.dumps(sid)}]", timeout=20000)
+        await pg.wait_for_timeout(500)
+        check("Later: saved to the cloud (still snoozed after a reload)",
+              await pg.locator(f"#feed > .item[data-id='{sid}']").count() == 0 and await pg.locator(".snoozed-label").count() == 1)
+        await pg.click("[data-act=snoozeshow]"); await pg.wait_for_timeout(300)
+        check("Later: Show lists it with Wake now", await pg.locator(f"#feed > .item[data-id='{sid}'] [data-act=wake]").count() == 1)
+        # Due now (as if its time came): back at the top, under "Back from snooze".
+        await pg.evaluate(f"col('snoozed').doc({json.dumps(sid)}).update({{ until: new Date(Date.now() - 1000).toISOString() }})")
+        await pg.wait_for_selector(".woke-label", timeout=10000)
+        first = await pg.get_attribute("#feed > .item", "data-id")
+        check("Later: comes back first, under 'Back from snooze'", first == sid and await pg.locator(".snoozed-label").count() == 0, first)
+        await pg.click(f"#feed > .item[data-id='{sid}'] [data-act=read]"); await pg.wait_for_timeout(400)
+        check("Later: reading it clears the section", await pg.locator(".woke-label").count() == 0)
+        await pg.evaluate(f"setRead([{json.dumps(sid)}], false); col('snoozed').doc({json.dumps(sid)}).delete()")
+        # Red-team regressions (10 Oct): the Later menu never follows you to Favorites
+        # (a snooze saved there could never wake), and kept/quieted/older lists respect snoozes.
+        await pg.click(f"#feed > .item[data-id='{await pg.get_attribute('#feed > .item:has([data-act=later])', 'data-id')}'] [data-act=later]")
+        await pg.click('[data-tab="favorites"]:visible'); await pg.wait_for_timeout(300)
+        check("Later: menu closes on a tab switch, never offered on Favorites",
+              await pg.evaluate("snoozeOpen === null && originTab({ id: 'x' }) === null"))
+        await pg.click('[data-tab="monthly"]:visible'); await pg.wait_for_timeout(300)
+        leak = await pg.evaluate("""(() => {
+            const it = allData.monthly[0], id = String(it.id);
+            snoozed['kfake'] = { until: new Date(Date.now() + 864e5).toISOString(), tab: 'monthly', item: { ...it, id: 'kfake' } };
+            kept.monthly['kfake'] = { item: { ...it, id: 'kfake' }, gone: etDate() };
+            const n = carried('monthly').filter((i) => i.id === 'kfake').length;
+            delete snoozed['kfake']; delete kept.monthly['kfake']; render();
+            return n; })()""")
+        check("Later: a snoozed kept post isn't in 'Still unread' (or its Mark these read)", leak == 0, f"{leak}")
+        # Podcast this: on AM Reads cards only (yesterday's list when today's isn't out).
+        await pg.click('[data-tab="ritholtz"]:visible'); await pg.wait_for_timeout(400)
+        if not await pg.locator("#feed .item [data-act=podcast]").count():
+            await pg.evaluate("amShowOlder = true; render()")
+        pid = await pg.get_attribute("#feed .item:has([data-act=podcast])", "data-id")
+        check("Podcast: button on AM Reads cards", bool(pid))
+        check("Podcast: not on Reddit cards", await pg.evaluate(
+            "(() => { const i = allData.monthly[0]; return !extrasHTML(i).includes('podcast'); })()"))
+        if pid:
+            btn = f"#feed .item[data-id='{pid}'] [data-act=podcast]"
+            await pg.click(btn); await pg.wait_for_timeout(300)
+            check("Podcast: tap = requested", "Podcast requested" in await pg.inner_text(btn), await pg.inner_text(btn))
+            await pg.wait_for_timeout(2500)
+            await pg.reload()
+            await pg.wait_for_function("allData && Object.keys(podcastReq).length", timeout=20000)
+            await pg.evaluate("amShowOlder = true; render()")
+            check("Podcast: saved to the cloud (after a reload)", "Podcast requested" in await pg.inner_text(btn))
+            await pg.click(btn); await pg.wait_for_timeout(300)
+            check("Podcast: tap again takes it back", "Podcast this" in await pg.inner_text(btn))
+        check("No JS errors (later/podcast)", not errs5, "; ".join(errs5)[:200])
+        await ctx.close()
         await b.close()
     print(f"\n{sum(results)}/{len(results)} passed")
     sys.exit(0 if all(results) else 1)

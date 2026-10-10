@@ -77,6 +77,7 @@ main() {
 
   git add -f data/r_*/posts.csv 2>/dev/null
   [ -f data/reddit_browser.json ] && git add -f data/reddit_browser.json
+  [ -f data/reddit_comments.json ] && git add -f data/reddit_comments.json
   if git diff --cached --quiet; then
     echo "NO REDDIT CHANGES (scraper exit $rc)"
     return "$rc"

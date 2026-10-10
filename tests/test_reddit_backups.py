@@ -287,6 +287,9 @@ class FakePlaywright:
         return False
 
 
+COMMENT_RUNS = []   # budgets fake_run's comment step was called with
+
+
 def fake_run(monkeypatch, result, subs):
     """rb.run() with no browser: result(sub, t, session_no) gives read_one's answer."""
     mod = type(sys)("playwright.async_api")
@@ -308,9 +311,13 @@ def fake_run(monkeypatch, result, subs):
 
     async def try_method(page, m, sub, t, complete_ok=True):
         return None, ""
+
+    async def comments_step(page, subs, budget_s, max_posts=0):   # never the real one: it writes data/
+        COMMENT_RUNS.append(budget_s)
+    COMMENT_RUNS.clear()
     for name, fn in [("new_session", new_session), ("close_session", close_session), ("read_one", read_one),
                      ("try_method", try_method), ("write_list", lambda rows, key: None),
-                     ("update_meta", lambda *a, **k: None)]:
+                     ("update_meta", lambda *a, **k: None), ("comments_step", comments_step)]:
         monkeypatch.setattr(rb, name, fn)
     return asyncio.run(rb.run(Path("profile"), subs, False)), calls, sessions
 
@@ -445,3 +452,11 @@ def test_github_backup_script_actually_runs_main():
     out = subprocess.run([sys.executable, str(ROOT / "core" / "scrape_top.py"), "--help"],
                          capture_output=True, text=True, timeout=60)
     assert out.returncode == 0 and "--max-lists" in out.stdout
+
+
+def test_top_comments_run_after_the_lists_and_never_when_blocked(monkeypatch, capsys):
+    out, calls, _ = fake_run(monkeypatch, lambda sub, t, n: outcome("page", False), ["a"])
+    assert len(COMMENT_RUNS) == 1 and 30 <= COMMENT_RUNS[0] <= rb.top_comments.BUDGET_S
+    assert capsys.readouterr().out.index("METHOD CHECK") >= 0
+    fake_run(monkeypatch, lambda sub, t, n: outcome(None, True), list("abcdefgh"))
+    assert COMMENT_RUNS == [] and "TOP COMMENTS: skipped (Reddit blocked this run)" in capsys.readouterr().out

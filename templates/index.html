@@ -148,6 +148,18 @@
         .desc { margin: 6px 0 0; font-size: var(--desc); color: var(--muted); line-height: 1.5; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; cursor: pointer; }
         .desc.open { display: block; -webkit-line-clamp: unset; overflow: visible; }
         .meta { margin-top: 7px; font-size: .74rem; color: var(--faint); font-variant-numeric: tabular-nums; }
+        /* Top comment (10 Oct 2026): 2 lines, tap for all of it, like the blurb. */
+        .top-comment { margin: 7px 0 0; padding: 1px 0 1px 10px; border-left: 2px solid var(--line); font-size: var(--desc); color: var(--muted); line-height: 1.5;
+                       display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; cursor: pointer; }
+        .top-comment.open { display: block; -webkit-line-clamp: unset; overflow: visible; }
+        /* Later (snooze) + Podcast: small, rare actions under the meta line. */
+        .extras { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 7px; }
+        .mini-btn { min-height: 30px; padding: 0 10px; border-radius: 999px; border: 1px solid var(--line); font-size: .74rem; color: var(--muted);
+                    display: inline-flex; align-items: center; gap: 5px; }
+        .mini-btn:hover { color: var(--text); background: var(--surface-2); }
+        .mini-btn.on { color: var(--accent); border-color: var(--accent); background: var(--accent-soft); }
+        .mini-btn:disabled { opacity: .8; cursor: default; }
+        .snooze-menu .mini-btn { color: var(--text); }
         .actions { display: flex; flex-direction: column; gap: 2px; flex-shrink: 0; }
         .actions .icon-btn { width: 38px; height: 38px; font-size: 1.15rem; color: var(--faint); }
         .actions .icon-btn.fav-on { color: var(--accent); }
@@ -257,7 +269,7 @@
     <footer id="footer">
         <span>Sync key <strong id="sync-key"></strong><span id="sync-state"></span> · <button id="btn-link">Link another device</button></span>
         <span id="updated"></span>
-        <span class="hide-mobile">Keys: <kbd>j</kbd> <kbd>k</kbd> move, <kbd>o</kbd> open, <kbd>r</kbd> read, <kbd>x</kbd> skip, <kbd>f</kbd> favorite, <kbd>u</kbd> undo</span>
+        <span class="hide-mobile">Keys: <kbd>j</kbd> <kbd>k</kbd> move, <kbd>o</kbd> open, <kbd>r</kbd> read, <kbd>x</kbd> skip, <kbd>f</kbd> favorite, <kbd>l</kbd> later, <kbd>u</kbd> undo</span>
     </footer>
 </div>
 <nav class="tabbar" id="tabbar" aria-label="Sections"></nav>
@@ -292,6 +304,14 @@ let cloudFavorites = [];
 let cloudReadPosts = new Set();
 let cloudReadAt = {};   // id -> ISO time it was marked read
 let cloudSkip = new Set();   // ids marked read with Skip ("didn't read, get rid of it")
+// Snooze (10 Oct 2026): sync_groups/{key}/snoozed/{item id} = { until, tab, item, at }.
+// The item's own copy is stored, so an AM Read snoozed till tomorrow comes back
+// even though tomorrow's AM Reads tab no longer lists it.
+let snoozed = {};
+// "Podcast this" (10 Oct 2026): sync_groups/{key}/podcast_requests/{safe id}. The Mac
+// mini pulls them into podcast-factory's queue (favorites-queue/pull_requests.py)
+// and stamps `pulled`, so the button can say "In the queue".
+let podcastReq = {};
 let syncKey = store.raw('dailyReaderSyncKey');
 
 const col = (name) => db.collection('sync_groups').doc(syncKey).collection(name);
@@ -310,6 +330,20 @@ function initSync() {
             syncOk();
             render();
         }, syncFailed);
+        col('snoozed').onSnapshot((snap) => {
+            snoozed = {};
+            snap.forEach((d) => { const v = d.data() || {}; if (v.until && v.item) snoozed[d.id] = v; });
+            syncOk();
+            render();
+            pruneSnoozed();
+            scheduleWake();
+        }, syncFailed);
+        col('podcast_requests').onSnapshot((snap) => {
+            podcastReq = {};
+            snap.forEach((d) => { podcastReq[d.id] = d.data() || {}; });
+            syncOk();
+            render();
+        }, syncFailed);
         col('read_posts').onSnapshot((snap) => {
             cloudReadPosts = new Set();
             cloudReadAt = {};
@@ -320,6 +354,7 @@ function initSync() {
             syncOk();
             render();
             refreshQuiet();   // once a day: needs the read list
+            pruneSnoozed();
         }, syncFailed);
     }).catch(syncFailed);
 }
@@ -376,6 +411,130 @@ function toggleFav(item) {
                     source: item.source || '', domain: item.domain || '', date: item.date || '' };
     if (isFav(item)) { ref.delete().catch(syncFailed); return false; }
     ref.set(clean).catch(syncFailed); return true;
+}
+
+// ---------- Snooze: "not now, show me later" ----------
+// A snoozed item leaves every tab (and the counts) until its time, then comes back
+// at the top of the tab it came from under "Back from snooze", unread, on every
+// device. Nothing is hidden silently: each tab lists its snoozed items at the
+// bottom ("Snoozed · 2", Show), with when they return and a Wake now button.
+const SNOOZE_GRACE_DAYS = 2;   // a woken item that was read is forgotten 2 days later
+const SNOOZE_KEEP_DAYS = 30;   // one woken 30 days ago and still unread goes too (like kept posts)
+const snoozeDue = (s) => Date.parse(s.until) <= Date.now();
+const isSnoozedNow = (item) => { const s = snoozed[String(item.id)]; return !!(s && !snoozeDue(s)); };
+function liveCopy(tab, id) {
+    return ((allData && allData[tab]) || []).find((i) => String(i.id) === id) || null;
+}
+// Woken items for a tab, the live card when it still exists (fresher numbers).
+function wokeFor(tab) {
+    return Object.entries(snoozed).filter(([, s]) => s.tab === tab && snoozeDue(s))
+        .sort((a, b) => Date.parse(a[1].until) - Date.parse(b[1].until))
+        .map(([id, s]) => ({ ...(liveCopy(tab, id) || s.item), _woke: true }));
+}
+function snoozedFor(tab) {
+    return Object.entries(snoozed).filter(([, s]) => s.tab === tab && !snoozeDue(s))
+        .sort((a, b) => Date.parse(a[1].until) - Date.parse(b[1].until))
+        .map(([, s]) => ({ ...s.item, _snoozed: s.until }));
+}
+const snoozeWhen = (iso) => { const d = new Date(iso), today = new Date();
+    const t = d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }).replace(':00', '');
+    if (d.toDateString() === today.toDateString()) return 'today ' + t;
+    const tm = new Date(today); tm.setDate(tm.getDate() + 1);
+    if (d.toDateString() === tm.toDateString()) return 'tomorrow ' + t;
+    return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }) + ' ' + t; };
+function snoozeOptions(now = new Date()) {
+    const at = (base, days, h) => { const d = new Date(base); d.setDate(d.getDate() + days); d.setHours(h, 0, 0, 0); return d; };
+    const out = [['In 3 hours', new Date(now.getTime() + 3 * 3600e3)]];
+    if (now.getHours() < 15) out.push(['Tonight 7 PM', at(now, 0, 19)]);   // later than that, 'In 3 hours' is about the same
+    out.push(['Tomorrow 7 AM', at(now, 1, 7)]);
+    const toSat = (6 - now.getDay() + 7) % 7 || 7;   // on a Saturday = next Saturday ("9 AM today" is sooner than "In 3 hours")
+    out.push([toSat === 7 ? 'Next Saturday 9 AM' : 'Saturday 9 AM', at(now, toSat, 9)]);
+    return out;
+}
+// The tab a card belongs to (snooze needs it to know where to bring it back).
+function originTab(item) {
+    if (item._snoozed || item._woke) { const s = snoozed[String(item.id)]; if (s) return s.tab; }
+    if (item._tab) { const t = TABS.find((x) => x.label === item._tab); return t ? t.key : null; }
+    return currentTab === 'favorites' ? null : currentTab;
+}
+const canSnooze = (item) => { const t = originTab(item); return !!t && t !== 'favorites' && (!isRead(item) || item._snoozed); };
+function plainCopy(item) {   // what Firestore stores: the card's own fields, no page flags, no undefined
+    const c = JSON.parse(JSON.stringify(item));
+    for (const k of Object.keys(c)) if (k.startsWith('_')) delete c[k];
+    return c;
+}
+function snoozeItem(item, until) {
+    const id = String(item.id), tab = originTab(item), prev = snoozed[id];
+    snoozeOpen = null;
+    if (!tab || !canSnooze(item)) { render(); return; }
+    const doc = { until: until.toISOString(), tab, item: plainCopy(item), at: new Date().toISOString() };
+    snoozed[id] = doc;
+    col('snoozed').doc(id).set(doc).catch(syncFailed);
+    snoozeOpen = null;
+    buzz();
+    render();
+    scheduleWake();
+    toast('Snoozed till ' + snoozeWhen(doc.until), () => {
+        if (prev) { snoozed[id] = prev; col('snoozed').doc(id).set(prev).catch(syncFailed); }
+        else { delete snoozed[id]; col('snoozed').doc(id).delete().catch(syncFailed); }
+        render();
+    });
+}
+function wakeItem(item) {
+    const id = String(item.id), prev = snoozed[id];
+    if (!prev) return;
+    delete snoozed[id];
+    col('snoozed').doc(id).delete().catch(syncFailed);
+    render();
+    toast('Back in the list', () => { snoozed[id] = prev; col('snoozed').doc(id).set(prev).catch(syncFailed); render(); });
+}
+// Woken + read for SNOOZE_GRACE_DAYS (Undo and the eye button still work before that): forget it.
+function pruneSnoozed() {
+    if (!readLoaded) return;
+    for (const [id, s] of Object.entries(snoozed)) {
+        const readAt = Date.parse(cloudReadAt[id] || '');
+        const stale = snoozeDue(s) && Date.parse(s.until) < Date.now() - SNOOZE_KEEP_DAYS * 864e5;   // woken, never read
+        if (stale || (snoozeDue(s) && cloudReadPosts.has(id) && readAt < Date.now() - SNOOZE_GRACE_DAYS * 864e5)) {
+            delete snoozed[id];
+            col('snoozed').doc(id).delete().catch(() => {});
+        }
+    }
+}
+// Re-render when the next snooze is due, if the page is open then.
+let wakeTimer = null;
+function scheduleWake() {
+    clearTimeout(wakeTimer);
+    const next = Math.min(...Object.values(snoozed).map((s) => Date.parse(s.until)).filter((t) => t > Date.now()));
+    if (isFinite(next)) wakeTimer = setTimeout(() => { render(); scheduleWake(); }, Math.min(next - Date.now() + 500, 2 ** 31 - 1));
+}
+let snoozeOpen = null;   // id of the card whose "Later" menu is open
+let showSnoozed = false;
+
+// ---------- Podcast this (AM Reads) ----------
+const isAmRead = (item) => /^(rth|trg)_/.test(String(item.id));
+const podcastDoc = (item) => podcastReq[getSafeId(item)];
+function podcastItem(item) {
+    const ref = col('podcast_requests').doc(getSafeId(item));
+    const cur = podcastDoc(item);
+    if (cur && cur.pulled) { toast('Already in the podcast queue'); return; }
+    if (cur) {
+        delete podcastReq[getSafeId(item)];
+        ref.delete().catch(syncFailed);
+        render();
+        toast('Removed from the podcast queue', () => podcastItem(item));
+        return;
+    }
+    const doc = { id: String(item.id), title: item.title || '', url: item.url || '', source: item.source || '',
+                  domain: item.domain || domainOf(item.url), date: item.date || '', requestedAt: new Date().toISOString() };
+    podcastReq[getSafeId(item)] = doc;
+    ref.set(doc).catch(syncFailed);
+    noteEngaged(item);
+    buzz();
+    render();
+    toast('Added to the podcast queue', () => {
+        if ((podcastReq[getSafeId(item)] || {}).pulled) { toast('The Mac mini already queued it'); return; }
+        delete podcastReq[getSafeId(item)]; ref.delete().catch(syncFailed); render();
+    });
 }
 
 // ============================================================================
@@ -497,7 +656,7 @@ function carried(tab, withRead = showRead) {
     if ((tab !== 'monthly' && tab !== 'yearly') || !allData || !(readLoaded || syncBroken)) return [];
     const live = liveIds();
     return Object.entries(kept[tab] || {})
-        .filter(([id, e]) => e && e.item && !live.has(id) && subOk(e.item) && (withRead || !cloudReadPosts.has(id)) && !quietHides(e.item, tab))
+        .filter(([id, e]) => e && e.item && !live.has(id) && !snoozed[id] && subOk(e.item) && (withRead || !cloudReadPosts.has(id)) && !quietHides(e.item, tab))
         .map(([, e]) => ({ ...e.item, _kept: true }));
 }
 
@@ -693,7 +852,7 @@ function stopQuiet(sub) {
         delete quiet.off[sub]; store.set('dr_quiet', quiet); applyQuiet(); trackKept(); render();
     });
 }
-const quietedFor = (tab) => (quietedOut[tab] || []).filter((i) => !activeSub(tab) || subKey(i) === activeSub(tab));
+const quietedFor = (tab) => (quietedOut[tab] || []).filter((i) => !snoozed[String(i.id)] && (!activeSub(tab) || subKey(i) === activeSub(tab)));
 function quietWhyHTML(tab) {
     const subs = [...new Set(quietedFor(tab).map(subKey))];
     return `<div class="quiet-why">These subs sit unread more than the rest, so only their bigger posts make your list:<ul>` + subs.map((sub) => {
@@ -817,6 +976,8 @@ function itemsFor(tab) {
     if (tab === 'monthly') items = items.filter((i) => !(i.meta || '').toLowerCase().includes('r/askhistorians'));
     if (tab === 'ritholtz') items = items.filter(amIsCurrent);
     if (tab === 'monthly' || tab === 'yearly') items = [...items, ...carried(tab)];
+    // Snoozed items leave the tab; due ones come back first (render() labels them).
+    if (Object.keys(snoozed).length) items = [...wokeFor(tab), ...items.filter((i) => !snoozed[String(i.id)])];
     return items;
 }
 
@@ -827,7 +988,11 @@ function searchAll(q) {
                    [TABS.find((t) => t.key === 'favorites'), cloudFavorites]];
     pools.forEach(([t, list]) => list.forEach((i) => {
         const hay = `${i.title} ${i.desc} ${i.meta} ${i.source || ''} ${i.domain || ''}`.toLowerCase();
-        if (hay.includes(q) && !seen.has(String(i.id))) { seen.add(String(i.id)); out.push({ ...i, _tab: t.label }); }
+        if (hay.includes(q) && !seen.has(String(i.id))) {
+            seen.add(String(i.id));
+            const s = snoozed[String(i.id)];
+            out.push({ ...i, _tab: t.label, ...(s && !snoozeDue(s) ? { _snoozed: s.until } : {}) });
+        }
     }));
     return out;
 }
@@ -884,7 +1049,9 @@ function cardHTML(item) {
                 <div class="src">${icon}<span class="name">${esc(srcLine)}</span></div>
                 <a class="item-title" href="${esc(safeUrl(item.url))}" target="_blank" rel="noopener noreferrer">${esc(item.title)}</a>
                 ${item.desc ? `<p class="desc${expanded.has(String(item.id)) ? ' open' : ''}">${esc(item.desc)}</p>` : ''}
+                ${item.top_comment ? `<p class="top-comment${expanded.has('c:' + item.id) ? ' open' : ''}" title="Top comment"><i class="ph ph-chat-circle-text" aria-label="Top comment"></i> ${esc(item.top_comment)}</p>` : ''}
                 ${meta ? `<div class="meta">${meta}</div>` : ''}
+                ${extrasHTML(item)}
             </div>
             <div class="actions">
                 <button class="icon-btn ${fav ? 'fav-on' : ''}" data-act="fav" aria-label="${fav ? 'Remove favorite' : 'Favorite'}" title="Favorite (f)"><i class="${fav ? 'ph-fill' : 'ph'} ph-star"></i></button>
@@ -893,6 +1060,25 @@ function cardHTML(item) {
             </div>
         </div>
     </article>`;
+}
+
+// Small buttons under the meta line: Later (snooze) on every tab but Favorites,
+// Podcast on AM Reads. The Later menu opens in place (no popover to position).
+function extrasHTML(item) {
+    const id = String(item.id), out = [];
+    if (snoozeOpen === id && !item._snoozed && canSnooze(item)) {
+        return `<div class="extras snooze-menu" role="group" aria-label="Snooze until">${snoozeOptions().map(([label, d]) =>
+            `<button class="mini-btn" data-act="snoozeat" data-at="${d.toISOString()}">${esc(label)}</button>`).join('')}
+            <button class="mini-btn" data-act="snoozecancel" aria-label="Cancel"><i class="ph ph-x"></i></button></div>`;
+    }
+    if (item._snoozed) out.push(`<button class="mini-btn on" data-act="wake" title="Bring it back now"><i class="ph ph-alarm"></i>Back ${esc(snoozeWhen(item._snoozed))} · Wake now</button>`);
+    else if (canSnooze(item)) out.push(`<button class="mini-btn" data-act="later" aria-label="Snooze: show me later" title="Snooze: show me later (l)"><i class="ph ph-alarm"></i>Later</button>`);
+    if (isAmRead(item)) {
+        const d = podcastDoc(item);
+        out.push(d ? `<button class="mini-btn on" data-act="podcast" ${d.pulled ? 'disabled' : ''} title="${d.pulled ? 'The Mac mini has it in the podcast queue' : 'Requested; tap to take it back'}"><i class="ph-fill ph-headphones"></i>${d.pulled ? 'In the podcast queue' : 'Podcast requested'}</button>`
+                   : `<button class="mini-btn" data-act="podcast" title="Add this article to the podcast queue"><i class="ph ph-headphones"></i>Podcast this</button>`);
+    }
+    return out.length ? `<div class="extras">${out.join('')}</div>` : '';
 }
 
 let visibleItems = [];
@@ -924,7 +1110,7 @@ function render() {
         items = searchAll(query);
     } else {
         items = tabItems(currentTab);
-        if (currentTab === 'ritholtz' && amShowOlder) older = (allData.ritholtz || []).filter((i) => !amIsCurrent(i));
+        if (currentTab === 'ritholtz' && amShowOlder) older = (allData.ritholtz || []).filter((i) => !amIsCurrent(i) && !snoozed[String(i.id)]);
     }
     const total = items.length;
     const unread = items.filter((i) => !isRead(i));
@@ -938,15 +1124,19 @@ function render() {
     if (currentTab === 'ritholtz' && !query) shown = [...shown.filter((i) => !isSat(i)), ...shown.filter(isSat)];
     // Kept posts go last, under their own label (and last for j/k too).
     if (!query) shown = [...shown.filter((i) => !i._kept), ...shown.filter((i) => i._kept)];
+    // Back from snooze: pulled out here, painted first under their own label.
+    const woke = query ? [] : shown.filter((i) => i._woke);
+    if (woke.length) { shown = shown.filter((i) => !i._woke); items = items.filter((i) => !i._woke); }
+    const snoozeList = query || currentTab === 'favorites' ? [] : snoozedFor(currentTab).filter((i) => showRead || !isRead(i));
     const shownOlder = older.filter((i) => showRead || !isRead(i));
     const quietList = !query && isReddit(currentTab) ? quietedFor(currentTab).filter((i) => showRead || !isRead(i)) : [];
-    visibleItems = [...shown, ...(showQuieted ? quietList : []), ...shownOlder];
+    visibleItems = [...woke, ...shown, ...(showQuieted ? quietList : []), ...(showSnoozed ? snoozeList : []), ...shownOlder];
 
     let html = '';
     if (query) {
         html = shown.length ? `<div class="section-label">${shown.length} match${shown.length === 1 ? '' : 'es'} for "${esc(query)}"</div>` + shown.map(cardHTML).join('')
                             : `<div class="state"><i class="ph ph-magnifying-glass"></i><h2>No matches</h2><p>Nothing in any tab matches "${esc(query)}".</p></div>`;
-    } else if (currentTab === 'ritholtz' && !items.some((i) => i.kind !== 'SATPOST')) {
+    } else if (currentTab === 'ritholtz' && !(allData.ritholtz || []).some((i) => amIsCurrent(i) && i.kind !== 'SATPOST')) {
         const prev = (allData.ritholtz || []).filter((i) => !amIsCurrent(i) && i.kind !== 'SATPOST');
         const prevDay = prev[0] && prev[0].date ? etWeekday(prev[0].date) : 'the last';
         html = `<div class="state"><i class="ph ph-coffee"></i><h2>Today's AM Reads aren't out yet</h2>
@@ -954,12 +1144,16 @@ function render() {
                 ${prev.length && !amShowOlder ? `<button class="pill-btn" data-act="older"><i class="ph ph-clock-counter-clockwise"></i>Show ${esc(prevDay)}'s list</button>` : ''}</div>`;
         const sat = shown.filter((i) => i.kind === 'SATPOST');
         if (sat.length) html += `<div class="section-label">SatPost</div>` + sat.map(cardHTML).join('');
+    } else if (total > 0 && shown.length === 0 && woke.length) {
+        html = isReddit(currentTab) ? sortRowHTML() + subChipsHTML(currentTab) : '';   // woken items are painted above; keep the way back to All
     } else if (total > 0 && shown.length === 0) {
         const doneToday = readByDay[etDate()] || 0, sub = activeSub(currentTab);
         // Filtered to one sub: keep the chips so there's a way back to All.
         html = (sub ? subChipsHTML(currentTab) : '') + `<div class="state"><i class="ph ph-check-circle"></i><h2>All caught up</h2>
                 <p>You've read all ${total} ${currentTab === 'ritholtz' ? "of today's AM Reads" : sub ? `${esc(subName(sub, items[0]))} posts in this tab` : 'items in this tab'}.${doneToday > 1 ? ` ${doneToday} items cleared today across every tab.` : ''}</p>
                 <button class="pill-btn" data-act="showread"><i class="ph ph-eye"></i>Show read items</button></div>`;
+    } else if (total === 0 && snoozeList.length) {
+        html = `<div class="state"><i class="ph ph-alarm"></i><h2>All snoozed</h2><p>Everything left in this tab is snoozed. It comes back at the time you picked.</p></div>`;
     } else if (total === 0) {
         html = currentTab === 'favorites'
             ? `<div class="state"><i class="ph ph-star"></i><h2>No favorites yet</h2><p>Tap the star on any item, or swipe it right, to keep it here.</p></div>`
@@ -977,11 +1171,7 @@ function render() {
             if (sat.length) html += `<div class="section-label">SatPost</div>` + sat.map(cardHTML).join('');
         } else {
             if (isReddit(currentTab)) {
-                html += `<div class="section-label sort-row"><i class="ph ph-sort-descending" aria-hidden="true"></i>Order
-                    <div class="seg" role="group" aria-label="Order">
-                        <button data-act="sort" data-sort="mix" class="${sortTop ? '' : 'on'}" aria-pressed="${!sortTop}">Mixed</button>
-                        <button data-act="sort" data-sort="top" class="${sortTop ? 'on' : ''}" aria-pressed="${sortTop}">Most upvotes</button>
-                    </div></div>` + subChipsHTML(currentTab);
+                html += sortRowHTML() + subChipsHTML(currentTab);
             }
             const keptShown = shown.filter((i) => i._kept);
             html += shown.filter((i) => !i._kept).map(cardHTML).join('');
@@ -1009,11 +1199,25 @@ function render() {
     if (!query && currentTab === 'github' && githubAt && Date.now() - Date.parse(githubAt) > 24 * 3600e3) {
         html = `<div class="notice"><i class="ph ph-warning"></i><span>GitHub Trending last refreshed ${esc(clock(githubAt))}, so this list is older than usual.</span></div>` + html;
     }
+    if (woke.length) {
+        html = `<div class="section-label woke-label"><i class="ph ph-alarm" aria-hidden="true"></i>Back from snooze · ${woke.length}</div>` + woke.map(cardHTML).join('') + html;
+    }
+    if (snoozeList.length) {
+        html += `<div class="section-label snoozed-label"><i class="ph ph-alarm" aria-hidden="true"></i>Snoozed · ${snoozeList.length}
+                    <button class="pill-btn" data-act="snoozeshow">${showSnoozed ? 'Hide' : 'Show'}</button></div>`
+             + (showSnoozed ? snoozeList.map(cardHTML).join('') : '');
+    }
     if (shownOlder.length) {
         html += `<div class="section-label"><i class="ph ph-clock-counter-clockwise"></i>Earlier list · ${esc(etWeekday(shownOlder[0].date || etDate()))}</div>` + shownOlder.map(cardHTML).join('');
     }
     paintFeed(html);
 }
+
+const sortRowHTML = () => `<div class="section-label sort-row"><i class="ph ph-sort-descending" aria-hidden="true"></i>Order
+                    <div class="seg" role="group" aria-label="Order">
+                        <button data-act="sort" data-sort="mix" class="${sortTop ? '' : 'on'}" aria-pressed="${!sortTop}">Mixed</button>
+                        <button data-act="sort" data-sort="top" class="${sortTop ? 'on' : ''}" aria-pressed="${sortTop}">Most upvotes</button>
+                    </div></div>`;
 
 // "Quieted · 6" at the bottom of Monthly/Yearly: why, and a Show/Hide toggle.
 function quietHTML(list) {
@@ -1169,6 +1373,8 @@ function findItem(id) {
         const e = (kept[k] || {})[String(id)];
         if (e && e.item) return e.item;
     }
+    const s = snoozed[String(id)];
+    if (s && s.item) return { ...s.item, ...(snoozeDue(s) ? { _woke: true } : { _snoozed: s.until }) };
     return cloudFavorites.find((i) => String(i.id) === String(id));
 }
 
@@ -1199,6 +1405,7 @@ function switchTab(tab) {
     store.set('dr_scroll', scrollPos);
     currentTab = tab;
     viewCleared = false;
+    snoozeOpen = null;
     store.set('dr_tab', tab);
     focusIndex = -1; focusId = null;
     if (query) { query = ''; document.getElementById('searchInput').value = ''; document.getElementById('search').classList.remove('open'); }
@@ -1217,7 +1424,7 @@ function markKeptRead() {
 }
 
 function markAll() {
-    const ids = (query ? searchAll(query) : tabItems(currentTab)).filter((i) => !isRead(i)).map((i) => i.id);
+    const ids = (query ? searchAll(query) : tabItems(currentTab)).filter((i) => !isRead(i) && !i._snoozed).map((i) => i.id);
     if (!ids.length) return;
     setRead(ids, true);
     buzz();
@@ -1245,6 +1452,8 @@ document.getElementById('feed').addEventListener('click', (e) => {
         if (a === 'showread') { setShowRead(true); return; }
         if (a === 'keptread') { markKeptRead(); return; }
         if (a === 'quietshow') { showQuieted = !showQuieted; render(); return; }
+        if (a === 'snoozeshow') { showSnoozed = !showSnoozed; render(); return; }
+        if (a === 'snoozecancel') { snoozeOpen = null; render(); return; }
         if (a === 'unquiet') { stopQuiet(act.dataset.sub); return; }
         if (a === 'sub') {
             const k = act.dataset.sub || null;
@@ -1266,6 +1475,10 @@ document.getElementById('feed').addEventListener('click', (e) => {
         if (a === 'fav') favItem(item);
         if (a === 'read') toggleRead(item);
         if (a === 'skip') skipItem(item);
+        if (a === 'later') { snoozeOpen = String(item.id); render(); }
+        if (a === 'snoozeat') snoozeItem(item, new Date(act.dataset.at));
+        if (a === 'wake') wakeItem(item);
+        if (a === 'podcast') podcastItem(item);
         return;
     }
     const card = e.target.closest('.item');
@@ -1277,6 +1490,14 @@ document.getElementById('feed').addEventListener('click', (e) => {
         // "Done with it? Mark read" prompt count. We only remember it was opened.
         const item = findItem(card.dataset.id);
         if (item) noteOpened(item);
+        return;
+    }
+    // Tap the top comment to read all of it.
+    const tc = e.target.closest('.top-comment');
+    if (tc && !window.getSelection().toString()) {
+        const k = 'c:' + card.dataset.id;
+        expanded.has(k) ? expanded.delete(k) : expanded.add(k);
+        tc.classList.toggle('open', expanded.has(k));
         return;
     }
     // Tap the blurb to read all of it without leaving the list.
@@ -1470,7 +1691,7 @@ document.getElementById('btn-search').onclick = () => {
     if (box.classList.contains('open')) { box.classList.remove('open'); query = ''; document.getElementById('searchInput').value = ''; render(); }
     else openSearch();
 };
-document.getElementById('searchInput').addEventListener('input', (e) => { query = e.target.value.trim(); focusIndex = -1; focusId = null; render(); });
+document.getElementById('searchInput').addEventListener('input', (e) => { query = e.target.value.trim(); focusIndex = -1; focusId = null; snoozeOpen = null; render(); });
 document.getElementById('btn-link').onclick = () => {
     const k = prompt('Enter the sync key from your other device:');
     if (k && k.trim()) { try { localStorage.setItem('dailyReaderSyncKey', k.trim().toUpperCase()); } catch {} location.reload(); }
@@ -1496,6 +1717,7 @@ document.addEventListener('keydown', (e) => {
     else if ((e.key === 'r' || e.key === 'e') && cur) toggleRead(cur);
     else if (e.key === 'x' && cur && !isRead(cur) && String(cur.source || '').startsWith('r/')) skipItem(cur);
     else if ((e.key === 'f' || e.key === 's') && cur) favItem(cur);
+    else if (e.key === 'l' && cur && canSnooze(cur) && !cur._snoozed) { snoozeOpen = snoozeOpen === String(cur.id) ? null : String(cur.id); render(); }
     else if (e.key === '/') { e.preventDefault(); openSearch(); }
     else if (e.key === 'Escape' && viewCleared) closeCleared();
     else if (/^[1-9]$/.test(e.key) && +e.key <= TABS.length) switchTab(TABS[+e.key - 1].key);
@@ -1543,6 +1765,7 @@ let lastDay = etDate();
 document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'hidden') { leftPage(); if (!viewCleared) scrollPos[currentTab] = window.scrollY; store.set('dr_scroll', scrollPos); return; }
     backOnPage();
+    render();   // a snooze that came due while the app was in the background
     if (Date.now() - lastLoad > 20 * 60e3 || etDate() !== lastDay) { lastDay = etDate(); amShowOlder = false; loadData(); }
 });
 

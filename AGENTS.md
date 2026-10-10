@@ -160,7 +160,21 @@ What one run does (~5–6 min):
   Monthly 46 of 50 r/todayilearned and Yearly 50 of 50.
 - `score_real=False` on Mac rows, because their `score` IS made up. A reader that doesn't know
   about `upvotes` then shows the rank, never the tier number.
-- `comments` is stored, not shown yet. Row order = Reddit's own top order (the site's `rank`).
+- `comments` is shown on cards ("· 451 comments"). Row order = Reddit's own top order (the site's `rank`).
+
+**Top comments (10 Oct 2026, `core/top_comments.py`).** After the lists AND the `METHOD CHECK`
+(so it can never cost a list), the same browser asks for each post's top comment:
+`<permalink>.json?sort=top&limit=10&depth=1&raw_json=1` through `fetch()` (browser cookies, one
+429 wait). First real comment in Reddit's top order wins: stickied, mod-distinguished,
+AutoModerator, `[deleted]`/`[removed]` are skipped; spoilers become "[spoiler]", markdown flattened to one plain line, cut at
+400 chars. Cached in **`data/reddit_comments.json`** (`posts: {id: {body, ups, at}}`; `body ""` =
+none yet, asked again after 2 days), so each post costs ONE request ever. Per run: at most 40
+uncached posts (`MAX_PER_RUN`), best tier score first (= what the site shows), inside 4 min
+(`BUDGET_S`) and before 17 min from the start (`COMMENTS_END_S`; the wrapper kills at 20),
+3–5 s apart, stop after 3 failures in a row (404s = a gone post, not counted; misses are cached and retried in 2 days). Reddit 429s after ~100 requests in a burst (first fill, 10 Oct), hence 40. Skipped when the run ended "blocked". Posts that left
+every list are pruned (checked against ALL saved lists, so an `--only` run keeps the other subs'). `ups` is stored but NOT served: it's a one-time snapshot (and Reddit says 1 while a score is hidden), so showing it would break rule 8. One log line: `TOP COMMENTS: 41 new, 3 none yet, 0 failed (210 cached,
+12 left)` (+ ` STOPPED: …`). `--no-comments` skips it; `--comments-only N` does only it (the
+first fill; it opens one list page first so the JSON gets the bot-check cookies).
 
 ### 2b. `mac/reddit-browser.sh` — the launchd wrapper
 
@@ -185,7 +199,7 @@ the file mid-run. Each run:
 5. Runs the scraper under `timeout 1200` with `python3 -u` (unbuffered: a killed run still leaves
    its lines in the log), profile `~/.local/share/reddit-browser/profile` (a throwaway profile
    just for this job; it keeps Reddit's cookie).
-6. `git add -f data/r_*/posts.csv` (+ the json if present). Nothing changed →
+6. `git add -f data/r_*/posts.csv` (+ `reddit_browser.json` and `reddit_comments.json` if present). Nothing changed →
    `NO REDDIT CHANGES (scraper exit N)` and exits with the scraper's code.
 7. Commits, then pushes with a 3-try loop (`git pull --rebase -X theirs` between tries, because
    GitHub's jobs push to the same branch). Success line:
@@ -351,7 +365,10 @@ post and extract articles.
   - **`monthly_reserve` / `yearly_reserve`** (9 Oct 2026) = the next `RESERVE = 50` posts after
     each top 50, same tier-mix order. Only the page's "quiet subs" uses them: it refills the 50
     slots a quieted sub gives up, so the tab never shrinks. Reddit cards also carry
-    `comments` ("451", "" when the list came from RSS), shown as "· 451 comments".
+    `comments` ("451", "" when the list came from RSS), shown as "· 451 comments", and, when
+    `data/reddit_comments.json` has one, `top_comment` (plain text, ≤ ~400 chars; its upvotes
+    are deliberately not served, see §2a). A missing/broken comments file costs only the
+    comments (`load_top_comments`/`add_top_comments`).
   - **`reddit_subs`** = the tracked subs (sorted). The page forgets kept unread posts whose sub
     isn't in it, so removing a sub also clears it from every device's kept list.
   - **`updated`** = `{news, ritholtz, reddit, github}` (UTC ISO): the newest `scraped_at` in each
@@ -412,7 +429,7 @@ python3 core/scrape_reddit_browser.py --only LifeProTips --visible   # needs Pla
 ```
 
 ### Tests
-- **`.venv/bin/python -m pytest tests -q`** — 100 tests, under a minute, no network:
+- **`.venv/bin/python -m pytest tests -q`** — 119 tests, under a minute, no network (`tests/test_top_comments.py`: the comment picker, spoilers, hidden scores, cache/prune/backoff rules, the server attaching them):
   - `tests/test_am_reads.py`: AM Reads cleanup/dedup helpers.
   - `tests/test_feeds.py`: RSS parsing + honest scores, the News retry (503/404), the live API's
     honesty/no-repeats rules on the committed data, the Mac scraper's rows and CSV round trip,
@@ -440,7 +457,7 @@ python3 core/scrape_reddit_browser.py --only LifeProTips --visible   # needs Pla
     deadline and block messages once), the stuck-profile fallback, the
     `METHOD CHECK` line, and GitHub's side (stalest first, own stamps, the RSS check line, only
     a real top list saved, and that `python core/scrape_top.py` really runs `main()`).
-- **`python3 tests/e2e_site.py [base_url]`** — 89 real-browser checks (~120 s; the last 11 = quiet subs + Skip): every tab shows
+- **`python3 tests/e2e_site.py [base_url]`** — 107 real-browser checks (~180 s; then 11 = quiet subs + Skip, last 18 = top comment, Later/snooze incl. a real Firestore round trip on a throwaway sync key, Podcast this): every tab shows
   all the API's posts with the right label, the GitHub tab (API's top 10 in GitHub's order,
   "top 10 of N", GitHub's star counts, read + Undo, keys 5/6, its 24 h stale notice), real upvotes on cards, opening ≠ reading, the
   "Done with X?" prompt, undo, keys, stale notices (News 36 h, Reddit 48 h), footer stamps,
@@ -662,7 +679,25 @@ python3 core/scrape_reddit_browser.py --only LifeProTips --visible   # needs Pla
   when `updated.news` is 36 h+ old; Monthly/Yearly when `updated.reddit` is 48 h+ old (the Mac
   stopped; lists may be older and show ranks); GitHub when `updated.github` is 24 h+ old (4
   missed runs). Footer: when AM Reads, News, Reddit and GitHub last landed. Sync write failures show a toast + "(offline)". Firebase layout:
-  `sync_groups/{key}/favorites` + `read_posts`.
+  `sync_groups/{key}/favorites` + `read_posts` + `snoozed` + `podcast_requests`.
+  **Top comment** (10 Oct 2026): Reddit cards show `top_comment` under the blurb, 2 lines, tap
+  for all (`expanded` key `c:<id>`). **Later = snooze** (10 Oct 2026): a small "Later" button
+  under the meta line (key `l`) opens In 3 hours / Tonight 7 PM (before 3 PM) / Tomorrow 7 AM /
+  Saturday 9 AM (next Saturday on a Saturday; device time). Firestore `snoozed/{item id}` = `{until, tab, item, at}`: the
+  item's own copy is stored, so an AM Read snoozed till tomorrow comes back even though that tab
+  only lists today's. Pending = gone from every tab and count (`itemsFor`); due = back FIRST in
+  its tab under "Back from snooze" (the live card if it still exists), unread, every device; a
+  re-render is timed for the next due one (`scheduleWake`) and on return to the app. Never
+  silent: "Snoozed · N" at the bottom of each tab (Show → cards with "Back … · Wake now").
+  Woken + read = forgotten 2 days later (`pruneSnoozed`; Undo/eye still work before that). Not
+  offered on Favorites or read cards. **Podcast this** (10 Oct 2026, AM Reads cards only):
+  writes `podcast_requests/{getSafeId}` `{id, title, url, source, domain, date, requestedAt}`;
+  tap again = take it back. The Mac mini's `com.jalal.podcast-requests` (:05/:35,
+  `~/PycharmProjects/podcast-factory/favorites-queue/pull_requests.py`, log
+  `~/Library/Logs/podcast-requests.log`, line `PODCAST REQUESTS: N new`) appends new urls to that
+  folder's `queue.json` as `todo` (paywalled domains `paywalled-skip`), stamps `pulled` (the
+  button then reads "In the podcast queue", disabled) and pings the alerts thread. Nothing is
+  made automatically: episodes are made when the owner asks.
 - `manifest.json` + `sw.js` — PWA; network-first service worker (cache `daily-reader-v2`, only
   the offline fallback; an offline `/api/data` copy carries `X-Offline-Copy: 1`).
 - `server_assets/icon.png` — app icon.

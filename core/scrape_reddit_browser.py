@@ -24,8 +24,12 @@ data/reddit_browser.json so GitHub's RSS fallback leaves fresh lists alone.
 Stdlib + Playwright only (the Mac's /opt/homebrew/bin/python3 has no pandas).
 usage: python3 core/scrape_reddit_browser.py [--profile DIR | --fresh-profile] [--only sub1,sub2]
                                             [--method page|json|rss] [--probe] [--visible]
+                                            [--no-comments | --comments-only N]
   --probe   try EVERY method on each --only list (default LifeProTips), print what
             each one got, write nothing. Exit 1 if any method failed.
+After the lists (and the METHOD CHECK) it reads up to 40 not-yet-cached posts' top
+comments into data/reddit_comments.json (core/top_comments.py); --comments-only N
+does only that, for N posts.
 """
 import argparse
 import asyncio
@@ -44,6 +48,7 @@ from urllib.parse import parse_qs, urlparse
 
 sys.path.insert(0, str(Path(__file__).parent))
 from reddit_common import SUBREDDITS, BROWSER_META, list_key, tier_base, tier_score, utc_now_iso
+import top_comments
 
 COLUMNS = ["id", "title", "selftext", "permalink", "score", "upvotes", "comments", "score_real"]
 WANT = 50                # posts per list (same as the old JSON limit=50)
@@ -53,6 +58,9 @@ MIN_POSTS = 5
 # No new list starts after this. One list can still take ~6 min in the worst case
 # (every method slow or rate-limited), and the wrapper kills the run at 20 min.
 RUN_DEADLINE_S = 12 * 60
+# Top comments (core/top_comments.py) run after the lists and the METHOD CHECK,
+# and must finish by here: the wrapper kills the run at 20 min.
+COMMENTS_END_S = 17 * 60
 # A top-of-the-month list holds posts from the last ~30 days, a yearly one the last
 # ~365. Posts older than this (with slack) mean Reddit served some other list.
 MAX_AGE_DAYS = {"month": 40, "year": 400}
@@ -473,11 +481,12 @@ async def read_one(page, sub: str, t: str, methods, retry_page: bool = True) -> 
     return out
 
 
-async def run(profile, subs: list, visible: bool, methods=METHODS) -> dict:
+async def run(profile, subs: list, visible: bool, methods=METHODS, with_comments: bool = True) -> dict:
     from playwright.async_api import async_playwright  # lazy: tests import this file without it
 
     saved, failed, via = {}, [], {}
-    deadline = time.monotonic() + RUN_DEADLINE_S
+    started = time.monotonic()
+    deadline = started + RUN_DEADLINE_S
     queue = [(sub, t) for sub in subs for t in ("month", "year")]
     async with async_playwright() as p:
         ctx, tmp, page = await new_session(p, profile, visible)
@@ -548,9 +557,40 @@ async def run(profile, subs: list, visible: bool, methods=METHODS) -> dict:
                 backups[m] = problem if not problem.startswith(SHORT) else ""
             page_saved = sum(1 for m in via.values() if m == "page")
             print(method_check_line(page_saved, len(set(saved) | set(failed)), backups))
+            # Last: each shown post's top comment (cached, ~40 new a run). After the
+            # lists on purpose, so Reddit slowing us down can never cost a list.
+            if with_comments:
+                left = started + COMMENTS_END_S - time.monotonic()
+                if stop == "blocked" or left < 30:
+                    print(f"TOP COMMENTS: skipped ({'Reddit blocked this run' if stop == 'blocked' else 'out of time'})")
+                else:
+                    await comments_step(page, subs, min(top_comments.BUDGET_S, left))
         finally:
             await close_session(ctx, tmp)
     return {"saved": saved, "failed": failed, "via": via}
+
+
+async def comments_step(page, subs: list, budget_s: float, max_posts: int = top_comments.MAX_PER_RUN):
+    try:
+        stats = await top_comments.fetch_top_comments(page, fetch, subs=set(subs), budget_s=budget_s,
+                                                      max_posts=max_posts)
+        print(top_comments.comments_line(stats))
+    except Exception as e:  # never costs the lists, which are already saved
+        print(f"TOP COMMENTS: FAILED {type(e).__name__}: {str(e)[:100]}")
+
+
+async def comments_only(profile, subs: list, visible: bool, max_posts: int):
+    """--comments-only: just the top-comment step (first fill, or a test). Opens one
+    list page first so Reddit's bot check hands out the cookies the JSON needs."""
+    from playwright.async_api import async_playwright
+
+    async with async_playwright() as p:
+        ctx, tmp, page = await new_session(p, profile, visible)
+        try:
+            await via_page(page, subs[0], "month")
+            await comments_step(page, subs, max_posts * 6 + 60, max_posts)
+        finally:
+            await close_session(ctx, tmp)
 
 
 async def probe(profile, subs: list, visible: bool) -> bool:
@@ -587,6 +627,9 @@ def main():
     ap.add_argument("--method", choices=METHODS, help="use only this method (to test a backup)")
     ap.add_argument("--probe", action="store_true", help="try every method, write nothing")
     ap.add_argument("--visible", action="store_true", help="show the browser window")
+    ap.add_argument("--no-comments", action="store_true", help="skip the top-comment step")
+    ap.add_argument("--comments-only", type=int, metavar="N", default=0,
+                    help="only fetch up to N posts' top comments, write data/reddit_comments.json")
     a = ap.parse_args()
     profile = None if a.fresh_profile else a.profile
     if a.probe:
@@ -594,10 +637,14 @@ def main():
         print(f"🔎 Reddit method probe: {', '.join(subs)} x month/year x {', '.join(METHODS)}  ({utc_now_iso()})")
         sys.exit(0 if asyncio.run(probe(profile, subs, a.visible)) else 1)
     subs = [s for s in a.only.split(",") if s] or SUBREDDITS
+    if a.comments_only:
+        asyncio.run(comments_only(profile, subs, a.visible, a.comments_only))
+        return
     print("=" * 50)
     print(f"🖥️ Reddit via real browser: {len(subs)} subs x month/year  ({utc_now_iso()})")
     print("=" * 50)
-    result = asyncio.run(run(profile, subs, a.visible, (a.method,) if a.method else METHODS))
+    result = asyncio.run(run(profile, subs, a.visible, (a.method,) if a.method else METHODS,
+                             with_comments=not a.no_comments and not a.method))
     total = len(set(result["saved"]) | set(result["failed"]))
     print(f"BROWSER SAVED: {len(result['saved'])} of {total} lists"
           + (f" (kept old: {', '.join(result['failed'])})" if result["failed"] else ""))

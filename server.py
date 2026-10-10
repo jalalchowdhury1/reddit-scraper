@@ -27,6 +27,7 @@ except Exception as e:  # pragma: no cover - only on a broken deploy
     log.warning("core.reddit_common not importable (%s); showing every data/r_* list", e)
     TRACKED_SUBS = None
 BROWSER_META = BASE_DIR / "data/reddit_browser.json"
+TOP_COMMENTS = BASE_DIR / "data/reddit_comments.json"   # core/top_comments.py (Mac browser job)
 GITHUB_META = BASE_DIR / "data/reddit_github.json"  # GitHub's RSS backup (core/scrape_top.py)
 
 app = FastAPI()
@@ -235,6 +236,28 @@ def reddit_item(row):
 RESERVE = 50   # posts past each top 50 the page may refill from (quieted subs)
 
 
+def load_top_comments(path: Path = None) -> dict:
+    """{post id: {"body", "ups"}} from data/reddit_comments.json, or {} (missing/broken
+    file = cards just show no comment). Only entries with a body."""
+    try:
+        posts = json.loads((path or TOP_COMMENTS).read_text(encoding="utf-8")).get("posts", {})
+    except Exception:
+        return {}
+    if not isinstance(posts, dict):
+        return {}
+    return {str(k): v for k, v in posts.items() if isinstance(v, dict) and isinstance(v.get("body"), str) and v["body"].strip()}
+
+
+def add_top_comments(items: list, comments: dict):
+    """Reddit cards get `top_comment` (plain text, <= ~400 chars); cards without one don't.
+    The comment's upvotes are NOT served: they're a snapshot from the one time it was
+    fetched (could be 100x stale), and a stale number is an invented number (§5 rule 8)."""
+    for item in items:
+        c = comments.get(str(item.get("id")))
+        if c:
+            item["top_comment"] = clean_text(c["body"])
+
+
 @app.get("/api/data")
 def get_data():
     data = {"monthly": [], "yearly": [], "news": [], "ritholtz": [], "github": []}
@@ -275,6 +298,11 @@ def get_data():
                     data[row['time_filter']].append(item)
             if bad_rows:
                 log.warning("skipped %d bad Reddit rows", bad_rows)
+            try:  # a broken comments file costs only the comments
+                tops = load_top_comments()
+                add_top_comments(data["monthly"] + data["yearly"], tops)
+            except Exception:
+                log.exception("top comments failed")
     except Exception:
         log.exception("Reddit tabs failed to build")
         data["monthly"], data["yearly"] = [], []
