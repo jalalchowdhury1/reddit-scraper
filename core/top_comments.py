@@ -30,15 +30,19 @@ BUDGET_S = 4 * 60
 EMPTY_RETRY_DAYS = 2
 MAX_CHARS = 400
 SKIP_AUTHORS = {"automoderator"}
+GONE = re.compile(r"^\[\s*(deleted|removed( by reddit)?)\s*\]$", re.I)   # incl. admin "[ Removed by Reddit ]"
 
 
 def clean_body(text: str, limit: int = MAX_CHARS) -> str:
     """Reddit markdown -> one plain line: links keep their text, no ** / quotes, cut at a word."""
     t = re.sub(r">!.*?!<", "[spoiler]", str(text or ""), flags=re.S)       # never reveal a spoiler on the card
+    t = re.sub(r"!\[(gif|img)\]\([^)]*\)", lambda m: "[GIF]" if m.group(1) == "gif" else "[image]", t)   # media/emotes
     t = re.sub(r"\[([^\]]+)\]\((?:[^()]|\([^)]*\))*\)", r"\1", t)   # [text](url) -> text
     t = re.sub(r"(\*\*|__|~~|\^)", "", t)
     t = re.sub(r"(?m)^\s*(&gt;|>)+\s?", "", t)          # quoted lines
     t = re.sub(r"(?m)^\s*#+\s*", "", t)                 # headings
+    t = re.sub(r"(?m)^\s*[*+-]\s+", "", t)              # bullets
+    t = re.sub(r"(?<![\w*])\*(?=\S)([^*\n]+?)(?<=\S)\*(?![\w*])", r"\1", t)   # *italics*
     t = re.sub(r"\s+", " ", t).strip()
     if len(t) > limit:
         t = t[:limit].rsplit(" ", 1)[0].rstrip(" ,;:-") + "…"
@@ -59,7 +63,7 @@ def pick_top(listing) -> dict:
         if str(d.get("author", "")).lower() in SKIP_AUTHORS:
             continue
         body = clean_body(d.get("body", ""))
-        if not body or body in ("[deleted]", "[removed]"):
+        if not body or GONE.match(body):
             continue
         ups = d.get("ups", d.get("score"))
         # Reddit says 1 while a new comment's score is hidden: that's not a real number.
@@ -164,14 +168,17 @@ async def fetch_top_comments(page, fetch, root: Path = Path("data"), subs=None,
             top = pick_top(await r.json())
         except Exception as e:
             stats["failed"] += 1
-            # Cache the miss like an empty one (asked again in EMPTY_RETRY_DAYS), so a post
-            # that always fails (removed, quarantined) can't sit at the top of every run.
-            cache[pid] = {"body": "", "failed": f"{type(e).__name__}: {str(e)[:60]}",
-                          "at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")}
-            save_cache(cache, path)
-            # A gone post (404) is that post's problem; 403/429/odd answers mean Reddit is
-            # pushing back: 3 of those in a row stop the step.
-            fails = fails if "HTTP 404" in str(e) else fails + 1
+            # A gone post (404) or a page that isn't a comment listing is THAT post's problem:
+            # cache the miss like an empty one (asked again in EMPTY_RETRY_DAYS), so it can't sit
+            # at the top of every run. 403/429/timeouts mean Reddit is pushing back: never cached
+            # (that would hide the best, most-visible posts' comments for days), and 3 in a row
+            # stop the step.
+            post_problem = "HTTP 404" in str(e) or isinstance(e, ValueError)
+            if post_problem:
+                cache[pid] = {"body": "", "failed": f"{type(e).__name__}: {str(e)[:60]}",
+                              "at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")}
+                save_cache(cache, path)
+            fails = fails if post_problem else fails + 1
             if fails >= 3:
                 stats["stopped"] = f"3 failures in a row ({type(e).__name__}: {str(e)[:60]})"
                 break

@@ -313,6 +313,7 @@ let snoozed = {};
 // and stamps `pulled`, so the button can say "In the queue".
 let podcastReq = {};
 let syncKey = store.raw('dailyReaderSyncKey');
+{ const c = store.get('dr_snoozed', null); if (c && c.key === syncKey && c.data && typeof c.data === 'object') snoozed = c.data; }   // no flash of snoozed cards on load
 
 const col = (name) => db.collection('sync_groups').doc(syncKey).collection(name);
 
@@ -333,6 +334,7 @@ function initSync() {
         col('snoozed').onSnapshot((snap) => {
             snoozed = {};
             snap.forEach((d) => { const v = d.data() || {}; if (v.until && v.item) snoozed[d.id] = v; });
+            store.set('dr_snoozed', { key: syncKey, data: snoozed });
             syncOk();
             render();
             pruneSnoozed();
@@ -445,10 +447,12 @@ const snoozeWhen = (iso) => { const d = new Date(iso), today = new Date();
 function snoozeOptions(now = new Date()) {
     const at = (base, days, h) => { const d = new Date(base); d.setDate(d.getDate() + days); d.setHours(h, 0, 0, 0); return d; };
     const out = [['In 3 hours', new Date(now.getTime() + 3 * 3600e3)]];
+    if (now.getHours() < 4) out.push(['This morning 7 AM', at(now, 0, 7)]);   // after midnight, "Tomorrow" is a day too far
     if (now.getHours() < 15) out.push(['Tonight 7 PM', at(now, 0, 19)]);   // later than that, 'In 3 hours' is about the same
     out.push(['Tomorrow 7 AM', at(now, 1, 7)]);
-    const toSat = (6 - now.getDay() + 7) % 7 || 7;   // on a Saturday = next Saturday ("9 AM today" is sooner than "In 3 hours")
-    out.push([toSat === 7 ? 'Next Saturday 9 AM' : 'Saturday 9 AM', at(now, toSat, 9)]);
+    // On a Saturday: before 6 AM it's this morning; later, 9 AM today is gone or sooner than "In 3 hours" = next Saturday.
+    const toSat = now.getDay() === 6 && now.getHours() < 6 ? 0 : ((6 - now.getDay() + 7) % 7 || 7);
+    out.push([toSat === 0 ? 'Saturday 9 AM (today)' : toSat === 7 ? 'Next Saturday 9 AM' : 'Saturday 9 AM', at(now, toSat, 9)]);
     return out;
 }
 // The tab a card belongs to (snooze needs it to know where to bring it back).
@@ -470,6 +474,7 @@ function snoozeItem(item, until) {
     const doc = { until: until.toISOString(), tab, item: plainCopy(item), at: new Date().toISOString() };
     snoozed[id] = doc;
     col('snoozed').doc(id).set(doc).catch(syncFailed);
+    noteEngaged(item);   // "Later" = he wants it: never counts against its sub in the quiet learner
     snoozeOpen = null;
     buzz();
     render();
@@ -483,8 +488,11 @@ function snoozeItem(item, until) {
 function wakeItem(item) {
     const id = String(item.id), prev = snoozed[id];
     if (!prev) return;
-    delete snoozed[id];
-    col('snoozed').doc(id).delete().catch(syncFailed);
+    // Due now, not deleted: the stored copy is the only way back for an AM Read / News item
+    // that today's lists no longer have. pruneSnoozed forgets it once it's read.
+    const doc = { ...prev, until: new Date().toISOString() };
+    snoozed[id] = doc;
+    col('snoozed').doc(id).set(doc).catch(syncFailed);
     render();
     toast('Back in the list', () => { snoozed[id] = prev; col('snoozed').doc(id).set(prev).catch(syncFailed); render(); });
 }
@@ -527,7 +535,7 @@ function podcastItem(item) {
     const doc = { id: String(item.id), title: item.title || '', url: item.url || '', source: item.source || '',
                   domain: item.domain || domainOf(item.url), date: item.date || '', requestedAt: new Date().toISOString() };
     podcastReq[getSafeId(item)] = doc;
-    ref.set(doc).catch(syncFailed);
+    ref.set(doc, { merge: true }).catch(syncFailed);   // merge: a tap before the first snapshot can't wipe the Mac's `pulled`
     noteEngaged(item);
     buzz();
     render();
@@ -809,6 +817,7 @@ function scoreQuiet(force = false) {
     let N = 0, L = 0;
     for (const id in qlog) {
         const e = qlog[id];
+        if (snoozed[id]) continue;   // snoozed = wanted, just not now (snoozes from before noteEngaged was added)
         const age = dayDiff(e.d, today);
         if (age < QUIET_MATURE || age > QUIET_WINDOW + QUIET_MATURE) continue;
         const limit = addDays(e.d, QUIET_MATURE);
@@ -1073,7 +1082,7 @@ function extrasHTML(item) {
     }
     if (item._snoozed) out.push(`<button class="mini-btn on" data-act="wake" title="Bring it back now"><i class="ph ph-alarm"></i>Back ${esc(snoozeWhen(item._snoozed))} · Wake now</button>`);
     else if (canSnooze(item)) out.push(`<button class="mini-btn" data-act="later" aria-label="Snooze: show me later" title="Snooze: show me later (l)"><i class="ph ph-alarm"></i>Later</button>`);
-    if (isAmRead(item)) {
+    if (isAmRead(item) && /^https?:\/\//.test(item.url || '')) {
         const d = podcastDoc(item);
         out.push(d ? `<button class="mini-btn on" data-act="podcast" ${d.pulled ? 'disabled' : ''} title="${d.pulled ? 'The Mac mini has it in the podcast queue' : 'Requested; tap to take it back'}"><i class="ph-fill ph-headphones"></i>${d.pulled ? 'In the podcast queue' : 'Podcast requested'}</button>`
                    : `<button class="mini-btn" data-act="podcast" title="Add this article to the podcast queue"><i class="ph ph-headphones"></i>Podcast this</button>`);
@@ -1145,13 +1154,13 @@ function render() {
         const sat = shown.filter((i) => i.kind === 'SATPOST');
         if (sat.length) html += `<div class="section-label">SatPost</div>` + sat.map(cardHTML).join('');
     } else if (total > 0 && shown.length === 0 && woke.length) {
-        html = isReddit(currentTab) ? sortRowHTML() + subChipsHTML(currentTab) : '';   // woken items are painted above; keep the way back to All
+        html = isReddit(currentTab) ? sortRowHTML() + subChipsHTML(currentTab) + quietHTML(quietList) : '';   // woken items are painted above; keep the way back to All
     } else if (total > 0 && shown.length === 0) {
         const doneToday = readByDay[etDate()] || 0, sub = activeSub(currentTab);
         // Filtered to one sub: keep the chips so there's a way back to All.
         html = (sub ? subChipsHTML(currentTab) : '') + `<div class="state"><i class="ph ph-check-circle"></i><h2>All caught up</h2>
                 <p>You've read all ${total} ${currentTab === 'ritholtz' ? "of today's AM Reads" : sub ? `${esc(subName(sub, items[0]))} posts in this tab` : 'items in this tab'}.${doneToday > 1 ? ` ${doneToday} items cleared today across every tab.` : ''}</p>
-                <button class="pill-btn" data-act="showread"><i class="ph ph-eye"></i>Show read items</button></div>`;
+                <button class="pill-btn" data-act="showread"><i class="ph ph-eye"></i>Show read items</button></div>` + quietHTML(quietList);
     } else if (total === 0 && snoozeList.length) {
         html = `<div class="state"><i class="ph ph-alarm"></i><h2>All snoozed</h2><p>Everything left in this tab is snoozed. It comes back at the time you picked.</p></div>`;
     } else if (total === 0) {

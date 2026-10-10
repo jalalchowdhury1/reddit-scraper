@@ -255,7 +255,7 @@ def add_top_comments(items: list, comments: dict):
     for item in items:
         c = comments.get(str(item.get("id")))
         if c:
-            item["top_comment"] = clean_text(c["body"])
+            item["top_comment"] = c["body"].strip()   # already plain text (raw_json=1): no unescape, or "&copy=2" in a link turns into "©=2"
 
 
 @app.get("/api/data")

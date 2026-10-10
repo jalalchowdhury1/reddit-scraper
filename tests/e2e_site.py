@@ -525,6 +525,7 @@ async def main():
               await pg.locator(f"#feed > .item[data-id='{sid}']").count() == 0 and "Snoozed till" in await pg.inner_text("#toast-msg"),
               await pg.inner_text("#toast-msg"))
         check("Later: 'Snoozed · 1' at the bottom", "Snoozed · 1" in await pg.inner_text(".snoozed-label"))
+        check("Later: counts as wanted for the quiet learner", await pg.evaluate(f"!!(qlog[{json.dumps(sid)}] && qlog[{json.dumps(sid)}].e)"))
         await pg.wait_for_timeout(2500)
         await pg.reload()
         await pg.wait_for_function(f"allData && readLoaded && snoozed[{json.dumps(sid)}]", timeout=20000)
@@ -533,6 +534,8 @@ async def main():
               await pg.locator(f"#feed > .item[data-id='{sid}']").count() == 0 and await pg.locator(".snoozed-label").count() == 1)
         await pg.click("[data-act=snoozeshow]"); await pg.wait_for_timeout(300)
         check("Later: Show lists it with Wake now", await pg.locator(f"#feed > .item[data-id='{sid}'] [data-act=wake]").count() == 1)
+        check("Later: this device keeps a copy (no flash of snoozed cards on load)",
+              await pg.evaluate(f"!!((store.get('dr_snoozed', {{}}).data || {{}})[{json.dumps(sid)}])"))
         # Due now (as if its time came): back at the top, under "Back from snooze".
         await pg.evaluate(f"col('snoozed').doc({json.dumps(sid)}).update({{ until: new Date(Date.now() - 1000).toISOString() }})")
         await pg.wait_for_selector(".woke-label", timeout=10000)
@@ -556,6 +559,20 @@ async def main():
             delete snoozed['kfake']; delete kept.monthly['kfake']; render();
             return n; })()""")
         check("Later: a snoozed kept post isn't in 'Still unread' (or its Mark these read)", leak == 0, f"{leak}")
+        # Red-team round 2 (10 Oct): Wake now on a card today's lists no longer have keeps its copy.
+        back = await pg.evaluate("""(() => {
+            const it = { ...allData.monthly[0], id: 'wfake2', title: 'Gone from the API' };
+            snoozed['wfake2'] = { until: new Date(Date.now() + 864e5).toISOString(), tab: 'monthly', item: it };
+            wakeItem({ ...it, _snoozed: snoozed['wfake2'].until });
+            const ok = wokeFor('monthly').some((i) => i.id === 'wfake2');
+            delete snoozed['wfake2']; col('snoozed').doc('wfake2').delete(); render();
+            return ok; })()""")
+        check("Later: Wake now brings back a card the API dropped", back)
+        o1 = await pg.evaluate("snoozeOptions(new Date(2026, 9, 10, 1, 0)).map((o) => o[0] + '@' + o[1].getDate() + ' ' + o[1].getHours())")
+        o2 = await pg.evaluate("snoozeOptions(new Date(2026, 9, 10, 10, 0)).map((o) => o[0])")
+        check("Later: after midnight offers this morning, Saturday = today",
+              "This morning 7 AM@10 7" in o1 and "Saturday 9 AM (today)@10 9" in o1 and "Next Saturday 9 AM" in o2 and not any("morning" in x for x in o2),
+              f"{o1} | {o2}")
         # Podcast this: on AM Reads cards only (yesterday's list when today's isn't out).
         await pg.click('[data-tab="ritholtz"]:visible'); await pg.wait_for_timeout(400)
         if not await pg.locator("#feed .item [data-act=podcast]").count():
@@ -564,6 +581,8 @@ async def main():
         check("Podcast: button on AM Reads cards", bool(pid))
         check("Podcast: not on Reddit cards", await pg.evaluate(
             "(() => { const i = allData.monthly[0]; return !extrasHTML(i).includes('podcast'); })()"))
+        check("Podcast: no button without a real link (the Mac could never pull it)", await pg.evaluate(
+            "(() => { const i = { ...(allData.ritholtz[0] || { id: 'rth_x' }), url: '' }; return !extrasHTML(i).includes('podcast'); })()"))
         if pid:
             btn = f"#feed .item[data-id='{pid}'] [data-act=podcast]"
             await pg.click(btn); await pg.wait_for_timeout(300)

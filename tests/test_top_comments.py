@@ -163,11 +163,11 @@ def site(tmp_path, monkeypatch):
 
 
 def test_server_attaches_top_comments(site):
-    tc.save_cache({"m0": {"body": "Top &amp; best", "ups": 1234, "at": "x"},
+    tc.save_cache({"m0": {"body": "Top & best ?a=1&copy=2", "ups": 1234, "at": "x"},
                    "m1": {"body": "", "at": "x"},
                    "m2": {"body": "no ups", "ups": None, "at": "x"}}, site / "reddit_comments.json")
     cards = {i["id"]: i for i in server.get_data()["monthly"]}
-    assert cards["m0"]["top_comment"] == "Top & best"
+    assert cards["m0"]["top_comment"] == "Top & best ?a=1&copy=2"   # served as-is, never unescaped twice
     assert "top_comment" not in cards["m1"] and "top_comment" not in cards["m3"]
     assert cards["m2"]["top_comment"] == "no ups"
     assert not any("top_comment_ups" in i for i in cards.values())   # a frozen snapshot = not shown
@@ -198,6 +198,30 @@ def test_an_only_run_keeps_other_subs_comments(tmp_path):
     run(tc.fetch_top_comments(FakePage(), fetch, root=tmp_path, subs={"lifeprotips"}, pace=(0, 0)))   # typo: no such folder
     run(tc.fetch_top_comments(FakePage(), fetch, root=tmp_path, subs={"LifeProTips"}, pace=(0, 0)))
     assert tc.load_cache(tmp_path / "reddit_comments.json")["z0"]["body"] == "keep me"
+
+
+def test_pushback_is_never_cached(tmp_path):
+    """A 429 burst must not hide the top posts' comments for days: next run asks them again."""
+    write_list(posts("LifeProTips", "h", 6), "r_LifeProTips", root=tmp_path)
+    asked = []
+
+    async def slow_down(page, url):
+        raise RuntimeError("HTTP 429")
+
+    stats = run(tc.fetch_top_comments(FakePage(), slow_down, root=tmp_path, pace=(0, 0)))
+    assert stats["failed"] == 3 and stats["stopped"] and tc.load_cache(tmp_path / "reddit_comments.json") == {}
+
+    async def fine(page, url):
+        asked.append(url.split("/comments/")[1][:2]); return Resp(listing(c("ok")))
+
+    run(tc.fetch_top_comments(FakePage(), fine, root=tmp_path, pace=(0, 0)))
+    assert asked[:3] == ["h0", "h1", "h2"]
+
+
+def test_admin_removed_media_italics_bullets():
+    assert tc.pick_top(listing(c("[ Removed by Reddit ]", ups=900), c("real one"))) == {"body": "real one", "ups": 10}
+    assert tc.clean_body("lol ![gif](giphy|abc123) and ![img](emote|t5_2|123)") == "lol [GIF] and [image]"
+    assert tc.clean_body("it *could* work\n* one\n- two\n2*3*4 stays") == "it could work one two 2*3*4 stays"
 
 
 def test_failures_are_cached_and_404s_dont_stop_the_step(tmp_path):
