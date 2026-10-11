@@ -469,7 +469,7 @@ python3 core/scrape_reddit_browser.py --only LifeProTips --visible   # needs Pla
     deadline and block messages once), the stuck-profile fallback, the
     `METHOD CHECK` line, and GitHub's side (stalest first, own stamps, the RSS check line, only
     a real top list saved, and that `python core/scrape_top.py` really runs `main()`).
-- **`python3 tests/e2e_site.py [base_url]`** — 116 real-browser checks (~180 s; then 11 = quiet subs + Skip, last 27 = top comment, Later/snooze incl. a real Firestore round trip on a throwaway sync key, Podcast this + the paywalled paste box): every tab shows
+- **`python3 tests/e2e_site.py [base_url]`** — 136 real-browser checks (~200 s; then 11 = quiet subs + Skip, 27 = top comment, Later/snooze incl. a real Firestore round trip on a throwaway sync key, Podcast this + the paywalled paste box, last 20 = paywall flag + From your Favorites, real Firestore round trips on another throwaway key): every tab shows
   all the API's posts with the right label, the GitHub tab (API's top 10 in GitHub's order,
   "top 10 of N", GitHub's star counts, read + Undo, keys 5/6, its 24 h stale notice), real upvotes on cards, opening ≠ reading, the
   "Done with X?" prompt, undo, keys, stale notices (News 36 h, Reddit 48 h), footer stamps,
@@ -731,6 +731,29 @@ python3 core/scrape_reddit_browser.py --only LifeProTips --visible   # needs Pla
   `state` for the card: `ready` "In the podcast queue" → `writing` "Writing the script…" →
   `uploaded` (+`minutes`) = a link "In ElevenReader ✓ · N min" (library search, same query as `elevenreader.py search_query()`) | `failed` "Problem: see Telegram".
   Docs that ended (uploaded/failed) are deleted 3 days later so each run reads only live ones.
+  **Paywall flag** (11 Oct 2026, every card, matters on AM Reads): `paywallOf(url)` checks the
+  host against `PAYWALLED` (built from 529 AM Reads links Aug–Oct: wsj, nytimes, washingtonpost,
+  theatlantic, ft, bloomberg, barrons, wired, newyorker, …; subdomains count, `notwsj.com` doesn't).
+  Hit = chip "Paywall · Open Option 3" (`ARCHIVE(url)`, same link as the paste box; a tap =
+  opened, never read). A publisher gift link reads free → "Gift link · free" instead: host
+  `giftarticle.ft.com` or a query key in `GIFT_PARAMS` (NYT `unlocked_article_code`, WSJ `st`,
+  WaPo `pwapi_token`, Bloomberg `accessToken`, Atlantic `gift`; `amp;`-mangled keys too). No
+  chip while the podcast paste box shows (it has its own Option 3 link). Client-side list
+  only: the Mac's real paywall check runs after "Podcast this", not before. If the owner
+  subscribes to a site, drop it from `PAYWALLED`.
+  **From your Favorites** (11 Oct 2026): once a day (Eastern) one favorite saved 7+ days ago
+  (`RESURFACE_MIN_DAYS`) sits at the top of every tab (not search / cleared list): "You saved
+  this N days ago. Still good?" + Keep / Let go (+ the paywall chip). It's a `<section
+  class="resurface" data-fav>`, NOT a feed card: no swipe, tick, j/k, counts or badge; the click
+  handler takes it first. Pick = never-resurfaced first, then oldest `savedAt`; it's stamped on
+  the favorite doc (`resurfacedOn: YYYY-MM-DD`), so every device shows the same one. Keep =
+  `answeredOn` + `keptAt` (Undo deletes `answeredOn`); it comes round again only when
+  `resurfacedOn` is 60+ days old (`RESURFACE_GAP_DAYS`), and so does one he ignored. Let go =
+  doc deleted, Undo writes the old doc back as it was. New stars write `savedAt`; un-star +
+  Undo (`favItem`) also restores the old doc, so the saved date survives. Stars from before
+  11 Oct had no `savedAt`: `fillSavedAt()` copies Firestore's own `createTime` once (REST list
+  with the anonymous ID token, `mask.fieldPaths=id`, µs cut to ms for Safari). If that fails
+  (`savedAtFill = 'failed'`) such stars can still come up, labelled "From your Favorites".
 - `manifest.json` + `sw.js` — PWA; network-first service worker (cache `daily-reader-v2`, only
   the offline fallback; an offline `/api/data` copy carries `X-Offline-Copy: 1`).
 - `server_assets/icon.png` — app icon.

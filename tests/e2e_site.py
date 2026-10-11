@@ -650,6 +650,112 @@ async def main():
             await pg.evaluate(f"col('podcast_requests').doc(getSafeId(findItem({sid_js}))).delete()")
         check("No JS errors (later/podcast)", not errs5, "; ".join(errs5)[:200])
         await ctx.close()
+
+        # ---------- Paywall flag + "From your Favorites" (11 Oct 2026) ----------
+        # Fresh browser = fresh ZZE2E sync key: the favorites below never touch the owner's.
+        ctx = await b.new_context(viewport={"width": 390, "height": 844}, service_workers="block")
+        await ctx.route("https://archive.is/**", lambda r: r.abort())   # Option 3 opens a tab; never hit archive.is
+        pg = await ctx.new_page()
+        errs6 = []
+        pg.on("pageerror", lambda e: errs6.append(str(e)))
+        await pg.goto(BASE)
+        await pg.wait_for_function("allData && readLoaded && favLoaded", timeout=20000)
+        cases = {
+            "https://www.nytimes.com/2026/10/04/magazine/x.html": "wall",
+            "https://www.nytimes.com/2026/10/04/x.html?unlocked_article_code=1.abc&smid=url-share": "gift",
+            "https://www.wsj.com/finance/x?mod=hp_lead_pos7": "wall",
+            "https://www.wsj.com/finance/x?reflink=desktopwebshare_permalink&st=6qj7my": "gift",
+            "https://www.wsj.com/x?amp%3Breflink=desktopwebshare_permalink&st=1WnK3s": "gift",
+            "https://www.washingtonpost.com/health/x/?pwapi_token=eyJ0&utm_source=nextdraft": "gift",
+            "https://giftarticle.ft.com/giftarticle/actions/redeem/abc": "gift",
+            "https://www.ft.com/content/abc?syn-25a6b1a6=1": "wall",
+            "https://blogs.wsj.com/x": "wall",
+            "https://notwsj.com/x": "",
+            "https://www.theguardian.com/x": "",
+            "https://reddit.com/r/x": "",
+            "not a url": "",
+        }
+        got = await pg.evaluate(f"Object.fromEntries({json.dumps(list(cases))}.map((u) => [u, paywallOf(u)]))")
+        bad = {u: (got[u], want) for u, want in cases.items() if got[u] != want}
+        check("Paywall: known sites flagged, gift links + free sites not", not bad, str(bad)[:300])
+        await pg.click('[data-tab="ritholtz"]:visible'); await pg.wait_for_timeout(400)
+        await pg.evaluate("amShowOlder = true")
+        pw_url = "https://www.nytimes.com/2026/10/04/magazine/gambling.html?smid=nytcore-ios-share"
+        pw_id = await pg.evaluate(f"""(() => {{ const it = allData.ritholtz.find((i) => isAmRead(i)); if (!it) return null;
+            it.url = {json.dumps(pw_url)}; render(); return String(it.id); }})()""")
+        check("Paywall: an AM Read to test on", bool(pw_id))
+        if pw_id:
+            chip = f"#feed .item[data-id='{pw_id}'] .mini-btn.wall"
+            href = await pg.get_attribute(chip, "href") if await pg.locator(chip).count() else None
+            check("Paywall: card shows the lock + Option 3 link (query dropped)",
+                  href == "https://archive.is/oldest/https://www.nytimes.com/2026/10/04/magazine/gambling.html", href)
+            async with ctx.expect_page() as popup:
+                await pg.click(chip)
+            await (await popup.value).close()
+            check("Paywall: tapping Option 3 counts as opened, never as read",
+                  await pg.evaluate(f"wasOpened(findItem({json.dumps(pw_id)})) && !isRead(findItem({json.dumps(pw_id)}))"))
+            hidden = await pg.evaluate(f"""(() => {{ const it = findItem({json.dumps(pw_id)}), k = getSafeId(it), keep = podcastReq[k];
+                podcastReq[k] = {{ url: it.url, pulled: 'x', state: 'needs-paste' }}; const h = extrasHTML(it);
+                if (keep) podcastReq[k] = keep; else delete podcastReq[k]; return h; }})()""")
+            check("Paywall: no extra chip when the paste box already shows Option 3",
+                  "mini-btn wall" not in hidden and "paste-box" in hidden, hidden[-120:])
+        # From your Favorites: seed 3 old favorites (+ 1 too new) in this throwaway sync group.
+        seed = await pg.evaluate("""(async () => {
+            const at = (n) => new Date(Date.now() - n * 864e5).toISOString(), b = db.batch(), out = [];
+            for (const [n, days] of [['a', 30], ['b', 10], ['c', 2]]) {
+                const f = { id: 'zzfav' + n, title: 'Resurface test ' + n, desc: '', url: 'https://example.com/zz-' + n,
+                            meta: '', source: 'Test', domain: 'example.com', date: '', savedAt: at(days) };
+                b.set(col('favorites').doc(getSafeId(f)), f); out.push(getSafeId(f));
+            }
+            const legacy = { id: 'zzfavold', title: 'Legacy favorite', desc: '', url: 'https://example.com/zz-old', meta: '', source: 'Test', domain: '', date: '' };
+            b.set(col('favorites').doc(getSafeId(legacy)), legacy); out.push(getSafeId(legacy));
+            await b.commit(); return out; })()""")
+        await pg.wait_for_function("cloudFavorites.length >= 4", timeout=15000)
+        await pg.evaluate("savedAtFill = 'todo'; fillSavedAt()")
+        await pg.wait_for_function("savedAtFill !== 'todo' && savedAtFill !== 'running'", timeout=15000)
+        legacy_at = await pg.evaluate("(cloudFavorites.find((f) => f.id === 'zzfavold') || {}).savedAt || ''")
+        check("Favorites: old ones get savedAt from Firestore's createTime",
+              await pg.evaluate("savedAtFill") == "done" and await pg.evaluate(f"Math.abs(Date.now() - Date.parse({json.dumps(legacy_at)})) < 600e3"),
+              f"{await pg.evaluate('savedAtFill')} {legacy_at}")
+        await pg.click('[data-tab="monthly"]:visible'); await pg.wait_for_timeout(500)
+        card = "#feed > .resurface"
+        txt = await pg.inner_text(card) if await pg.locator(card).count() else ""
+        check("Favorites: the oldest one comes back at the top", "30 days ago" in txt and "Resurface test a" in txt, txt[:80])
+        check("Favorites: it's first in the feed and not a feed card (no tick/j-k)",
+              await pg.evaluate("document.querySelector('#feed > *').classList.contains('resurface') && !visibleItems.some((i) => i.id === 'zzfava')"))
+        await pg.click('[data-tab="ritholtz"]:visible'); await pg.wait_for_timeout(300)
+        check("Favorites: same card on the other tabs", "Resurface test a" in (await pg.inner_text(card) if await pg.locator(card).count() else ""))
+        await pg.wait_for_timeout(1500)
+        stamp = await pg.evaluate(f"col('favorites').doc({json.dumps(seed[0])}).get().then((d) => d.data().resurfacedOn)")
+        check("Favorites: today's pick is stamped in the cloud (every device shows the same one)",
+              stamp == await pg.evaluate("etDate()"), stamp)
+        await pg.click(card + " [data-act=rskeep]"); await pg.wait_for_timeout(300)
+        check("Favorites: Keep = card gone", await pg.locator(card).count() == 0)
+        await pg.wait_for_timeout(2000)
+        await pg.reload()
+        await pg.wait_for_function("allData && readLoaded && favLoaded && savedAtFill === 'done'", timeout=20000)
+        await pg.wait_for_timeout(500)
+        check("Favorites: Keep is saved (no card after a reload, nothing else picked today)", await pg.locator(card).count() == 0)
+        # Next day: yesterday's pick waits its 60 days; the next oldest (10 days) comes up.
+        await pg.evaluate(f"col('favorites').doc({json.dumps(seed[0])}).update({{ resurfacedOn: etShift(-1), answeredOn: etShift(-1) }})")
+        await pg.wait_for_selector(card, timeout=10000)
+        txt = await pg.inner_text(card)
+        check("Favorites: next day brings the next one (too-new ones never)", "10 days ago" in txt and "Resurface test b" in txt, txt[:80])
+        await pg.click(card + " [data-act=rsletgo]"); await pg.wait_for_timeout(1500)
+        gone = not await pg.evaluate(f"col('favorites').doc({json.dumps(seed[1])}).get().then((d) => d.exists)")
+        check("Favorites: Let go removes it from Favorites", gone and await pg.locator(card).count() == 0)
+        await pg.click("#toast-undo"); await pg.wait_for_timeout(1500)
+        back = await pg.evaluate(f"col('favorites').doc({json.dumps(seed[1])}).get().then((d) => d.exists && d.data().savedAt)")
+        check("Favorites: Undo puts it back with its saved date", bool(back) and "Resurface test b" in await pg.inner_text(card), str(back))
+        # Undo after un-starring from the feed keeps savedAt too (not reset to now).
+        await pg.click('[data-tab="favorites"]:visible'); await pg.wait_for_timeout(400)
+        await pg.click(f"#feed > .item[data-id='zzfava'] [data-act=fav]"); await pg.wait_for_timeout(300)
+        await pg.click("#toast-undo"); await pg.wait_for_timeout(1500)
+        kept_at = await pg.evaluate(f"col('favorites').doc({json.dumps(seed[0])}).get().then((d) => d.exists && d.data().savedAt)")
+        check("Favorites: star off + Undo keeps the old saved date", bool(kept_at) and await pg.evaluate(f"daysAgo({json.dumps(kept_at)})") == 30, str(kept_at))
+        await pg.evaluate(f"Promise.all({json.dumps(seed)}.map((k) => col('favorites').doc(k).delete()))")
+        check("No JS errors (paywall/favorites)", not errs6, "; ".join(errs6)[:200])
+        await ctx.close()
         await b.close()
     print(f"\n{sum(results)}/{len(results)} passed")
     sys.exit(0 if all(results) else 1)
