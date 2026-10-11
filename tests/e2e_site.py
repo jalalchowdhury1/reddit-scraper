@@ -602,6 +602,19 @@ async def main():
             check("Podcast: saved to the cloud (after a reload)", "Podcast requested" in await pg.inner_text(btn))
             await pg.click(btn); await pg.wait_for_timeout(300)
             check("Podcast: tap again takes it back", "Podcast this" in await pg.inner_text(btn))
+            # Live status (10 Oct eve): the Mac mirrors writing -> uploaded | failed onto the doc.
+            states = await pg.evaluate(f"""(() => {{ const it = findItem({json.dumps(pid)}), k = getSafeId(it), keep = podcastReq[k];
+                const out = {{}};
+                for (const [st, extra] of [['writing', {{}}], ['uploaded', {{ minutes: '42' }}], ['failed', {{}}]]) {{
+                    podcastReq[k] = {{ url: it.url, pulled: 'x', state: st, ...extra }}; out[st] = extrasHTML(it); }}
+                if (keep) podcastReq[k] = keep; else delete podcastReq[k];
+                return out; }})()""")
+            check("Podcast: writing state shows on the card", "Writing the script" in states["writing"], states["writing"][-160:])
+            check("Podcast: uploaded = ElevenReader link with minutes",
+                  "In ElevenReader ✓ · 42 min" in states["uploaded"] and "elevenreader.io/reader/library?search=" in states["uploaded"],
+                  states["uploaded"][-200:])
+            check("Podcast: failed state shows on the card", "Couldn't make it" in states["failed"] or "Couldn&#39;t make it" in states["failed"],
+                  states["failed"][-160:])
             # Paywalled (10 Oct): the Mac says needs-paste -> Option 3 link + paste box -> the paste goes to the cloud.
             sid_js = json.dumps(pid)
             await pg.evaluate(f"""(() => {{ const it = findItem({sid_js});

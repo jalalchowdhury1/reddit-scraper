@@ -530,8 +530,12 @@ let showSnoozed = false;
 const isAmRead = (item) => /^(rth|trg)_/.test(String(item.id));
 const podcastDoc = (item) => podcastReq[getSafeId(item)];
 // The Mac mini's word on a pulled request: ready (it has the text), needs-paste (paywall it
-// couldn't get past: Option 3 on the phone + paste), pasted (waiting for the next :05/:35 run).
+// couldn't get past: Option 3 on the phone + paste), pasted (waiting for the next 5-min run),
+// writing (script being made), uploaded (in ElevenReader; `minutes`), failed (10 Oct eve).
+// Uploaded/failed docs are deleted by the Mac 3 days later.
 const ARCHIVE = (url) => 'https://archive.is/oldest/' + url;   // removepaywall.com's "Option 3"
+const ER_SEARCH = (title) => 'https://elevenreader.io/reader/library?search=' +
+    encodeURIComponent(((title || '').match(/[A-Za-z]{4,}/g) || []).sort((a, b) => b.length - a.length)[0] || '');
 function pasteSave(item) {
     const id = String(item.id), text = (pasteDraft[id] || '').trim(), words = text ? text.split(/\s+/).length : 0;
     if (words < 150) { toast(words ? `Only ${words} words: copy the whole article` : 'Paste the article first'); return; }
@@ -540,7 +544,7 @@ function pasteSave(item) {
     col('podcast_requests').doc(getSafeId(item)).set(doc, { merge: true }).catch(syncFailed);
     pasteOpen = null; delete pasteDraft[id];
     buzz(); render();
-    toast(`Got ${words} words. The Mac mini picks it up within 30 min`);
+    toast(`Got ${words} words. The Mac mini picks it up within 5 min`);
 }
 function podcastItem(item) {
     const ref = col('podcast_requests').doc(getSafeId(item));
@@ -1113,8 +1117,11 @@ function extrasHTML(item) {
                     <div class="row"><button class="mini-btn on" data-act="pastesave"><i class="ph ph-check"></i>Send to the podcast queue</button>
                     <button class="mini-btn" data-act="pastecancel">Cancel</button></div>`
                        : `<div class="row"><button class="mini-btn on" data-act="pasteopen"><i class="ph ph-clipboard-text"></i>Paste article</button></div>`}</div>`);
+        } else if (st === 'uploaded') {
+            out.push(`<a class="mini-btn on" href="${esc(ER_SEARCH(item.title))}" target="_blank" rel="noopener" title="Open it in ElevenReader"><i class="ph-fill ph-headphones"></i>In ElevenReader ✓${d.minutes ? ` · ${esc(d.minutes)} min` : ''}</a>`);
         } else {
-            const label = !d ? 'Podcast this' : st === 'pasted' ? 'Pasted · Mac picks it up soon' : st ? 'In the podcast queue' : 'Podcast requested';
+            const label = !d ? 'Podcast this' : st === 'pasted' ? 'Pasted · Mac picks it up soon' : st === 'writing' ? 'Writing the script…'
+                        : st === 'failed' ? "Couldn't make it (see Telegram)" : st ? 'In the podcast queue' : 'Podcast requested';
             out.push(d ? `<button class="mini-btn on" data-act="podcast" ${st ? 'disabled' : ''} title="${st ? 'The Mac mini has it' : 'Requested; tap to take it back'}"><i class="ph-fill ph-headphones"></i>${label}</button>`
                        : `<button class="mini-btn" data-act="podcast" title="Add this article to the podcast queue"><i class="ph ph-headphones"></i>Podcast this</button>`);
         }
