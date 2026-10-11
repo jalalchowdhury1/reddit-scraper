@@ -543,7 +543,8 @@ const podcastDoc = (item) => podcastReq[getSafeId(item)];
 // writing (script being made), uploaded (in ElevenReader; `minutes`), failed (10 Oct eve).
 // Uploaded/failed docs are deleted by the Mac 3 days later.
 // removepaywall.com's "Option 3" exactly: the url WITHOUT its ?query/#part (11 Oct: "?mod=…" kept = a different archive.is lookup)
-const ARCHIVE = (url) => 'https://archive.is/oldest/' + String(url || '').split('#')[0].split('?')[0];
+// host 'archive.ph' = the Backup link: the same archive at another address (11 Oct test: full article on 9 of 9 sites, like archive.is)
+const ARCHIVE = (url, host = 'archive.is') => `https://${host}/oldest/` + String(url || '').split('#')[0].split('?')[0];
 // Same query as the Mac's elevenreader.py search_query(): the title (cut at " . ", as uploaded)
 // up to its first punctuation, at most 4 words; under 2 words -> its longest word.
 const ER_SEARCH = (title) => {
@@ -601,7 +602,9 @@ function isPaywalled(url) {
 function paywallHTML(item) {
     if (!isPaywalled(item.url)) return '';
     return `<a class="mini-btn wall" data-act="option3" href="${esc(ARCHIVE(item.url))}" target="_blank" rel="noopener noreferrer"
-        title="${esc(domainOf(item.url))} usually has a paywall. Option 3 = the archive.is copy"><i class="ph ph-lock-simple"></i>Paywall · Open Option 3</a>`;
+        title="${esc(domainOf(item.url))} usually has a paywall. Option 3 = the archive.is copy"><i class="ph ph-lock-simple"></i>Paywall · Open Option 3</a>
+        <a class="mini-btn wall" data-act="option3b" href="${esc(ARCHIVE(item.url, 'archive.ph'))}" target="_blank" rel="noopener noreferrer"
+        title="Option 3 won't load? The same archive at archive.ph"><i class="ph ph-lifebuoy"></i>Backup</a>`;
 }
 
 // ---------- From your Favorites (11 Oct 2026) ----------
@@ -1246,7 +1249,7 @@ function extrasHTML(item) {
         if (st === 'needs-paste' || st === 'paste-too-short') {
             const open = pasteOpen === id;
             out.push(`<div class="paste-box" data-act="pastebox"><i class="ph ph-lock-simple"></i> ${st === 'paste-too-short' ? 'That paste was too short. ' : ''}Paywalled: the Mac mini couldn't get the article.
-                <a href="${esc(ARCHIVE(item.url))}" target="_blank" rel="noopener">Open Option 3</a>, copy the whole article, then paste it here.
+                <a href="${esc(ARCHIVE(item.url))}" target="_blank" rel="noopener">Open Option 3</a> (won't load? <a href="${esc(ARCHIVE(item.url, 'archive.ph'))}" target="_blank" rel="noopener">try the backup</a>), copy the whole article, then paste it here.
                 ${open ? `<textarea data-paste="${esc(id)}" placeholder="Paste the article text">${esc(pasteDraft[id] || '')}</textarea>
                     <div class="row"><button class="mini-btn on" data-act="pastesave"><i class="ph ph-check"></i>Send to the podcast queue</button>
                     <button class="mini-btn" data-act="pastecancel">Cancel</button></div>`
@@ -1680,7 +1683,7 @@ document.getElementById('feed').addEventListener('click', (e) => {
         if (a === 'pasteopen') { pasteOpen = String(item.id); render(); const t = document.querySelector(`textarea[data-paste="${CSS.escape(pasteOpen)}"]`); if (t) t.focus(); }
         if (a === 'pastecancel') { pasteOpen = null; render(); }
         if (a === 'pastesave') pasteSave(item);
-        if (a === 'option3') noteOpened(item);   // the link still opens; like the title, it never marks read
+        if (a === 'option3' || a === 'option3b') noteOpened(item);   // the link still opens; like the title, it never marks read
         return;   // incl. 'pastebox': taps inside the paste box never open/expand the card
     }
     const card = e.target.closest('.item');

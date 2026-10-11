@@ -634,6 +634,9 @@ async def main():
             href = await pg.get_attribute(box + " a", "href")
             url = await pg.evaluate(f"findItem({sid_js}).url")
             check("Paywalled: card shows the Option 3 link", href == "https://archive.is/oldest/" + url, href)
+            hrefs = await pg.eval_on_selector_all(box + " a", "els => els.map((a) => a.getAttribute('href'))")
+            check("Paywalled: paste box has the archive.ph backup too",
+                  (href or "").replace("https://archive.is/", "https://archive.ph/", 1) in hrefs and len(hrefs) == 2, str(hrefs))
             await pg.click(box + " [data-act=pasteopen]")
             await pg.fill(box + " textarea", "too short to be an article")
             await pg.click(box + " [data-act=pastesave]"); await pg.wait_for_timeout(300)
@@ -655,6 +658,7 @@ async def main():
         # Fresh browser = fresh ZZE2E sync key: the favorites below never touch the owner's.
         ctx = await b.new_context(viewport={"width": 390, "height": 844}, service_workers="block")
         await ctx.route("https://archive.is/**", lambda r: r.abort())
+        await ctx.route("https://archive.ph/**", lambda r: r.abort())
         pg = await ctx.new_page()
         errs6 = []
         pg.on("pageerror", lambda e: errs6.append(str(e)))
@@ -694,6 +698,18 @@ async def main():
             await (await popup.value).close()
             check("Paywall: tapping Option 3 counts as opened, never as read",
                   await pg.evaluate(f"wasOpened(findItem({json.dumps(pw_id)})) && !isRead(findItem({json.dumps(pw_id)}))"))
+            # Backup (11 Oct): the same archive at archive.ph, for when archive.is won't load.
+            bk = f"#feed .item[data-id='{pw_id}'] [data-act=option3b]"
+            bhref = await pg.get_attribute(bk, "href") if await pg.locator(bk).count() else None
+            check("Paywall: Backup chip = the same copy on archive.ph",
+                  bhref == "https://archive.ph/oldest/https://www.nytimes.com/2026/10/04/magazine/gambling.html", bhref)
+            if bhref:
+                await pg.evaluate(f"delete opened[{json.dumps(pw_id)}]")
+                async with ctx.expect_page() as popup:
+                    await pg.click(bk)
+                await (await popup.value).close()
+                check("Paywall: tapping Backup counts as opened, never as read",
+                      await pg.evaluate(f"wasOpened(findItem({json.dumps(pw_id)})) && !isRead(findItem({json.dumps(pw_id)}))"))
             gift_html = await pg.evaluate("paywallHTML({ url: 'https://www.wsj.com/finance/x-efd4c694?reflink=desktopwebshare_permalink&st=6qj7my' })")
             check("Paywall: a gift link gets Option 3 too (gift links don't open free)",
                   'href="https://archive.is/oldest/https://www.wsj.com/finance/x-efd4c694"' in gift_html, gift_html[:160])

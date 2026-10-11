@@ -469,7 +469,7 @@ python3 core/scrape_reddit_browser.py --only LifeProTips --visible   # needs Pla
     deadline and block messages once), the stuck-profile fallback, the
     `METHOD CHECK` line, and GitHub's side (stalest first, own stamps, the RSS check line, only
     a real top list saved, and that `python core/scrape_top.py` really runs `main()`).
-- **`python3 tests/e2e_site.py [base_url]`** — 137 real-browser checks (~200 s; then 11 = quiet subs + Skip, 27 = top comment, Later/snooze incl. a real Firestore round trip on a throwaway sync key, Podcast this + the paywalled paste box, last 21 = paywall flag + From your Favorites, real Firestore round trips on another throwaway key): every tab shows
+- **`python3 tests/e2e_site.py [base_url]`** — 140 real-browser checks (~200 s; then 11 = quiet subs + Skip, 27 = top comment, Later/snooze incl. a real Firestore round trip on a throwaway sync key, Podcast this + the paywalled paste box, last 23 = paywall flag (+ Backup chip) + From your Favorites, real Firestore round trips on another throwaway key): every tab shows
   all the API's posts with the right label, the GitHub tab (API's top 10 in GitHub's order,
   "top 10 of N", GitHub's star counts, read + Undo, keys 5/6, its 24 h stale notice), real upvotes on cards, opening ≠ reading, the
   "Done with X?" prompt, undo, keys, stale notices (News 36 h, Reddit 48 h), footer stamps,
@@ -735,7 +735,11 @@ python3 core/scrape_reddit_browser.py --only LifeProTips --visible   # needs Pla
   host against `PAYWALLED` (built from 529 AM Reads links Aug–Oct: wsj, nytimes, washingtonpost,
   theatlantic, ft, bloomberg, barrons, wired, newyorker, …; subdomains count, `notwsj.com` doesn't).
   Hit = chip "Paywall · Open Option 3" (`ARCHIVE(url)`, same link as the paste box; a tap =
-  opened, never read). Gift links (NYT `unlocked_article_code`, WSJ `st`, …) get the same
+  opened, never read) + a "Backup" chip (`data-act="option3b"`, `ARCHIVE(url, 'archive.ph')`:
+  the same archive at another address, for when archive.is won't load; the paste box has it
+  too as "try the backup"). Backups tested 11 Oct on 9 paywalled sites in real phone-size
+  renders: archive.ph/oldest and archive.is/newest 9/9; Wayback 2/9; 13ft/Ladder recipe 2/9;
+  Jina Reader 0/9; 12ft.io and smry.ai are gone. Don't swap in a git-repo proxy. Gift links (NYT `unlocked_article_code`, WSJ `st`, …) get the same
   chip: the owner found they don't open free (11 Oct; a separate "Gift link" chip was removed). No
   chip while the podcast paste box shows (it has its own Option 3 link). Client-side list
   only: the Mac's real paywall check runs after "Podcast this", not before. If the owner
