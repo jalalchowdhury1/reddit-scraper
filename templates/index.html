@@ -161,9 +161,8 @@
         .mini-btn:disabled { opacity: .8; cursor: default; }
         .snooze-menu .mini-btn { color: var(--text); }
         /* Paywalled podcast request: Option 3 link + paste box (10 Oct 2026). */
-        /* Paywall flag + gift link (11 Oct 2026) */
-        .mini-btn.wall, .mini-btn.gift { text-decoration: none; }
-        .mini-btn.gift { color: var(--accent); }
+        /* Paywall flag (11 Oct 2026) */
+        .mini-btn.wall { text-decoration: none; }
         /* "From your Favorites": one old favorite a day, at the top of every tab */
         .resurface { grid-column: 1 / -1; margin: 10px 0 6px; padding: 4px 14px 14px; border-radius: var(--radius); border: 1px solid var(--line); background: var(--surface); }
         .resurface .section-label { padding: 10px 0 6px; }
@@ -588,32 +587,21 @@ function podcastItem(item) {
 
 // ---------- Paywall flag (11 Oct 2026) ----------
 // Sites in Ritholtz's lists that wall off a casual reader (hard or metered). The card says
-// so BEFORE the tap and offers Option 3 (archive.is). A publisher's gift link (its token in
-// the url) reads free, so it gets "Gift link" instead. The Mac's own check only runs after
-// "Podcast this"; this list is what it found plus the usual suspects.
+// so BEFORE the tap and offers Option 3 (archive.is). Gift links get the same chip: the
+// owner found they don't open free (11 Oct), so there is no separate case for them. The
+// Mac's own check only runs after "Podcast this"; this list is what it found plus the usual suspects.
 const PAYWALLED = ['wsj.com', 'nytimes.com', 'washingtonpost.com', 'theatlantic.com', 'ft.com', 'bloomberg.com',
     'barrons.com', 'wired.com', 'newyorker.com', 'vanityfair.com', 'businessinsider.com', 'foreignaffairs.com',
     'sfchronicle.com', 'economist.com', 'theinformation.com', 'latimes.com', 'bostonglobe.com', 'hbr.org',
     'nymag.com', 'newscientist.com', 'thetimes.co.uk', 'telegraph.co.uk', 'theathletic.com'];
-const GIFT_HOSTS = ['giftarticle.ft.com'];
-// NYT unlocked_article_code, WSJ st, WaPo pwapi_token, Bloomberg accessToken, Atlantic gift
-const GIFT_PARAMS = ['unlocked_article_code', 'st', 'pwapi_token', 'accesstoken', 'gift'];
-function paywallOf(url) {
-    let u; try { u = new URL(url); } catch { return ''; }
-    const host = u.hostname.toLowerCase();
-    if (!PAYWALLED.some((d) => host === d || host.endsWith('.' + d))) return '';
-    if (GIFT_HOSTS.includes(host)) return 'gift';
-    for (const k of u.searchParams.keys()) if (GIFT_PARAMS.includes(k.toLowerCase().replace(/^amp;/, ''))) return 'gift';
-    return 'wall';
+function isPaywalled(url) {
+    let host; try { host = new URL(url).hostname.toLowerCase(); } catch { return false; }
+    return PAYWALLED.some((d) => host === d || host.endsWith('.' + d));
 }
 function paywallHTML(item) {
-    const pw = paywallOf(item.url);
-    // A real link (11 Oct: a <span> looked tappable and did nothing). Full url: the token is the gift.
-    if (pw === 'gift') return `<a class="mini-btn gift" data-act="option3" href="${esc(safeUrl(item.url))}" target="_blank" rel="noopener noreferrer"
-        title="A gift link from the publisher: free to read"><i class="ph ph-gift"></i>Gift link · Open free</a>`;
-    if (pw === 'wall') return `<a class="mini-btn wall" data-act="option3" href="${esc(ARCHIVE(item.url))}" target="_blank" rel="noopener noreferrer"
+    if (!isPaywalled(item.url)) return '';
+    return `<a class="mini-btn wall" data-act="option3" href="${esc(ARCHIVE(item.url))}" target="_blank" rel="noopener noreferrer"
         title="${esc(domainOf(item.url))} usually has a paywall. Option 3 = the archive.is copy"><i class="ph ph-lock-simple"></i>Paywall · Open Option 3</a>`;
-    return '';
 }
 
 // ---------- From your Favorites (11 Oct 2026) ----------
