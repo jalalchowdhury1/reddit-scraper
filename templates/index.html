@@ -534,8 +534,13 @@ const podcastDoc = (item) => podcastReq[getSafeId(item)];
 // writing (script being made), uploaded (in ElevenReader; `minutes`), failed (10 Oct eve).
 // Uploaded/failed docs are deleted by the Mac 3 days later.
 const ARCHIVE = (url) => 'https://archive.is/oldest/' + url;   // removepaywall.com's "Option 3"
-const ER_SEARCH = (title) => 'https://elevenreader.io/reader/library?search=' +
-    encodeURIComponent(((title || '').match(/[A-Za-z]{4,}/g) || []).sort((a, b) => b.length - a.length)[0] || '');
+// Same query as the Mac's elevenreader.py search_query(): the title (cut at " . ", as uploaded)
+// up to its first punctuation, at most 4 words; under 2 words -> its longest word.
+const ER_SEARCH = (title) => {
+    const t = (title || '').split(' . ')[0].trim(), words = (t.match(/^[A-Za-z0-9 ]*/)[0].match(/\S+/g) || []).slice(0, 4);
+    const q = words.length >= 2 ? words.join(' ') : ((t.match(/[A-Za-z0-9]{3,}/g) || []).sort((a, b) => b.length - a.length)[0] || t.slice(0, 20));
+    return 'https://elevenreader.io/reader/library?search=' + encodeURIComponent(q);
+};
 function pasteSave(item) {
     const id = String(item.id), text = (pasteDraft[id] || '').trim(), words = text ? text.split(/\s+/).length : 0;
     if (words < 150) { toast(words ? `Only ${words} words: copy the whole article` : 'Paste the article first'); return; }
@@ -1121,7 +1126,7 @@ function extrasHTML(item) {
             out.push(`<a class="mini-btn on" href="${esc(ER_SEARCH(item.title))}" target="_blank" rel="noopener" title="Open it in ElevenReader"><i class="ph-fill ph-headphones"></i>In ElevenReader ✓${d.minutes ? ` · ${esc(d.minutes)} min` : ''}</a>`);
         } else {
             const label = !d ? 'Podcast this' : st === 'pasted' ? 'Pasted · Mac picks it up soon' : st === 'writing' ? 'Writing the script…'
-                        : st === 'failed' ? "Couldn't make it (see Telegram)" : st ? 'In the podcast queue' : 'Podcast requested';
+                        : st === 'failed' ? 'Problem: see Telegram' : st ? 'In the podcast queue' : 'Podcast requested';
             out.push(d ? `<button class="mini-btn on" data-act="podcast" ${st ? 'disabled' : ''} title="${st ? 'The Mac mini has it' : 'Requested; tap to take it back'}"><i class="ph-fill ph-headphones"></i>${label}</button>`
                        : `<button class="mini-btn" data-act="podcast" title="Add this article to the podcast queue"><i class="ph ph-headphones"></i>Podcast this</button>`);
         }

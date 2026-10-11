@@ -613,7 +613,12 @@ async def main():
             check("Podcast: uploaded = ElevenReader link with minutes",
                   "In ElevenReader ✓ · 42 min" in states["uploaded"] and "elevenreader.io/reader/library?search=" in states["uploaded"],
                   states["uploaded"][-200:])
-            check("Podcast: failed state shows on the card", "Couldn't make it" in states["failed"] or "Couldn&#39;t make it" in states["failed"],
+            q = await pg.evaluate("[ER_SEARCH(\"Tim Cook's Apple . How it works\"), ER_SEARCH('How Everything Became Gambling, Part 2'), ER_SEARCH('Why')]")
+            check("Podcast: ElevenReader link searches what the Mac uploads (cut at ' . ', first words)",
+                  q == ["https://elevenreader.io/reader/library?search=Tim%20Cook",
+                        "https://elevenreader.io/reader/library?search=How%20Everything%20Became%20Gambling",
+                        "https://elevenreader.io/reader/library?search=Why"], str(q))
+            check("Podcast: failed state shows on the card", "Problem: see Telegram" in states["failed"],
                   states["failed"][-160:])
             # Paywalled (10 Oct): the Mac says needs-paste -> Option 3 link + paste box -> the paste goes to the cloud.
             sid_js = json.dumps(pid)
