@@ -533,7 +533,8 @@ const podcastDoc = (item) => podcastReq[getSafeId(item)];
 // couldn't get past: Option 3 on the phone + paste), pasted (waiting for the next 5-min run),
 // writing (script being made), uploaded (in ElevenReader; `minutes`), failed (10 Oct eve).
 // Uploaded/failed docs are deleted by the Mac 3 days later.
-const ARCHIVE = (url) => 'https://archive.is/oldest/' + url;   // removepaywall.com's "Option 3"
+// removepaywall.com's "Option 3" exactly: the url WITHOUT its ?query/#part (11 Oct: "?mod=…" kept = a different archive.is lookup)
+const ARCHIVE = (url) => 'https://archive.is/oldest/' + String(url || '').split('#')[0].split('?')[0];
 // Same query as the Mac's elevenreader.py search_query(): the title (cut at " . ", as uploaded)
 // up to its first punctuation, at most 4 words; under 2 words -> its longest word.
 const ER_SEARCH = (title) => {
