@@ -37,7 +37,10 @@ async def main():
         pg = await ctx.new_page()
         errs = []
         pg.on("pageerror", lambda e: errs.append(str(e)))
-        pg.on("console", lambda m: m.type == "error" and "favicons" not in m.text and errs.append("console: " + m.text))
+        # A site with no icon 404s on Google's favicon service (the card hides it, onerror). Chrome's
+        # "Failed to load resource" text has no URL, so match the message's location url (11 Oct).
+        pg.on("console", lambda m: m.type == "error" and "favicon" not in (m.text + m.location.get("url", "")).lower()
+              and errs.append("console: " + m.text))
         await pg.goto(BASE + "/", wait_until="load")
         await pg.wait_for_function("allData", timeout=20000)   # a cold local server can take ~2 s
         await pg.wait_for_timeout(1500)
