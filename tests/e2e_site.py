@@ -654,7 +654,8 @@ async def main():
         # ---------- Paywall flag + "From your Favorites" (11 Oct 2026) ----------
         # Fresh browser = fresh ZZE2E sync key: the favorites below never touch the owner's.
         ctx = await b.new_context(viewport={"width": 390, "height": 844}, service_workers="block")
-        await ctx.route("https://archive.is/**", lambda r: r.abort())   # Option 3 opens a tab; never hit archive.is
+        await ctx.route("https://archive.is/**", lambda r: r.abort())
+        await ctx.route("https://www.wsj.com/**", lambda r: r.fulfill(status=200, content_type="text/html", body="gift ok"))   # gift-link tap test: never hit wsj.com   # Option 3 opens a tab; never hit archive.is
         pg = await ctx.new_page()
         errs6 = []
         pg.on("pageerror", lambda e: errs6.append(str(e)))
@@ -694,6 +695,19 @@ async def main():
             await (await popup.value).close()
             check("Paywall: tapping Option 3 counts as opened, never as read",
                   await pg.evaluate(f"wasOpened(findItem({json.dumps(pw_id)})) && !isRead(findItem({json.dumps(pw_id)}))"))
+            # Gift link (11 Oct fix): the chip is a real link to the gift url itself, token kept.
+            gift_url = "https://www.wsj.com/finance/x-efd4c694?reflink=desktopwebshare_permalink&st=6qj7my"
+            await pg.evaluate(f"findItem({json.dumps(pw_id)}).url = {json.dumps(gift_url)}; render()")
+            gchip = f"#feed .item[data-id='{pw_id}'] a.mini-btn.gift"
+            check("Gift link: chip is a link to the gift url (token kept), no lock",
+                  await pg.locator(gchip).count() == 1 and await pg.get_attribute(gchip, "href") == gift_url
+                  and await pg.locator(chip).count() == 0)
+            async with ctx.expect_page() as popup:
+                await pg.click(gchip)
+            gp = await popup.value
+            check("Gift link: tapping it opens the article", "st=6qj7my" in gp.url, gp.url)
+            await gp.close()
+            await pg.evaluate(f"findItem({json.dumps(pw_id)}).url = {json.dumps(pw_url)}; render()")
             hidden = await pg.evaluate(f"""(() => {{ const it = findItem({json.dumps(pw_id)}), k = getSafeId(it), keep = podcastReq[k];
                 podcastReq[k] = {{ url: it.url, pulled: 'x', state: 'needs-paste' }}; const h = extrasHTML(it);
                 if (keep) podcastReq[k] = keep; else delete podcastReq[k]; return h; }})()""")

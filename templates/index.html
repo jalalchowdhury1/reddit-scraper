@@ -162,7 +162,7 @@
         .snooze-menu .mini-btn { color: var(--text); }
         /* Paywalled podcast request: Option 3 link + paste box (10 Oct 2026). */
         /* Paywall flag + gift link (11 Oct 2026) */
-        .mini-btn.wall { text-decoration: none; }
+        .mini-btn.wall, .mini-btn.gift { text-decoration: none; }
         .mini-btn.gift { color: var(--accent); }
         /* "From your Favorites": one old favorite a day, at the top of every tab */
         .resurface { grid-column: 1 / -1; margin: 10px 0 6px; padding: 4px 14px 14px; border-radius: var(--radius); border: 1px solid var(--line); background: var(--surface); }
@@ -608,7 +608,9 @@ function paywallOf(url) {
 }
 function paywallHTML(item) {
     const pw = paywallOf(item.url);
-    if (pw === 'gift') return `<span class="mini-btn gift" title="A gift link from the publisher: free to read"><i class="ph ph-gift"></i>Gift link · free</span>`;
+    // A real link (11 Oct: a <span> looked tappable and did nothing). Full url: the token is the gift.
+    if (pw === 'gift') return `<a class="mini-btn gift" data-act="option3" href="${esc(safeUrl(item.url))}" target="_blank" rel="noopener noreferrer"
+        title="A gift link from the publisher: free to read"><i class="ph ph-gift"></i>Gift link · Open free</a>`;
     if (pw === 'wall') return `<a class="mini-btn wall" data-act="option3" href="${esc(ARCHIVE(item.url))}" target="_blank" rel="noopener noreferrer"
         title="${esc(domainOf(item.url))} usually has a paywall. Option 3 = the archive.is copy"><i class="ph ph-lock-simple"></i>Paywall · Open Option 3</a>`;
     return '';

@@ -469,7 +469,7 @@ python3 core/scrape_reddit_browser.py --only LifeProTips --visible   # needs Pla
     deadline and block messages once), the stuck-profile fallback, the
     `METHOD CHECK` line, and GitHub's side (stalest first, own stamps, the RSS check line, only
     a real top list saved, and that `python core/scrape_top.py` really runs `main()`).
-- **`python3 tests/e2e_site.py [base_url]`** — 136 real-browser checks (~200 s; then 11 = quiet subs + Skip, 27 = top comment, Later/snooze incl. a real Firestore round trip on a throwaway sync key, Podcast this + the paywalled paste box, last 20 = paywall flag + From your Favorites, real Firestore round trips on another throwaway key): every tab shows
+- **`python3 tests/e2e_site.py [base_url]`** — 138 real-browser checks (~200 s; then 11 = quiet subs + Skip, 27 = top comment, Later/snooze incl. a real Firestore round trip on a throwaway sync key, Podcast this + the paywalled paste box, last 22 = paywall flag + From your Favorites, real Firestore round trips on another throwaway key): every tab shows
   all the API's posts with the right label, the GitHub tab (API's top 10 in GitHub's order,
   "top 10 of N", GitHub's star counts, read + Undo, keys 5/6, its 24 h stale notice), real upvotes on cards, opening ≠ reading, the
   "Done with X?" prompt, undo, keys, stale notices (News 36 h, Reddit 48 h), footer stamps,
@@ -735,7 +735,7 @@ python3 core/scrape_reddit_browser.py --only LifeProTips --visible   # needs Pla
   host against `PAYWALLED` (built from 529 AM Reads links Aug–Oct: wsj, nytimes, washingtonpost,
   theatlantic, ft, bloomberg, barrons, wired, newyorker, …; subdomains count, `notwsj.com` doesn't).
   Hit = chip "Paywall · Open Option 3" (`ARCHIVE(url)`, same link as the paste box; a tap =
-  opened, never read). A publisher gift link reads free → "Gift link · free" instead: host
+  opened, never read). A publisher gift link reads free → "Gift link · Open free" instead (a real link to the gift url itself, token kept; it was a dead <span> until 11 Oct): host
   `giftarticle.ft.com` or a query key in `GIFT_PARAMS` (NYT `unlocked_article_code`, WSJ `st`,
   WaPo `pwapi_token`, Bloomberg `accessToken`, Atlantic `gift`; `amp;`-mangled keys too). No
   chip while the podcast paste box shows (it has its own Option 3 link). Client-side list
