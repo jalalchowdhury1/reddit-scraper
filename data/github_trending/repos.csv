@@ -1,11 +1,11 @@
 rank,repo,url,description,language,stars,forks,stars_today,scraped_at
-1,morluto/rea,https://github.com/morluto/rea,"Reverse engineer anything with agents, from app behavior down to native binaries.",TypeScript,84855,18391,25793.0,2026-10-11T11:00:35
-2,boykopovar/AnyPS5,https://github.com/boykopovar/AnyPS5,Tool for automatic PS5 executables porting to Linux and Windows,C++,28164,2387,5805.0,2026-10-11T11:00:35
-3,storytold/artcraft,https://github.com/storytold/artcraft,"ArtCraft is an intentional crafting engine for artists, designers, and filmmakers",Rust,15705,2522,3222.0,2026-10-11T11:00:35
-4,cathrynlavery/diagram-design,https://github.com/cathrynlavery/diagram-design,"Editorial diagram design for Claude Code, Codex, GitHub Copilot, Cursor, Factory Droid, and Pi. 44 diagram types. Self-contained HTML + SVG. No shadows. No Mermaid slop.",HTML,49484,3137,1190.0,2026-10-11T11:00:35
-5,bilawalsidhu/gods-eye-view,https://github.com/bilawalsidhu/gods-eye-view,"A spy satellite simulator in your browser, except the data is real. Live open source spatial intelligence on a photorealistic 3D globe.",JavaScript,50688,10236,872.0,2026-10-11T11:00:35
-6,pytorch/pytorch,https://github.com/pytorch/pytorch,Tensors and Dynamic neural networks in Python with strong GPU acceleration,Python,104251,32015,84.0,2026-10-11T11:00:35
-7,lyogavin/airllm,https://github.com/lyogavin/airllm,AirLLM 70B inference with single 4GB GPU,Jupyter Notebook,36088,3788,541.0,2026-10-11T11:00:35
-8,chrislgarry/Apollo-11,https://github.com/chrislgarry/Apollo-11,Original Apollo 11 Guidance Computer (AGC) source code for the command and lunar modules.,Assembly,73845,8082,496.0,2026-10-11T11:00:35
-9,tester-army/e2e,https://github.com/tester-army/e2e,Next generation e2e testing framework for web and mobile apps.,TypeScript,8834,429,,2026-10-11T11:00:35
-10,mattpocock/skills,https://github.com/mattpocock/skills,Skills for Real Engineers. Straight from my .agents directory.,Shell,285260,23876,,2026-10-11T11:00:35
+1,morluto/rea,https://github.com/morluto/rea,"Reverse engineer anything with agents, from app behavior down to native binaries.",TypeScript,84855,18391,25793.0,2026-10-11T11:00:58
+2,boykopovar/AnyPS5,https://github.com/boykopovar/AnyPS5,Tool for automatic PS5 executables porting to Linux and Windows,C++,28164,2387,5805.0,2026-10-11T11:00:58
+3,storytold/artcraft,https://github.com/storytold/artcraft,"ArtCraft is an intentional crafting engine for artists, designers, and filmmakers",Rust,15705,2522,3222.0,2026-10-11T11:00:58
+4,cathrynlavery/diagram-design,https://github.com/cathrynlavery/diagram-design,"Editorial diagram design for Claude Code, Codex, GitHub Copilot, Cursor, Factory Droid, and Pi. 44 diagram types. Self-contained HTML + SVG. No shadows. No Mermaid slop.",HTML,49484,3137,1190.0,2026-10-11T11:00:58
+5,bilawalsidhu/gods-eye-view,https://github.com/bilawalsidhu/gods-eye-view,"A spy satellite simulator in your browser, except the data is real. Live open source spatial intelligence on a photorealistic 3D globe.",JavaScript,50688,10236,872.0,2026-10-11T11:00:58
+6,pytorch/pytorch,https://github.com/pytorch/pytorch,Tensors and Dynamic neural networks in Python with strong GPU acceleration,Python,104251,32015,84.0,2026-10-11T11:00:58
+7,lyogavin/airllm,https://github.com/lyogavin/airllm,AirLLM 70B inference with single 4GB GPU,Jupyter Notebook,36088,3788,541.0,2026-10-11T11:00:58
+8,chrislgarry/Apollo-11,https://github.com/chrislgarry/Apollo-11,Original Apollo 11 Guidance Computer (AGC) source code for the command and lunar modules.,Assembly,73845,8082,496.0,2026-10-11T11:00:58
+9,tester-army/e2e,https://github.com/tester-army/e2e,Next generation e2e testing framework for web and mobile apps.,TypeScript,8834,429,,2026-10-11T11:00:58
+10,mattpocock/skills,https://github.com/mattpocock/skills,Skills for Real Engineers. Straight from my .agents directory.,Shell,285261,23877,,2026-10-11T11:00:58
