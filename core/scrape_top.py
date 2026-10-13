@@ -35,6 +35,12 @@ RSS_BACKOFF_BUDGET = {"seconds": 480}
 # and a killed job never reaches its commit step.
 RUN_DEADLINE_S = 12 * 60
 
+def bust(url: str) -> str:
+    """_=<ms> cache-buster (13 Oct 2026): Reddit's network-security 403 can stick to one EXACT url
+    (seen on the Mac's job), so never ask the same url twice."""
+    return f"{url}{'&' if '?' in url else '?'}_={int(time.time() * 1000)}"
+
+
 def retry_after(response) -> int:
     try:
         return max(5, int(float(response.headers.get("Retry-After", 30))))
@@ -78,13 +84,13 @@ def fetch_via_rss(subreddit: str, time_filter: str) -> list:
     print(f"  ⚠️ Attempting Tertiary Fallback (RSS) for r/{subreddit}...")
     url = f"https://www.reddit.com/r/{subreddit}/top/.rss?t={time_filter}&limit=50"
     try:
-        response = requests.get(url, headers=HEADERS, timeout=10)
+        response = requests.get(bust(url), headers=HEADERS, timeout=10)
         if response.status_code == 429 and RSS_BACKOFF_BUDGET["seconds"] > 0:
             wait = min(retry_after(response), 60, RSS_BACKOFF_BUDGET["seconds"])
             RSS_BACKOFF_BUDGET["seconds"] -= wait
             print(f"  ⏳ RSS 429: waiting {wait}s, then one more try...")
             time.sleep(wait)
-            response = requests.get(url, headers=HEADERS, timeout=10)
+            response = requests.get(bust(url), headers=HEADERS, timeout=10)
         response.raise_for_status()
         problem = list_problem(raw_from_rss(response.content), subreddit, time_filter,
                                response.url, upvotes=False)
@@ -103,14 +109,14 @@ def fetch_via_json(subreddit: str, time_filter: str) -> list:
     url = f"https://old.reddit.com/r/{subreddit}/top.json?t={time_filter}&limit=50"
 
     try:
-        response = requests.get(url, headers=HEADERS, timeout=15)
+        response = requests.get(bust(url), headers=HEADERS, timeout=15)
 
         # Handle strict rate limiting (429) explicitly
         if response.status_code == 429:
             print("  ⚠️ HTTP 429 Too Many Requests. Reddit is suspicious. Sleeping for 30s...")
             time.sleep(30)
             # Try one more time after a long pause
-            response = requests.get(url, headers=HEADERS, timeout=15)
+            response = requests.get(bust(url), headers=HEADERS, timeout=15)
 
         response.raise_for_status()
         data = response.json()

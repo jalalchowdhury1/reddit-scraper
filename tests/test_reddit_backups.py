@@ -489,3 +489,17 @@ def test_fetch_adds_a_fresh_cache_buster_so_a_blocked_exact_url_is_never_asked_t
     assert asked[0].startswith("https://www.reddit.com/r/x/top.json?t=month&limit=50&_=")
     assert asked[2].startswith("https://www.reddit.com/r/x/top/.rss?_=")
     assert asked[0] != asked[1], "the buster must change between calls"
+
+
+def test_github_backup_busts_every_reddit_url(monkeypatch):
+    """Same 13 Oct 2026 lesson as fetch(): never ask Reddit the exact same url twice."""
+    asked = []
+
+    def get(url, **k):
+        asked.append(url)
+        return FakeResponse(rss_feed(30), url)
+
+    monkeypatch.setattr(scrape_top.requests, "get", get)
+    scrape_top.fetch_via_rss("LifeProTips", "month")
+    scrape_top.fetch_via_json("LifeProTips", "month")
+    assert len(asked) == 2 and all(re.search(r"[?&]_=\d{13}$", u) for u in asked), asked
