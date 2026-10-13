@@ -105,6 +105,9 @@ on 26 Sep got JSON 403 and RSS 429 for a while). Rung 5 is on another IP for tha
 `old.reddit.com` is no longer a rung: it sends logged-out visitors to a login page (and 403s
 GitHub). JSON needs the cookies from Reddit's bot check; on a 403 `via_json` loads the list page
 once and asks again (proven: home page = 2 cookies + 403, after one list page = 14 cookies + 200).
+Every `fetch()` url also carries a fresh `_=<ms>` cache-buster (13 Oct 2026): Reddit's
+"blocked by network security" 403 is keyed on this profile's cookies + the EXACT url (one sub's
+monthly `top.json` 403'd for two runs while the same url with any extra parameter answered 200).
 
 **What every method's result must pass** (`list_problem()`, else it isn't saved): still on
 `/r/<sub>/top` with `t=<month|year>` after redirects (catches a login wall or a bounce to the

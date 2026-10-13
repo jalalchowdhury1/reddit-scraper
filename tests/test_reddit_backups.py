@@ -460,3 +460,32 @@ def test_top_comments_run_after_the_lists_and_never_when_blocked(monkeypatch, ca
     assert capsys.readouterr().out.index("METHOD CHECK") >= 0
     fake_run(monkeypatch, lambda sub, t, n: outcome(None, True), list("abcdefgh"))
     assert COMMENT_RUNS == [] and "TOP COMMENTS: skipped (Reddit blocked this run)" in capsys.readouterr().out
+
+
+def test_fetch_adds_a_fresh_cache_buster_so_a_blocked_exact_url_is_never_asked_twice():
+    """13 Oct 2026: Reddit's "blocked by network security" 403 was keyed on this
+    profile's cookies + the EXACT url (dataisbeautiful's monthly top.json), while the
+    same url with any extra parameter answered 200. So fetch() asks a new url every time."""
+    asked = []
+
+    class Resp:
+        status = 200
+        headers = {}
+
+    class Req:
+        async def get(self, url, timeout):
+            asked.append(url)
+            return Resp()
+
+    class Page:
+        class context:
+            request = Req()
+
+    asyncio.run(rb.fetch(Page(), "https://www.reddit.com/r/x/top.json?t=month&limit=50"))
+    time.sleep(0.002)
+    asyncio.run(rb.fetch(Page(), "https://www.reddit.com/r/x/top.json?t=month&limit=50"))
+    asyncio.run(rb.fetch(Page(), "https://www.reddit.com/r/x/top/.rss"))
+    assert all(re.search(r"[?&]_=\d{13}$", u) for u in asked), asked
+    assert asked[0].startswith("https://www.reddit.com/r/x/top.json?t=month&limit=50&_=")
+    assert asked[2].startswith("https://www.reddit.com/r/x/top/.rss?_=")
+    assert asked[0] != asked[1], "the buster must change between calls"

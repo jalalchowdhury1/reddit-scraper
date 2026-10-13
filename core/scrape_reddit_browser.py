@@ -317,7 +317,14 @@ async def via_page(page, sub: str, t: str) -> dict:
 
 async def fetch(page, url: str):
     """GET with the browser's own cookies (the solved challenge). Plain requests get 403.
-    429 = "slow down": wait what Reddit asks (capped at 20 s) and try once more."""
+    429 = "slow down": wait what Reddit asks (capped at 20 s) and try once more.
+    `_=<ms>` on every url (13 Oct 2026): Reddit's "blocked by network security" 403
+    turned out to be keyed on this profile's cookies + the EXACT url. From 12 Oct 19:35
+    r/dataisbeautiful's monthly top.json 403'd on every run (and so did some post .json
+    urls in the top-comments step) while its yearly list, every other sub, a fresh
+    profile, and the SAME url with any extra parameter all answered 200. A fresh
+    query string each call never lands on a poisoned key again."""
+    url = f"{url}{'&' if '?' in url else '?'}_={int(time.time() * 1000)}"
     r = await page.context.request.get(url, timeout=20000)
     if r.status == 429:
         try:
