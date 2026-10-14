@@ -108,6 +108,8 @@ once and asks again (proven: home page = 2 cookies + 403, after one list page = 
 Every `fetch()` url also carries a fresh `_=<ms>` cache-buster (13 Oct 2026): Reddit's
 "blocked by network security" 403 is keyed on this profile's cookies + the EXACT url (one sub's
 monthly `top.json` 403'd for two runs while the same url with any extra parameter answered 200).
+The cache-buster did NOT end it (13 Oct 19:35, 14 Oct 07:35 still 403), and on 14 Oct a brand-new
+profile ALSO got json 403 on both LifeProTips lists, so it is not this profile's cookies: profile kept.
 
 **What every method's result must pass** (`list_problem()`, else it isn't saved): still on
 `/r/<sub>/top` with `t=<month|year>` after redirects (catches a login wall or a bounce to the
