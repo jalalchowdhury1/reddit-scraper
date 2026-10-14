@@ -9,7 +9,8 @@
 # Log: ~/Library/Logs/reddit-browser.log. Each run starts with
 # "== YYYY-MM-DD HH:MM:SS start" and ends well with "REDDIT PUSHED: N files"
 # (or "NO REDDIT CHANGES (scraper exit 0)"). fleet-health checks exactly that,
-# plus the scraper's "METHOD CHECK: page ok · json ok · rss ok" (backups alive).
+# plus the scraper's "METHOD CHECK: page ok · json ok|FAILED · rss ok" (backups alive;
+# json retired 14 Oct 2026, so it isn't graded).
 #
 # The REDDIT_BROWSER_* variables exist for tests/test_robustness.py only.
 

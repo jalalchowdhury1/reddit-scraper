@@ -28,8 +28,8 @@ usage: python3 core/scrape_reddit_browser.py [--profile DIR | --fresh-profile] [
   --probe   try EVERY method on each --only list (default LifeProTips), print what
             each one got, write nothing. Exit 1 if any method failed.
 After the lists (and the METHOD CHECK) it reads up to 40 not-yet-cached posts' top
-comments into data/reddit_comments.json (core/top_comments.py); --comments-only N
-does only that, for N posts.
+comments (each post's comments RSS since 14 Oct 2026) into data/reddit_comments.json
+(core/top_comments.py); --comments-only N does only that, for N posts.
 """
 import argparse
 import asyncio
@@ -199,8 +199,10 @@ def list_problem(raw: list, sub: str, t: str, url: str = "", upvotes: bool = Tru
 
 def method_check_line(page_saved: int, tried: int, backups: dict) -> str:
     """Last line of a run. fleet-health's reddit-browser backups row greps
-    "METHOD CHECK: page ok · json ok · rss ok": the page method saved at least half
-    the lists AND both backups just fetched a real list. Anything else names what broke."""
+    "METHOD CHECK: page ok · json (?:ok|FAILED) · rss ok": the page method saved at
+    least half the lists AND the rss backup just fetched a real list. json is shown
+    honestly but not graded (14 Oct 2026: Reddit 403s every .json url from this Mac).
+    Anything else names what broke."""
     page = "ok" if tried and page_saved * 2 >= tried else "FAILING"
     parts = [f"page {page}"] + [f"{m} {'ok' if not p else 'FAILED'}" for m, p in backups.items()]
     why = [f"{m}: {p}" for m, p in backups.items() if p]
@@ -588,14 +590,14 @@ async def comments_step(page, subs: list, budget_s: float, max_posts: int = top_
 
 async def comments_only(profile, subs: list, visible: bool, max_posts: int):
     """--comments-only: just the top-comment step (first fill, or a test). Opens one
-    list page first so Reddit's bot check hands out the cookies the JSON needs."""
+    list page first so Reddit's bot check hands out its cookies."""
     from playwright.async_api import async_playwright
 
     async with async_playwright() as p:
         ctx, tmp, page = await new_session(p, profile, visible)
         try:
             await via_page(page, subs[0], "month")
-            await comments_step(page, subs, max_posts * 6 + 60, max_posts)
+            await comments_step(page, subs, max_posts * 9 + 60, max_posts)   # 3-7 s pace + the request
         finally:
             await close_session(ctx, tmp)
 

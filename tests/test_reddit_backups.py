@@ -23,8 +23,9 @@ from scrape_reddit_browser import epoch, list_problem, method_check_line, raw_fr
 
 NOW = datetime(2026, 9, 26, 20, 0, tzinfo=timezone.utc).timestamp()
 DAY = 86400
-# The exact line fleet-health's "reddit-browser backups" row greps for.
-FLEET_METHODS_RE = r"METHOD CHECK: page ok · json ok · rss ok"
+# The exact regex fleet-health's "reddit-browser backups" row greps for (github-notion-sync
+# fleet_health.py). 14 Oct 2026: json is a dead backup (403 from the Mac), so it isn't graded.
+FLEET_METHODS_RE = r"METHOD CHECK: page ok · json (?:ok|FAILED) · rss ok"
 
 
 def post(i, sub="LifeProTips", score="100", age_days=3, **kw):
@@ -360,8 +361,16 @@ def test_method_check_line_is_green_only_when_every_method_works():
     assert re.search(FLEET_METHODS_RE, method_check_line(13, 26, {"json": "", "rss": ""}))
     line = method_check_line(12, 26, {"json": "", "rss": ""})
     assert not re.search(FLEET_METHODS_RE, line) and "page FAILING" in line
+    # json is retired: its 403 stays green on the fleet row but is still printed honestly.
     line = method_check_line(26, 26, {"json": "RuntimeError: HTTP 403", "rss": ""})
-    assert not re.search(FLEET_METHODS_RE, line) and "json FAILED" in line and "HTTP 403" in line
+    assert re.search(FLEET_METHODS_RE, line) and "json FAILED" in line and "HTTP 403" in line
+    line = method_check_line(26, 26, {"json": "not checked (out of time)", "rss": ""})
+    assert re.search(FLEET_METHODS_RE, line) and "json FAILED" in line
+    # rss is the live backup: it failing is red, whatever json does.
+    for js in ("", "RuntimeError: HTTP 403"):
+        line = method_check_line(26, 26, {"json": js, "rss": "RuntimeError: HTTP 403"})
+        assert not re.search(FLEET_METHODS_RE, line) and "rss FAILED" in line
+    assert not re.search(FLEET_METHODS_RE, method_check_line(12, 26, {"json": "x", "rss": ""}))
     assert not re.search(FLEET_METHODS_RE, method_check_line(0, 0, {"json": "", "rss": ""}))
 
 

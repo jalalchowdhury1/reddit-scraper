@@ -150,7 +150,9 @@ What one run does (~5–6 min):
 - **Ends with the backup check:** fetches the first sub's monthly list via `json` and `rss`
   (nothing written) and prints `METHOD CHECK: page ok · json ok · rss ok  (page saved N of M
   lists)`, or names what failed (`page FAILING` = the page saved under half the lists). fleet-health
-  greps this line, so a dead backup shows up before the day it's needed.
+  greps `METHOD CHECK: page ok · json (?:ok|FAILED) · rss ok`, so a dead backup shows up before the
+  day it's needed. **json is not graded since 14 Oct 2026** (Reddit 403s every `.json` url from
+  this Mac): the line still prints `json FAILED` honestly; only page + rss turn the row red.
 - Prints `BROWSER SAVED: N of M lists` (+ which kept their old file). Exit 1 if it saved none.
 - Stdlib + Playwright only: the Mac's `/opt/homebrew/bin/python3` has Playwright but no pandas.
 - Manual runs (write into `./data/` of the current folder, so run them from a scratch folder
@@ -170,17 +172,24 @@ What one run does (~5–6 min):
 
 **Top comments (10 Oct 2026, `core/top_comments.py`).** After the lists AND the `METHOD CHECK`
 (so it can never cost a list), the same browser asks for each post's top comment:
-`<permalink>.json?sort=top&limit=10&depth=1&raw_json=1` through `fetch()` (browser cookies, one
-429 wait). First real comment in Reddit's top order wins: stickied, mod-distinguished,
-AutoModerator, `[deleted]`/`[removed]`/`[ Removed by Reddit ]` are skipped; spoilers become "[spoiler]", GIFs/images "[GIF]"/"[image]", markdown flattened to one plain line (served as-is: never html-unescaped again), cut at
+`https://www.reddit.com/comments/<id>/.rss?sort=top&limit=10&depth=1` through `fetch()` (browser
+cookies, `_=<ms>` buster, one 429 wait). **RSS since 14 Oct 2026**: from 12 Oct Reddit 403s every
+`.json` url from this Mac (fresh profile and buster too), while the comments RSS answers 200
+(`pick_top_rss`; real reply saved as `tests/fixtures/comments_1x41kxe.rss`; old JSON `pick_top`
+kept only as the skip-rule reference). Feed entry 0 is the post (`t3_`), then comments (`t1_`)
+in top order, a sticky first. RSS has no stickied/distinguished flags or upvotes, so: skip
+AutoModerator and `*bot` authors, and mod/bot notices by their text (`NOTICE`: links into
+`/r/<sub>/wiki/` or modmail, "I am a bot", "performed automatically"; r/dataisbeautiful's
+rule-3 sticky comes from a mod's own account), plus `[deleted]`/`[removed]`/`[ Removed by Reddit ]`;
+`ups` is stored as `null`. A reply that is not a feed (a challenge page) counts as pushback, never cached; spoilers become "[spoiler]", GIFs/images "[GIF]"/"[image]", markdown flattened to one plain line (served as-is: never html-unescaped again), cut at
 400 chars. Cached in **`data/reddit_comments.json`** (`posts: {id: {body, ups, at}}`; `body ""` =
 none yet, asked again after 2 days), so each post costs ONE request ever. Per run: at most 40
 uncached posts (`MAX_PER_RUN`), best tier score first (= what the site shows), inside 4 min
 (`BUDGET_S`) and before 17 min from the start (`COMMENTS_END_S`; the wrapper kills at 20),
-3–5 s apart, stop after 3 failures in a row (404s = a gone post, not counted; a 404/odd page is cached and retried in 2 days, but 403/429/timeouts are NEVER cached, or a 429 burst would hide the top posts' comments for days). Reddit 429s after ~100 requests in a burst (first fill, 10 Oct), hence 40. Skipped when the run ended "blocked". Posts that left
+3–7 s apart, stop after 3 failures in a row (404s = a gone post, not counted; a 404/odd page is cached and retried in 2 days, but 403/429/timeouts are NEVER cached, or a 429 burst would hide the top posts' comments for days). Reddit 429s after ~100 requests in a burst (first fill, 10 Oct), hence 40. Skipped when the run ended "blocked". Posts that left
 every list are pruned (checked against ALL saved lists, so an `--only` run keeps the other subs'). `ups` is stored but NOT served: it's a one-time snapshot (and Reddit says 1 while a score is hidden), so showing it would break rule 8. One log line: `TOP COMMENTS: 41 new, 3 none yet, 0 failed (210 cached,
 12 left)` (+ ` STOPPED: …`). `--no-comments` skips it; `--comments-only N` does only it (the
-first fill; it opens one list page first so the JSON gets the bot-check cookies).
+first fill, or a test; it opens one list page first so the requests get the bot-check cookies).
 
 ### 2b. `mac/reddit-browser.sh` — the launchd wrapper
 
@@ -800,7 +809,7 @@ the Mac at 05:00 + 06:30) has five rows for this repo:
 | `reddit-scraper (daily data)` | GitHub run of `daily_scrape.yml` | no run in 36 h, or no `DATA PUSHED` / guard line |
 | `reddit-browser (Mac 07:35/19:35 Reddit lists)` | last block of `~/Library/Logs/reddit-browser.log` | last `== … start` over 26 h old, or that block lacks `REDDIT PUSHED: N files` / `NO REDDIT CHANGES (scraper exit 0)` |
 | `reddit-browser (live site: every Reddit list fresh)` | live `/api/status` | the OLDEST `reddit_lists[].checked` is over 36 h old (the third missed run in a row). Fleet converts these UTC `…Z` stamps to local time since 2026-09-26; before that they read 4–5 h too young |
-| `reddit-browser (backup methods: page, json, rss all work)` | last block of the same log | the block lacks `METHOD CHECK: page ok · json ok · rss ok`: the Mac is running on a backup, or a backup stopped working. The rows above stay green in both cases |
+| `reddit-browser (backup methods: page, json, rss all work)` | last block of the same log | the block lacks `METHOD CHECK: page ok · json (?:ok\|FAILED) · rss ok` (json retired 14 Oct, not graded; name kept so the row's history stays): the Mac is running on a backup, or a backup stopped working. The rows above stay green in both cases |
 | `reddit-backup (GitHub RSS every 3 h)` | GitHub run of `reddit_backup.yml` | no run in 8 h, or neither `GITHUB REDDIT CHECK: rss ok` nor `REDDIT BACKUP: refreshed <1+>` |
 
 **Is it healthy right now?** (3 commands)
@@ -820,7 +829,7 @@ launchctl print gui/$(id -u)/com.jalal.reddit-browser | grep -E 'state|last exit
   gets the Mac's IP rate-limited for a while (JSON 403, RSS 429), which looks like a block.
 - **`METHOD CHECK: page FAILING`** with lists saved `via json`: the page layout changed. The site
   still has real upvotes; fix `READ_POSTS_JS` / `via_page` (compare with `--probe`).
-  **`json FAILED`** / **`rss FAILED`**: that backup broke; the site is fine today, fix it before
+  **`json FAILED`**: expected since 12 Oct (403 from this Mac), not graded. **`rss FAILED`**: that backup broke; the site is fine today, fix it before
   the day it's needed. Every list `via rss` = both page and JSON are down: ranks, no upvotes.
 - **`the page failed 4 lists in a row` / `failed every method`**: Reddit is blocking this Mac
   (after the fresh profile too). Wait for the next run; GitHub's RSS backup (another IP) takes
