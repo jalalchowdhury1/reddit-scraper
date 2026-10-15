@@ -1968,13 +1968,25 @@ async function loadData(restoreScroll = true) {
 
 // A home-screen app left open overnight would keep yesterday's feed. Re-fetch
 // when it comes back to the foreground after 20+ minutes (or on a new day).
+// A desktop tab that just stays on screen never goes 'hidden' (15 Oct 2026: it
+// showed Wednesday's GitHub list on Thursday), so window focus and a 5-min
+// check while visible re-fetch too. Those keep the scroll where it is.
 let lastDay = etDate();
+function stale() { return Date.now() - lastLoad > 20 * 60e3 || etDate() !== lastDay; }
+let refreshing = false;   // focus + visibilitychange fire together: fetch once
+function refreshIfStale(restoreScroll) {
+    if (refreshing || document.visibilityState !== 'visible' || !stale()) return;
+    refreshing = true; lastDay = etDate(); amShowOlder = false;
+    loadData(restoreScroll).finally(() => { refreshing = false; });
+}
 document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'hidden') { leftPage(); if (!viewCleared) scrollPos[currentTab] = window.scrollY; store.set('dr_scroll', scrollPos); return; }
     backOnPage();
     render();   // a snooze that came due while the app was in the background
-    if (Date.now() - lastLoad > 20 * 60e3 || etDate() !== lastDay) { lastDay = etDate(); amShowOlder = false; loadData(); }
+    refreshIfStale(true);
 });
+window.addEventListener('focus', () => refreshIfStale(false));
+setInterval(() => refreshIfStale(false), 5 * 60e3);
 
 applyPrefs();
 render();
