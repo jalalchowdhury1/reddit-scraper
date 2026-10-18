@@ -721,8 +721,11 @@ python3 core/scrape_reddit_browser.py --only LifeProTips --visible   # needs Pla
   stopped; lists may be older and show ranks); GitHub when `updated.github` is 24 h+ old (4
   missed runs). Footer: when AM Reads, News, Reddit and GitHub last landed. Sync write failures show a toast + "(offline)". Firebase layout:
   `sync_groups/{key}/favorites` + `read_posts` + `snoozed` + `podcast_requests`.
-  **Top comment** (10 Oct 2026): Reddit cards show `top_comment` under the blurb, 2 lines, tap
-  for all (`expanded` key `c:<id>`). **Later = snooze** (10 Oct 2026): a small "Later" button
+  **Top comment** (10 Oct 2026): Reddit cards show `top_comment` under the blurb, ONE faint line
+  (minimal pass, 17 Oct 2026: the owner found 2 lines too wordy), tap for all (`expanded` key `c:<id>`).
+  **Card footer** (same pass): meta + Later/Podcast/Paywall share one `.foot` row as quiet text
+  links (`.extras` is `display: contents`; only `.on` states keep a pill); no reddit favicon on
+  Reddit cards; hairline between cards. **Later = snooze** (10 Oct 2026): a small "Later" button
   under the meta line (key `l`) opens In 3 hours / Tonight 7 PM (before 3 PM) / Tomorrow 7 AM /
   Saturday 9 AM (next Saturday on a Saturday after 6 AM; before 4 AM also "This morning 7 AM"; device time). Firestore `snoozed/{item id}` = `{until, tab, item, at}`: the
   item's own copy is stored, so an AM Read snoozed till tomorrow comes back even though that tab
