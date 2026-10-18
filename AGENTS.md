@@ -277,9 +277,15 @@ Exponential Decay"), so high-signal subs float up:
   every "82.4k upvotes" on the site was invented.
 - Between subreddits: `time.sleep(random.uniform(6.5, 12.5))` (human jitter, see §5).
 
-**The 11 tracked subs** (`core/reddit_common.py:SUBREDDITS`, NOT `config.py`):
+**The 12 tracked subs** (`core/reddit_common.py:SUBREDDITS`, NOT `config.py`):
 `dataisbeautiful, todayilearned, bestof, getmotivated, UnethicalLifeProTips, LifeProTips,
-UpliftingNews, lifehacks, Productivity, PersonalFinance, explainlikeimfive`
+UpliftingNews, lifehacks, Productivity, PersonalFinance, explainlikeimfive, coolguides`
+**r/coolguides (added 18 Oct 2026, the owner: "strict rules so it's not way too much content"):**
+tier 2 base so its best posts make the top 50, then `SUB_CAPS` (max **2 per tab**) and
+`SUB_FLOORS` (**1,000+ real upvotes**; an RSS row with no number never qualifies), both applied in
+`server.py` before the 50 cut, so the reserve/quiet refill can't add more. On the day it was added
+the month's best guide had 128 upvotes, so Monthly shows none until one takes off; Yearly shows 2
+(~6k). Chip name "Guides". Tests: `test_capped_sub_*` in `tests/test_robustness.py`.
 (r/AskHistorians + r/TrueReddit removed 4 Oct 2026 — he never read them). To add/remove one, edit `SUBREDDITS` (and `SUBREDDIT_TIERS` for a non-default
 base). **Removing a sub? Also `git rm -r data/r_<sub> data/r_<sub>_yearly`.** `server.py` now
 ignores untracked subs anyway, but the dead files would sit in every deploy.

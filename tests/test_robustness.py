@@ -76,6 +76,33 @@ def test_broken_news_and_missing_am_reads_leave_reddit_alone(site):
     assert d["monthly"][0]["upvotes"] == "2.0k" and d["monthly"][0]["rank"] == 1
 
 
+def test_capped_sub_never_shows_more_than_its_cap(site, monkeypatch):
+    """r/coolguides: at most SUB_CAPS posts per tab, and none left over in the reserve."""
+    monkeypatch.setattr(server, "TRACKED_SUBS", ["LifeProTips", "coolguides"])
+    write_list(mac_posts("coolguides", "cm"), "r_coolguides", root=site)
+    write_list(mac_posts("coolguides", "cy"), "r_coolguides_yearly", root=site)
+    d = server.get_data()
+    for tab in ("monthly", "yearly"):
+        guides = [i for i in d[tab] + d[tab + "_reserve"] if i["source"] == "r/coolguides"]
+        assert len(guides) == server.SUB_CAPS["coolguides"] == 2, tab
+        assert [g["rank"] for g in guides] == [1, 2]          # its best two, not random ones
+    assert sum(i["source"] == "r/LifeProTips" for i in d["monthly"]) == 8   # others untouched
+
+
+def test_capped_sub_needs_real_upvotes_over_its_floor(site, monkeypatch):
+    """r/coolguides posts under SUB_FLOORS (or with no real number) never show."""
+    monkeypatch.setattr(server, "TRACKED_SUBS", ["LifeProTips", "coolguides"])
+    small = [dict(r, upvotes=str(900 - i)) for i, r in enumerate(mac_posts("coolguides", "cs"))]
+    small[3]["upvotes"] = "4200"                       # the one big guide this month
+    write_list(small, "r_coolguides", root=site)
+    norss = [dict(r, upvotes="") for r in mac_posts("coolguides", "cr")]   # RSS backup: no number
+    write_list(norss, "r_coolguides_yearly", root=site)
+    d = server.get_data()
+    got = [i for i in d["monthly"] + d["monthly_reserve"] if i["source"] == "r/coolguides"]
+    assert [i["upvotes"] for i in got] == ["4.2k"]
+    assert not any(i["source"] == "r/coolguides" for i in d["yearly"] + d["yearly_reserve"])
+
+
 def test_dropped_sub_is_hidden_and_its_stamp_ignored(site):
     d = server.get_data()
     assert not any(i["source"] == "r/Fitness" for i in d["monthly"] + d["yearly"])

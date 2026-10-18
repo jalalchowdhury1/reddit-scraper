@@ -26,9 +26,12 @@ log = logging.getLogger("daily-reader")
 # ever fails, show everything rather than take the site down.
 try:
     from core.reddit_common import SUBREDDITS as TRACKED_SUBS
+    from core.reddit_common import SUB_CAPS, SUB_FLOORS
 except Exception as e:  # pragma: no cover - only on a broken deploy
     log.warning("core.reddit_common not importable (%s); showing every data/r_* list", e)
     TRACKED_SUBS = None
+    SUB_CAPS = {"coolguides": 2}   # same as core/reddit_common.py: the rules hold even if core fails
+    SUB_FLOORS = {"coolguides": 1000}
 # data/ comes from the newest commit on GitHub when running on Vercel (core/live_data.py,
 # 10 Oct 2026): robots' data commits no longer redeploy the site (Vercel's 100 deploys/day
 # account cap). Locally, in tests, or if GitHub fails: this checkout / the deployed copy.
@@ -238,6 +241,14 @@ def shown_upvotes(row) -> str:
     return format_score(int(row['score'])) if row['score_real'] else ""
 
 
+def real_upvotes(row):
+    """Reddit's own upvote number as an int, or None (RSS rows, junk)."""
+    up = frames.to_number(row.get('upvotes', ''))
+    if not frames.is_missing(up) and math.isfinite(up):
+        return int(up)
+    return int(row['score']) if row.get('score_real') else None
+
+
 def shown_comments(row) -> str:
     """Reddit's comment count ("1.2k"), or "" when the list came without one (RSS)."""
     c = frames.to_number(row.get('comments', ''))
@@ -328,6 +339,7 @@ def get_data():
             rows = frames.sort_rows(rows, "score", ascending=False, stable=True)
         
             bad_rows = 0
+            per_tab = {}   # (tab, sub) -> posts taken, for SUB_CAPS
             for row in rows:
                 try:  # one odd row costs that row, not both tabs
                     item = reddit_item(row)
@@ -337,6 +349,13 @@ def get_data():
                         log.warning("skipping bad Reddit row %r: %s", row.get('id'), e)
                     continue
                 if item:
+                    key = (row['time_filter'], str(row['subreddit']).lower())
+                    cap, floor = SUB_CAPS.get(key[1]), SUB_FLOORS.get(key[1])
+                    if floor is not None and (real_upvotes(row) or 0) < floor:
+                        continue   # too small (or no real number) for a strict sub
+                    if cap is not None and per_tab.get(key, 0) >= cap:
+                        continue   # its best `cap` posts only (rows are in tier order)
+                    per_tab[key] = per_tab.get(key, 0) + 1
                     data[row['time_filter']].append(item)
             if bad_rows:
                 log.warning("skipped %d bad Reddit rows", bad_rows)

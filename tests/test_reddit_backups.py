@@ -425,7 +425,7 @@ def test_github_backup_refreshes_a_batch_and_says_how_many(tmp_path, monkeypatch
     monkeypatch.setattr(sys, "argv", ["scrape_top.py", "--max-lists", "3"])
     scrape_top.main()                                                            # no Mac json at all
     out = capsys.readouterr().out
-    assert len(got) == 3 and "REDDIT BACKUP: refreshed 2 of 22 lists that needed it (tried 3)" in out
+    assert len(got) == 3 and f"REDDIT BACKUP: refreshed 2 of {2 * len(scrape_top.SUBREDDITS)} lists that needed it (tried 3)" in out
     assert "GITHUB REDDIT CHECK" not in out
     assert len(scrape_top.load_github_meta(tmp_path / "data/reddit_github.json")) == 2
 

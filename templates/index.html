@@ -1113,7 +1113,7 @@ function upvoteNum(item) {
 }
 const isReddit = (tab) => tab === 'monthly' || tab === 'yearly';
 const subKey = (item) => String(item.source || '').replace(/^r\//, '').toLowerCase();
-const SUB_SHORT = { todayilearned: 'TIL', explainlikeimfive: 'ELI5', unethicallifeprotips: 'ULPT', lifeprotips: 'LPT' };
+const SUB_SHORT = { todayilearned: 'TIL', explainlikeimfive: 'ELI5', unethicallifeprotips: 'ULPT', lifeprotips: 'LPT', coolguides: 'Guides' };
 const subName = (key, item) => SUB_SHORT[key] || String((item && item.source) || key).replace(/^r\//, '');
 // The tab's sub filter, or null. A filter whose sub has left the list switches itself off.
 function activeSub(tab) {

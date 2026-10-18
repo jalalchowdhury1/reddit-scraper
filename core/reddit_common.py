@@ -12,8 +12,20 @@ SUBREDDITS = [
     "dataisbeautiful", "todayilearned", "bestof",
     "getmotivated", "UnethicalLifeProTips", "LifeProTips",
     "UpliftingNews", "lifehacks", "Productivity",
-    "PersonalFinance", "explainlikeimfive"
+    "PersonalFinance", "explainlikeimfive", "coolguides"
 ]
+
+# Hard ceiling per tab for subs that would otherwise flood the feed (the owner's
+# rule when adding r/coolguides, 18 Oct 2026: "strict rules so it's not way too
+# much content"). server.py drops every post past the cap BEFORE the top-50 cut,
+# so the page's quiet-sub refill (the reserve) can't sneak more in either.
+# Keys are lowercase sub names. The scoring math below is untouched.
+SUB_CAPS = {"coolguides": 2}
+# ...and a floor: only posts with at least this many REAL upvotes (Reddit's own
+# number; an RSS-backup row with no number never qualifies). On 18 Oct 2026 the
+# month's best coolguides post had 128 upvotes, the year's ~6k: Monthly stays
+# empty until a guide really takes off.
+SUB_FLOORS = {"coolguides": 1000}
 
 # Tiered priority for the made-up ORDERING scores (RSS/HTML fallbacks and the Mac
 # browser). They decide the mix of subs in Monthly/Yearly; never shown as upvotes.
@@ -26,6 +38,9 @@ SUBREDDIT_TIERS = {
     # Tier 2: High Signal
     "dataisbeautiful": (40000, 70000),
     "PersonalFinance": (40000, 70000),
+    # Tier 2 so its best posts reliably make the top 50; SUB_CAPS + SUB_FLOORS
+    # below keep it to 2 strong guides per tab (18 Oct 2026).
+    "coolguides": (40000, 70000),
 
     # Tier 3: Default (Everything else)
     "default": (15000, 35000)
