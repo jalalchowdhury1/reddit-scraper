@@ -1,11 +1,11 @@
 rank,repo,url,description,language,stars,forks,stars_today,scraped_at
-1,cloudflare/security-audit-skill,https://github.com/cloudflare/security-audit-skill,"A coding-agent skill for multi-phase security audits with independently verified, machine-readable findings",JavaScript,41452,2589,2706.0,2026-10-23T17:25:15
-2,php/php-src,https://github.com/php/php-src,The PHP Interpreter,C,41503,8349,722.0,2026-10-23T17:25:15
-3,anthropics/knowledge-work-plugins,https://github.com/anthropics/knowledge-work-plugins,Open source repository of plugins primarily intended for knowledge workers to use in Claude Cowork,Python,32071,3562,643.0,2026-10-23T17:25:15
-4,NVIDIA/OpenShell,https://github.com/NVIDIA/OpenShell,"OpenShell is the safe, private runtime for autonomous AI agents.",Rust,18545,1864,1240.0,2026-10-23T17:25:15
-5,Renhuai123/ziwei-doushu,https://github.com/Renhuai123/ziwei-doushu,紫微斗数开源排盘引擎 — 基于倪海厦《天纪》体系，含完整排盘算法、四化系统、格局知识库、古籍原文数据,TypeScript,6774,1390,547.0,2026-10-23T17:25:15
-6,SnailSploit/Claude-Red,https://github.com/SnailSploit/Claude-Red,"claude-red is a curated library of offensive security skills designed for the Claude skills system. Each skill is a structured SKILL.md file that primes Claude with expert-level methodology for a specific attack surface — from SQLi to shellcode, EDR evasion to exploit development.",Python,8239,1081,209.0,2026-10-23T17:25:15
-7,OpenBMB/VoxCPM,https://github.com/OpenBMB/VoxCPM,"VoxCPM2: Tokenizer-Free TTS for Multilingual Speech Generation, Creative Voice Design, and True-to-Life Cloning",Python,40124,4561,144.0,2026-10-23T17:25:15
-8,nodejs/node,https://github.com/nodejs/node,Node.js JavaScript runtime ✨🐢🚀✨,JavaScript,122712,39944,93.0,2026-10-23T17:25:15
-9,morluto/rea,https://github.com/morluto/rea,"Reverse engineer anything with agents, from app behavior down to native binaries.",TypeScript,371818,93110,,2026-10-23T17:25:15
-10,anthropics/claude-plugins-official,https://github.com/anthropics/claude-plugins-official,"Official, Anthropic-managed directory of high quality Claude Code Plugins.",Python,44067,4636,,2026-10-23T17:25:15
+1,cloudflare/security-audit-skill,https://github.com/cloudflare/security-audit-skill,"A coding-agent skill for multi-phase security audits with independently verified, machine-readable findings",JavaScript,41944,2623,2706.0,2026-10-23T21:38:23
+2,php/php-src,https://github.com/php/php-src,The PHP Interpreter,C,41538,8357,722.0,2026-10-23T21:38:23
+3,anthropics/knowledge-work-plugins,https://github.com/anthropics/knowledge-work-plugins,Open source repository of plugins primarily intended for knowledge workers to use in Claude Cowork,Python,32164,3566,643.0,2026-10-23T21:38:23
+4,NVIDIA/OpenShell,https://github.com/NVIDIA/OpenShell,"OpenShell is the safe, private runtime for autonomous AI agents.",Rust,18715,1878,1240.0,2026-10-23T21:38:23
+5,Renhuai123/ziwei-doushu,https://github.com/Renhuai123/ziwei-doushu,紫微斗数开源排盘引擎 — 基于倪海厦《天纪》体系，含完整排盘算法、四化系统、格局知识库、古籍原文数据,TypeScript,6822,1403,547.0,2026-10-23T21:38:23
+6,SnailSploit/Claude-Red,https://github.com/SnailSploit/Claude-Red,"claude-red is a curated library of offensive security skills designed for the Claude skills system. Each skill is a structured SKILL.md file that primes Claude with expert-level methodology for a specific attack surface — from SQLi to shellcode, EDR evasion to exploit development.",Python,8387,1091,209.0,2026-10-23T21:38:23
+7,OpenBMB/VoxCPM,https://github.com/OpenBMB/VoxCPM,"VoxCPM2: Tokenizer-Free TTS for Multilingual Speech Generation, Creative Voice Design, and True-to-Life Cloning",Python,40206,4572,144.0,2026-10-23T21:38:23
+8,nodejs/node,https://github.com/nodejs/node,Node.js JavaScript runtime ✨🐢🚀✨,JavaScript,122805,39871,93.0,2026-10-23T21:38:23
+9,morluto/rea,https://github.com/morluto/rea,"Reverse engineer anything with agents, from app behavior down to native binaries.",TypeScript,372749,93270,,2026-10-23T21:38:23
+10,anthropics/claude-plugins-official,https://github.com/anthropics/claude-plugins-official,"Official, Anthropic-managed directory of high quality Claude Code Plugins.",Python,44102,4637,,2026-10-23T21:38:23
