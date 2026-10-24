@@ -1,11 +1,11 @@
 rank,repo,url,description,language,stars,forks,stars_today,scraped_at
-1,cloudflare/security-audit-skill,https://github.com/cloudflare/security-audit-skill,"A coding-agent skill for multi-phase security audits with independently verified, machine-readable findings",JavaScript,42900,2677,2716.0,2026-10-24T11:01:05
-2,php/php-src,https://github.com/php/php-src,The PHP Interpreter,C,41626,8373,716.0,2026-10-24T11:01:05
-3,anthropics/knowledge-work-plugins,https://github.com/anthropics/knowledge-work-plugins,Open source repository of plugins primarily intended for knowledge workers to use in Claude Cowork,Python,32479,3587,635.0,2026-10-24T11:01:05
-4,NVIDIA/OpenShell,https://github.com/NVIDIA/OpenShell,"OpenShell is the safe, private runtime for autonomous AI agents.",Rust,19089,1903,1119.0,2026-10-24T11:01:05
-5,Renhuai123/ziwei-doushu,https://github.com/Renhuai123/ziwei-doushu,紫微斗数开源排盘引擎 — 基于倪海厦《天纪》体系，含完整排盘算法、四化系统、格局知识库、古籍原文数据,TypeScript,7158,1459,546.0,2026-10-24T11:01:05
-6,SnailSploit/Claude-Red,https://github.com/SnailSploit/Claude-Red,"claude-red is a curated library of offensive security skills designed for the Claude skills system. Each skill is a structured SKILL.md file that primes Claude with expert-level methodology for a specific attack surface — from SQLi to shellcode, EDR evasion to exploit development.",Python,8762,1123,226.0,2026-10-24T11:01:05
-7,OpenBMB/VoxCPM,https://github.com/OpenBMB/VoxCPM,"VoxCPM2: Tokenizer-Free TTS for Multilingual Speech Generation, Creative Voice Design, and True-to-Life Cloning",Python,40467,4597,150.0,2026-10-24T11:01:05
-8,nodejs/node,https://github.com/nodejs/node,Node.js JavaScript runtime ✨🐢🚀✨,JavaScript,123045,39846,66.0,2026-10-24T11:01:05
-9,morluto/rea,https://github.com/morluto/rea,"Reverse engineer anything with agents, from app behavior down to native binaries.",TypeScript,375458,93855,,2026-10-24T11:01:05
-10,anthropics/claude-plugins-official,https://github.com/anthropics/claude-plugins-official,"Official, Anthropic-managed directory of high quality Claude Code Plugins.",Python,44239,4648,,2026-10-24T11:01:05
+1,cloudflare/security-audit-skill,https://github.com/cloudflare/security-audit-skill,"A coding-agent skill for multi-phase security audits with independently verified, machine-readable findings",JavaScript,42944,2682,2271,2026-10-24T11:34:50
+2,NVIDIA/OpenShell,https://github.com/NVIDIA/OpenShell,"OpenShell is the safe, private runtime for autonomous AI agents.",Rust,19108,1907,893,2026-10-24T11:34:50
+3,aws/agent-toolkit-for-aws,https://github.com/aws/agent-toolkit-for-aws,"Official, AWS-supported MCP servers, skills, and plugins to help AI agents build on AWS",Python,2956,391,11,2026-10-24T11:34:50
+4,Nutlope/hallmark,https://github.com/Nutlope/hallmark,"Anti-AI-slop design skill for Claude Code, Cursor, and Codex.",CSS,31475,1624,567,2026-10-24T11:34:50
+5,luongnv89/claude-howto,https://github.com/luongnv89/claude-howto,"A visual, example-driven guide to Claude Code — from basic concepts to advanced agents, with copy-paste templates that bring immediate value.",Python,44136,5466,1053,2026-10-24T11:34:50
+6,pbakaus/impeccable,https://github.com/pbakaus/impeccable,The design language that makes your AI harness better at design.,Rust,85835,5133,541,2026-10-24T11:34:50
+7,pollen-robotics/microduck,https://github.com/pollen-robotics/microduck,A Tiny biped duck robot 🦆,Rust,10625,1376,421,2026-10-24T11:34:50
+8,google-gemini/gemini-cli,https://github.com/google-gemini/gemini-cli,An open-source AI agent that brings the power of Gemini directly into your terminal.,TypeScript,107579,14776,38,2026-10-24T11:34:50
+9,jbiaojerry/ebook-treasure-chest,https://github.com/jbiaojerry/ebook-treasure-chest,欢迎来到电子书下载宝库，一个汇聚了各类电子书下载链接的地方。无论你是喜欢阅读经典文学、经管励志、终身学习、职场创业、技术手册还是其他类型的书籍，这里都能满足你的需求。 该库涵盖了帆书app(原樊登读书)、微信读书、京东读书、喜马拉雅等读书app的大部分电子书。,Python,22258,3166,220,2026-10-24T11:34:50
+10,makecindy/cindy,https://github.com/makecindy/cindy,Consider it done. The open-source AI agent that works out of the box · 想到，就能做到。开源、开箱即用的 AI Agent。,TypeScript,3736,559,471,2026-10-24T11:34:50
