@@ -10,6 +10,7 @@ from fastapi.templating import Jinja2Templates
 import glob
 import logging
 import math
+import time
 
 # pandas' rules in plain Python (core/frames.py): pandas + numpy were ~85% of this
 # function's size on Vercel (10 Oct 2026). The scrapers still use pandas.
@@ -310,8 +311,7 @@ def add_top_comments(items: list, comments: dict):
             item["top_comment"] = c["body"].strip()   # already plain text (raw_json=1): no unescape, or "&copy=2" in a link turns into "©=2"
 
 
-@app.get("/api/data")
-def get_data():
+def build_data():
     data = {"monthly": [], "yearly": [], "news": [], "ritholtz": [], "github": []}
     updated = {"news": "", "ritholtz": "", "reddit": "", "github": ""}
     github_pool = 0
@@ -535,6 +535,26 @@ def get_data():
     updated["reddit"] = max(stamps.values()) if stamps else ""  # last Mac-browser save
     data["updated"] = updated  # when each feed last landed (UTC ISO)
     return data
+
+
+# Vercel Active CPU (24 Oct 2026): build_data() parses every CSV (~90 ms CPU) and /api/data,
+# /api/status and /api/freshness each need it. On Vercel a data folder never changes once
+# written (live_data names it by commit), so a warm instance reuses the answer for the same
+# folder for DATA_CACHE_S (news' 7-day window moves by minutes at most). Tests and local runs
+# (live data off, or BASE_DIR pointed elsewhere) always rebuild.
+DATA_CACHE_S = 300
+_data_cache = {"key": None, "at": 0.0, "data": None}
+
+
+@app.get("/api/data")
+def get_data():
+    if live_data is None or not live_data.enabled() or BASE_DIR != _BUNDLE_DIR:
+        return build_data()
+    key = (data_dir(), BROWSER_META, TOP_COMMENTS, GITHUB_META)
+    c = _data_cache
+    if c["key"] != key or time.time() - c["at"] >= DATA_CACHE_S:
+        c.update(key=key, at=time.time(), data=build_data())
+    return c["data"]
 
 
 @app.get("/api/status")

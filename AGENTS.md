@@ -442,6 +442,8 @@ were byte-identical on all 459 historical `data/` commits (two clock times each)
 blocked from importing. `tests/test_frames.py` pins the rules and fuzzes against pandas 2.x.
 Don't add pandas/numpy back to `requirements.txt`; the scrapers keep them.
 
+**CPU budget (24 Oct 2026).** The free Vercel team has 4 h Active CPU / 30 days for ALL sites; over it, every site pauses. `build_data()` costs ~90 ms CPU, so on Vercel `get_data()` (behind `/api/data`, `/api/status`, `/api/freshness`) reuses one answer per live-data folder for `DATA_CACHE_S` = 300 s. Never call `build_data()` per request on Vercel. Tripwire: `tests/test_live_data.py::test_get_data_builds_once_per_folder_on_vercel`.
+
 ---
 
 ## 4. Run / test / deploy

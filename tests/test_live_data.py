@@ -118,3 +118,30 @@ def test_status_reports_the_data_source(live, monkeypatch):
     monkeypatch.setattr(live_data, "_fetch", lambda: make_tarball({"data/x.csv": "1"}))
     live_data.root(server.BASE_DIR)
     assert server.status()["data_source"]["commit"] == SHA[:7]
+
+
+# Vercel Active CPU tripwire (24 Oct 2026): build_data() costs ~90 ms of CPU and /api/data,
+# /api/status and /api/freshness all call get_data(). On Vercel a warm instance must build it
+# once per data folder per DATA_CACHE_S, never once per request.
+def test_get_data_builds_once_per_folder_on_vercel(live, monkeypatch):
+    builds = []
+    monkeypatch.setattr(server, "build_data", lambda: builds.append(1) or {"n": len(builds)})
+    monkeypatch.setattr(server, "_data_cache", {"key": None, "at": 0.0, "data": None})
+    monkeypatch.setattr(server, "data_dir", lambda: live / "commit-a")
+    assert server.get_data() == {"n": 1}
+    assert server.get_data() == {"n": 1} and server.get_data() == {"n": 1}
+    assert len(builds) == 1
+    assert server.DATA_CACHE_S <= 300   # a new data commit shows within the live-data TTL
+    monkeypatch.setattr(server, "data_dir", lambda: live / "commit-b")   # a new commit = a new answer
+    assert server.get_data() == {"n": 2}
+    monkeypatch.setattr(server, "_data_cache", {**server._data_cache, "at": time.time() - server.DATA_CACHE_S})
+    assert server.get_data() == {"n": 3}
+
+
+def test_get_data_never_caches_off_vercel(monkeypatch):
+    monkeypatch.delenv("VERCEL", raising=False)
+    monkeypatch.delenv("VERCEL_ENV", raising=False)
+    builds = []
+    monkeypatch.setattr(server, "build_data", lambda: builds.append(1) or {})
+    server.get_data(); server.get_data()
+    assert len(builds) == 2
