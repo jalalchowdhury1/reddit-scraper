@@ -91,6 +91,38 @@ async def robustness(b):
     await ctx.unroute_all(behavior="ignoreErrors")
     await ctx.close()
 
+    # A saved copy (or a failed refresh) says so on the page, on one line, with Try again.
+    ctx = await b.new_context(service_workers="block", **PHONE)
+    async def offline_copy(r):
+        res = await r.fetch()
+        await r.fulfill(response=res, headers={**res.headers, "x-offline-copy": "1"})
+    await ctx.route("**/api/data", offline_copy)
+    pg = await ctx.new_page()
+    await pg.goto(BASE); await pg.wait_for_selector("#feed .item", timeout=20000)
+    note = "#feed .data-note"
+    txt = await pg.inner_text(note) if await pg.locator(note).count() else ""
+    check("Saved copy: the feed says so ('Saved copy · <day time>')", txt.startswith("Saved copy"), txt)
+    h = await pg.evaluate(f"document.querySelector('{note} span') && document.querySelector('{note} span').getBoundingClientRect().height")
+    check("Saved copy: the notice is one line", bool(h) and h < 26, str(h))
+    await pg.click('[data-tab="ritholtz"]:visible'); await pg.wait_for_timeout(300)
+    if not await pg.evaluate("allData.ritholtz.some((i) => amIsCurrent(i) && i.kind !== 'SATPOST')"):
+        st = await pg.inner_text("#feed")
+        check("Saved copy: AM Reads doesn't blame Ritholtz", "aren't out yet" not in st and "Can't check" in st, st[:80])
+    await pg.click('[data-tab="monthly"]:visible')
+    await ctx.unroute_all(behavior="ignoreErrors")
+    await ctx.route("**/api/data", lambda r: r.fulfill(status=500, body="boom"))
+    await pg.evaluate("lastLoad = 0; refreshIfStale(false)")
+    try: await pg.wait_for_function(f"(document.querySelector('{note}') || {{}}).textContent?.includes(\"Couldn't refresh\")", timeout=10000)
+    except Exception: pass
+    txt = await pg.inner_text(note) if await pg.locator(note).count() else ""
+    check("Failed refresh: the old list stays and says 'Couldn't refresh'", "Couldn't refresh" in txt and await pg.locator("#feed .item").count() > 0, txt)
+    await ctx.unroute_all(behavior="ignoreErrors")
+    if await pg.locator(note).count(): await pg.click(note + " [data-act=reload]")
+    try: await pg.wait_for_function(f"!document.querySelector('{note}')", timeout=10000)
+    except Exception: pass
+    check("Try again with the site back: the notice goes", bool(txt) and await pg.locator(note).count() == 0)
+    await ctx.close()
+
 async def main():
     async with async_playwright() as p:
         b = await p.chromium.launch(headless=True)

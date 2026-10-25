@@ -136,6 +136,10 @@
         .tag i { vertical-align: -1px; }
         .notice { grid-column: 1 / -1; margin: 12px 0 4px; padding: 10px 12px; border-radius: 12px; background: var(--accent-soft); font-size: .82rem; line-height: 1.45; display: flex; gap: 8px; align-items: flex-start; }
         .notice i { color: var(--accent); font-size: 1rem; margin-top: 1px; }
+        .notice.data-note { align-items: center; white-space: nowrap; }
+        .notice.data-note span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+        .notice.data-note .pill-btn { height: 32px; padding: 0 12px; font-size: .78rem; color: var(--text); }
+        .notice.data-note { padding-top: 6px; padding-bottom: 6px; }
         .item-main { flex: 1; min-width: 0; }
         .src { display: flex; align-items: center; gap: 7px; font-size: .75rem; color: var(--muted); margin-bottom: 5px; min-width: 0; }
         .src img { width: 14px; height: 14px; border-radius: 3px; flex-shrink: 0; background: var(--surface-2); }
@@ -751,6 +755,9 @@ const TABS = [   // icon = the phone tab bar's Phosphor icon
     { key: 'favorites', label: 'Favorites', icon: 'star' },
 ];
 let allData = null, rawData = null, loadError = false, lastLoad = 0;
+// Not fresh = said on the page (25 Oct 2026): the service worker's saved copy, or a
+// refresh that failed while an older list stays up. '' = fresh.
+let dataNote = '', shownAt = 0;
 let currentTab = store.get('dr_tab', 'monthly');
 if (!TABS.some((t) => t.key === currentTab)) currentTab = 'monthly';
 let showRead = store.get('reddit_dash_show_read', false);
@@ -1359,8 +1366,11 @@ function render() {
     } else if (currentTab === 'ritholtz' && !(allData.ritholtz || []).some((i) => amIsCurrent(i) && i.kind !== 'SATPOST')) {
         const prev = (allData.ritholtz || []).filter((i) => !amIsCurrent(i) && i.kind !== 'SATPOST');
         const prevDay = prev[0] && prev[0].date ? etWeekday(prev[0].date) : 'the last';
-        html = `<div class="state"><i class="ph ph-coffee"></i><h2>Today's AM Reads aren't out yet</h2>
-                <p>Barry Ritholtz posts around 6:30 AM Eastern. This page checks for it three times each morning.</p>
+        html = dataNote ? `<div class="state"><i class="ph ph-wifi-slash"></i><h2>Can't check today's list</h2>
+                <p>This page couldn't reach the site, so today's AM Reads may be out already.</p>`
+                        : `<div class="state"><i class="ph ph-coffee"></i><h2>Today's AM Reads aren't out yet</h2>
+                <p>Barry Ritholtz posts around 6:30 AM Eastern. This page checks for it three times each morning.</p>`;
+        html += `
                 ${prev.length && !amShowOlder ? `<button class="pill-btn" data-act="older"><i class="ph ph-clock-counter-clockwise"></i>Show ${esc(prevDay)}'s list</button>` : ''}</div>`;
         const sat = shown.filter((i) => i.kind === 'SATPOST');
         if (sat.length) html += `<div class="section-label">SatPost</div>` + sat.map(cardHTML).join('');
@@ -1418,6 +1428,9 @@ function render() {
     const githubAt = allData && allData.updated && allData.updated.github;
     if (!query && currentTab === 'github' && githubAt && Date.now() - Date.parse(githubAt) > 24 * 3600e3) {
         html = `<div class="notice"><i class="ph ph-warning"></i><span>GitHub Trending last refreshed ${esc(clock(githubAt))}, so this list is older than usual.</span></div>` + html;
+    }
+    if (dataNote && !query && currentTab !== 'favorites') {
+        html = `<div class="notice data-note"><i class="ph ph-wifi-slash"></i><span>${esc(dataNote)}</span><button class="pill-btn" data-act="reload">Try again</button></div>` + html;
     }
     if (woke.length) {
         html = `<div class="section-label woke-label"><i class="ph ph-alarm" aria-hidden="true"></i>Back from snooze · ${woke.length}</div>` + woke.map(cardHTML).join('') + html;
@@ -1981,6 +1994,8 @@ async function loadData(restoreScroll = true) {
             data = await res.json();
         } finally { clearTimeout(timer); }
         const offline = res.headers.get('X-Offline-Copy') === '1';
+        shownAt = offline ? Date.parse(res.headers.get('Date')) || 0 : Date.now();
+        dataNote = offline ? 'Saved copy' + (shownAt ? ' · ' + clock(shownAt) : '') : '';
         rawData = data;
         applyQuiet();          // yesterday's quiet levels: the list holds still while reading
         trackFirstSeen();
@@ -1993,6 +2008,7 @@ async function loadData(restoreScroll = true) {
     } catch (e) {
         console.error('Load failed:', e);
         loadError = !allData;
+        if (allData) dataNote = "Couldn't refresh" + (shownAt ? ' · ' + clock(shownAt) : '');
     }
     render();
     if (restoreScroll && !query && !viewCleared && scrollPos[currentTab]) { showHeader(); window.scrollTo(0, scrollPos[currentTab]); }
