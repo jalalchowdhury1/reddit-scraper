@@ -11,6 +11,7 @@ const FB = 'https://www.gstatic.com/firebasejs/10.8.0/';
 const PH = 'https://cdn.jsdelivr.net/npm/@phosphor-icons/web@2.1.1/src/';
 const ASSETS = [FB + 'firebase-app-compat.js', FB + 'firebase-auth-compat.js', FB + 'firebase-firestore-compat.js',
                 PH + 'regular/style.css', PH + 'regular/Phosphor.woff2', PH + 'fill/style.css', PH + 'fill/Phosphor-Fill.woff2'];
+const SLOW_MS = 8000;   // weak signal: after this, the saved copy instead of a spinner
 
 self.addEventListener('install', (e) => {
   self.skipWaiting();
@@ -39,22 +40,33 @@ self.addEventListener('fetch', (e) => {
     return;
   }
   if (url.origin !== self.location.origin) return;
-  e.respondWith(
-    fetch(e.request)
-      .then((res) => {
-        if (res.ok) {
-          const copy = res.clone();
-          caches.open(CACHE_NAME).then((c) => c.put(e.request, copy));
-        }
-        return res;
-      })
-      // Offline: the saved copy, marked so the page can say it's not fresh
-      // (pull-to-refresh must not claim "Refreshed" from a saved copy).
-      .catch(() => caches.match(e.request).then((r) => {
-        if (!r || url.pathname !== '/api/data') return r;
-        const h = new Headers(r.headers);
-        h.set('X-Offline-Copy', '1');
-        return new Response(r.body, { status: r.status, statusText: r.statusText, headers: h });
-      }))
-  );
+  // The saved copy, marked so the page can say it's not fresh
+  // (pull-to-refresh must not claim "Refreshed" from a saved copy).
+  const saved = () => caches.match(e.request).then((r) => {
+    if (!r || url.pathname !== '/api/data') return r;
+    const h = new Headers(r.headers);
+    h.set('X-Offline-Copy', '1');
+    return new Response(r.body, { status: r.status, statusText: r.statusText, headers: h });
+  });
+  const network = fetch(e.request).then((res) => {
+    if (res.ok) {
+      const copy = res.clone();
+      return caches.open(CACHE_NAME).then((c) => c.put(e.request, copy)).then(() => res, () => res);
+    }
+    return res;
+  });
+  e.waitUntil(network.catch(() => {}));   // a late answer still refreshes the saved copy
+  e.respondWith(new Promise((resolve) => {
+    let done = false;
+    const give = (r) => { if (!done) { done = true; resolve(r); } };
+    // Weak signal: the saved copy after SLOW_MS (only if there is one; else keep waiting).
+    if (url.pathname === '/api/data' || e.request.mode === 'navigate') {
+      setTimeout(() => saved().then((r) => r && give(r)), SLOW_MS);
+    }
+    network
+      // The server failed (a Vercel pause is 503 DEPLOYMENT_PAUSED, a crash 500, a timeout 504):
+      // the saved copy if there is one, else the real error.
+      .then((res) => (res.status >= 500 ? saved().then((r) => give(r || res)) : give(res)))
+      .catch(() => saved().then(give));   // offline
+  }));
 });

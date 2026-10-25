@@ -68,6 +68,27 @@ async def robustness(b):
     w = await pg.evaluate("Math.min(...[...document.querySelectorAll('.tools .icon-btn i')].map((i) => i.getBoundingClientRect().width))")
     check("CDNs down: header icons still show (saved by the service worker)", w > 0, str(w))
     await ctx.unroute_all()
+    # The site answers 5xx (a Vercel pause is 503 DEPLOYMENT_PAUSED): the saved page and feed.
+    await ctx.route("**/*", lambda r: r.fulfill(status=503, body="The deployment is currently paused. DEPLOYMENT_PAUSED")
+                    if r.request.url.split("?")[0] in (BASE + "/", BASE + "/api/data") else r.continue_())
+    await pg.reload()
+    try: await pg.wait_for_selector("#feed .item", timeout=15000)
+    except Exception: pass
+    check("Site paused (503): the saved feed still shows", await pg.locator("#feed .item").count() > 0)
+    await ctx.unroute_all()
+    # Weak signal: /api/data stalls. The saved copy shows within ~8 s, not a 20 s spinner.
+    async def stall(r):
+        await asyncio.sleep(25)
+        try: await r.abort()
+        except Exception: pass
+    await ctx.route("**/api/data", stall)
+    t0 = asyncio.get_event_loop().time()
+    await pg.reload()
+    try: await pg.wait_for_selector("#feed .item", timeout=14000)
+    except Exception: pass
+    took = asyncio.get_event_loop().time() - t0
+    check("Stalled /api/data: the saved feed shows within 14 s", await pg.locator("#feed .item").count() > 0, f"{took:.1f} s")
+    await ctx.unroute_all(behavior="ignoreErrors")
     await ctx.close()
 
 async def main():
