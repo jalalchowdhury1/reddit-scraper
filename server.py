@@ -549,6 +549,10 @@ def build_data():
               + served_list_stamps(data["yearly"], "_yearly", stamps, github)]
     served = [w for w in served if w is not None]
     updated["reddit_oldest"] = min(served).strftime("%Y-%m-%dT%H:%M:%SZ") if served else ""
+    # When the AM Reads checker last read ritholtz.com (source.json, what am-reads-check grades):
+    # the AM Reads empty state can say the check is alive even on a day with no new post.
+    checked = frames.parse_stamp(str(am_reads_source_meta().get("checked_at") or ""))
+    updated["ritholtz_checked"] = checked.strftime("%Y-%m-%dT%H:%M:%SZ") if checked else ""
     data["updated"] = updated  # when each feed last landed (UTC ISO)
     return data
 

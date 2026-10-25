@@ -225,6 +225,13 @@ def test_am_reads_missing_source_meta_is_red(site):
     assert got["am-reads"]["inputAgeH"] is None and not judge(got["am-reads-check"])
 
 
+def test_api_data_serves_when_the_am_reads_checker_last_ran(site):
+    """updated.ritholtz_checked = source.json checked_at, the stamp am-reads-check grades."""
+    assert server.get_data()["updated"]["ritholtz_checked"] == iso(NOW - timedelta(hours=6, minutes=30))
+    (site / "ritholtz/source.json").unlink()
+    assert server.get_data()["updated"]["ritholtz_checked"] == ""
+
+
 class FakeResp:
     def __init__(self, body):
         self.content = body.encode()
