@@ -44,6 +44,21 @@ async def robustness(b):
     check("Firebase blocked: no JS errors", not errs, "; ".join(errs)[:200])
     await ctx.close()
 
+    # A tick made offline survives a reload while still offline (Firestore keeps it on the device).
+    ctx = await b.new_context(**PHONE)
+    pg = await ctx.new_page()
+    await pg.goto(BASE)
+    await pg.wait_for_function("allData && readLoaded && navigator.serviceWorker.controller", timeout=30000)
+    await ctx.set_offline(True)
+    pid = await pg.evaluate("visibleItems.find((i) => !isRead(i)).id")
+    await pg.click(f"#feed .item[data-id='{pid}'] [data-act=read]"); await pg.wait_for_timeout(500)
+    await pg.reload()
+    try: await pg.wait_for_function("allData && readLoaded", timeout=20000)
+    except Exception: pass
+    check("Offline tick survives an offline reload", await pg.evaluate(f"cloudReadPosts.has({json.dumps(str(pid))})"), str(pid))
+    await ctx.set_offline(False)
+    await ctx.close()
+
 async def main():
     async with async_playwright() as p:
         b = await p.chromium.launch(headless=True)

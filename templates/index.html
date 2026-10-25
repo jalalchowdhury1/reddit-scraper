@@ -321,6 +321,9 @@ const fbReady = Promise.all(['app', 'auth', 'firestore'].map((m) => new Promise(
 }))).then(() => {
     firebase.initializeApp(firebaseConfig);
     db = firebase.firestore();
+    // Ticks made offline wait on the device (IndexedDB), not in memory, so an app iOS
+    // kills before signal returns still has them. Must run before the first read/write.
+    db.enablePersistence({ synchronizeTabs: true }).catch(() => {});
     auth = firebase.auth();
 });
 
