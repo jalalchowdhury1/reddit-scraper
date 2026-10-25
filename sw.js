@@ -3,23 +3,42 @@
 // have shown yesterday's feed on open. Cache is only the offline fallback.
 const CACHE_NAME = 'daily-reader-v2';
 const SHELL = ['/', '/manifest.json', '/icon.png'];
+// The CDN files the page needs to work (25 Oct 2026): Firebase sync and the Phosphor
+// icons. Their URLs pin a version, so they never change: cache-first, in their own cache
+// (CACHE_NAME holds his saved feed and must survive every deploy).
+const ASSET_CACHE = 'daily-reader-assets-v1';
+const FB = 'https://www.gstatic.com/firebasejs/10.8.0/';
+const PH = 'https://cdn.jsdelivr.net/npm/@phosphor-icons/web@2.1.1/src/';
+const ASSETS = [FB + 'firebase-app-compat.js', FB + 'firebase-auth-compat.js', FB + 'firebase-firestore-compat.js',
+                PH + 'regular/style.css', PH + 'regular/Phosphor.woff2', PH + 'fill/style.css', PH + 'fill/Phosphor-Fill.woff2'];
 
 self.addEventListener('install', (e) => {
   self.skipWaiting();
-  e.waitUntil(caches.open(CACHE_NAME).then((c) => c.addAll(SHELL)).catch(() => {}));
+  e.waitUntil(Promise.all([
+    caches.open(CACHE_NAME).then((c) => c.addAll(SHELL)).catch(() => {}),
+    caches.open(ASSET_CACHE).then((c) => c.addAll(ASSETS)).catch(() => {}),
+  ]));
 });
 
 self.addEventListener('activate', (e) => {
   e.waitUntil(
     caches.keys()
-      .then((keys) => Promise.all(keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k))))
+      .then((keys) => Promise.all(keys.filter((k) => k !== CACHE_NAME && k !== ASSET_CACHE).map((k) => caches.delete(k))))
       .then(() => self.clients.claim())
   );
 });
 
 self.addEventListener('fetch', (e) => {
   const url = new URL(e.request.url);
-  if (e.request.method !== 'GET' || url.origin !== self.location.origin) return;
+  if (e.request.method !== 'GET') return;
+  if (url.href.startsWith(FB) || url.href.startsWith(PH)) {
+    e.respondWith(caches.match(e.request).then((r) => r || fetch(e.request).then((res) => {
+      if (res.ok) { const copy = res.clone(); caches.open(ASSET_CACHE).then((c) => c.put(e.request, copy)); }
+      return res;
+    })));
+    return;
+  }
+  if (url.origin !== self.location.origin) return;
   e.respondWith(
     fetch(e.request)
       .then((res) => {

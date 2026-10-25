@@ -14,8 +14,8 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,500;0,600;1,400&family=Geist:wght@400;500;600&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@phosphor-icons/web@2.1.1/src/regular/style.css">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@phosphor-icons/web@2.1.1/src/fill/style.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@phosphor-icons/web@2.1.1/src/regular/style.css" crossorigin>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@phosphor-icons/web@2.1.1/src/fill/style.css" crossorigin>
     <style>
         /* ---------- Tokens: one accent (amber), dark default, light + auto ---------- */
         :root {
@@ -316,6 +316,7 @@ const fbReady = Promise.all(['app', 'auth', 'firestore'].map((m) => new Promise(
     const s = document.createElement('script');
     s.src = `https://www.gstatic.com/firebasejs/10.8.0/firebase-${m}-compat.js`;
     s.async = false;   // run in this order
+    s.crossOrigin = 'anonymous';   // a readable answer, so the service worker can keep a copy
     s.onload = ok; s.onerror = () => no(new Error('Firebase did not load'));
     document.head.appendChild(s);
 }))).then(() => {

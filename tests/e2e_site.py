@@ -57,6 +57,17 @@ async def robustness(b):
     except Exception: pass
     check("Offline tick survives an offline reload", await pg.evaluate(f"cloudReadPosts.has({json.dumps(str(pid))})"), str(pid))
     await ctx.set_offline(False)
+    # The CDN files (icons, Firebase) come from the service worker's own cache, so a cold
+    # start with the CDNs down (or no HTTP cache, as iOS drops it) still has icons + sync.
+    await ctx.route(lambda u: "cdn.jsdelivr.net" in u or "gstatic.com/firebasejs" in u, lambda r: r.abort())
+    await pg.reload()
+    try: await pg.wait_for_function("allData && readLoaded", timeout=20000)
+    except Exception: pass
+    await pg.wait_for_timeout(500)
+    check("CDNs down: sync still loads (Firebase saved by the service worker)", await pg.evaluate("readLoaded"))
+    w = await pg.evaluate("Math.min(...[...document.querySelectorAll('.tools .icon-btn i')].map((i) => i.getBoundingClientRect().width))")
+    check("CDNs down: header icons still show (saved by the service worker)", w > 0, str(w))
+    await ctx.unroute_all()
     await ctx.close()
 
 async def main():
