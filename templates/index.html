@@ -1571,9 +1571,10 @@ function setProgress(total, unread) {
 // ACTIONS
 // ============================================================================
 // toast(msg, undoFn) shows an Undo button; toast(msg, fn, 'Mark read', 8000) any action.
-let toastTimer, lastUndo = null, lastUndoAt = 0;
+let toastTimer, lastUndo = null, lastUndoAt = 0, toastKind = '';   // 'done' = the "Done with X?" prompt
 function toast(msg, fn, label = 'Undo', ms = 4500) {
     const t = document.getElementById('toast');
+    toastKind = '';
     document.getElementById('toast-msg').textContent = msg;
     const u = document.getElementById('toast-undo');
     u.textContent = label;
@@ -1615,6 +1616,7 @@ function backOnPage() {
     const markThem = () => { setRead(ids, true); buzz(); toast(ids.length === 1 ? 'Marked read' : `Marked ${ids.length} read`, () => setRead(ids, false)); };
     toast(ids.length === 1 ? `Done with ${name}?` : `Done with the ${ids.length} you opened?`,
           markThem, ids.length === 1 ? 'Mark read' : `Mark ${ids.length} read`, 9000);
+    toastKind = 'done';
 }
 window.addEventListener('blur', leftPage);
 window.addEventListener('focus', backOnPage);
@@ -1670,6 +1672,7 @@ function switchTab(tab) {
     currentTab = tab;
     viewCleared = false;
     snoozeOpen = null;
+    if (toastKind === 'done') hideToast();   // the prompt is about the last tab; Undo toasts stay
     store.set('dr_tab', tab);
     focusIndex = -1; focusId = null;
     if (query) { query = ''; document.getElementById('searchInput').value = ''; document.getElementById('search').classList.remove('open'); }

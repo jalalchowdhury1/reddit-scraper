@@ -205,6 +205,20 @@ async def one_line(b):
     await pg.click("#updated [data-upd=news]"); await pg.wait_for_timeout(300)
     check("Footer: a stamp opens its tab", await pg.evaluate("currentTab") == "news")
     await pg.click('[data-tab="monthly"]:visible'); await pg.wait_for_timeout(300)
+    # The longest Done prompt: one line, and a tab switch puts it away (Undo toasts stay).
+    await pg.evaluate("""(() => { const i = allData.monthly[0]; i.title = 'The Half-Life of Extraordinary Wealth and Why It Ends';
+        pendingOpened = [String(i.id)]; awayAt = Date.now() - 15000; backOnPage(); })()""")
+    check("One line: the 'Done with …?' prompt", await pg.evaluate(ONE_LINE, "#toast-msg") and await pg.evaluate("document.getElementById('toast-undo').getBoundingClientRect().height <= 40")
+          and await pg.evaluate("document.getElementById('toast').getBoundingClientRect().width <= 358"), await pg.inner_text("#toast-msg"))
+    await pg.click('[data-tab="news"]:visible'); await pg.wait_for_timeout(300)
+    check("Done prompt goes away on a tab switch", not await pg.evaluate("document.getElementById('toast').classList.contains('show')"))
+    await pg.click("#btn-markall"); await pg.wait_for_timeout(300)
+    await pg.click('[data-tab="monthly"]:visible'); await pg.wait_for_timeout(300)
+    check("Mark all read's Undo toast survives a tab switch", await pg.evaluate("document.getElementById('toast').classList.contains('show')")
+          and "read" in await pg.inner_text("#toast-msg"), await pg.inner_text("#toast-msg"))
+    await pg.click("#toast-undo"); await pg.wait_for_timeout(500)
+    await pg.click('[data-tab="news"]:visible'); await pg.wait_for_timeout(300)
+    check("Undo after a tab switch brings the tab back", "All " not in await pg.inner_text("#progress-label"), await pg.inner_text("#progress-label"))
     await ctx.close()
 
 async def main():
