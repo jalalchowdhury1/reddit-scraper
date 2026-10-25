@@ -1669,7 +1669,8 @@ function setProgress(total, unread) {
     if (!query && total && currentTab === 'news' && totals.news_days) scope = ` · last ${totals.news_days} days`;
     if (!query && total && currentTab === 'github' && totals.github > total) scope = ` · top ${total} of ${totals.github}`;
     const label = document.getElementById('progress-label'), src = !query && SOURCE_OF[currentTab], f = src ? freshness(src) : null;
-    label.textContent = (snapshotOn ? 'Updating… · ' : '') + (unread ? `${unread} of ${total} left` : `All ${total} read`) + scope;
+    // A saved copy / failed refresh says so here too: mid-list the in-feed notice is off screen.
+    label.textContent = (snapshotOn ? 'Updating… · ' : src && dataNote ? dataNote.split(' · ')[0] + ' · ' : '') + (unread ? `${unread} of ${total} left` : `All ${total} read`) + scope;
     // Desktop: "· updated 9h ago" after the count; phones show the dot only (that row is full).
     if (f && f.ts) label.insertAdjacentHTML('beforeend', `<span class="hide-mobile"> · ${src === 'amreads' ? 'checked' : 'updated'} ${esc(ago(f.ts))}</span>`);
     const dot = document.getElementById('btn-fresh');

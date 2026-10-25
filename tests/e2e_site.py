@@ -109,6 +109,9 @@ async def robustness(b):
     check("Saved copy: the feed says so ('Saved copy · <day time>')", txt.startswith("Saved copy"), txt)
     h = await pg.evaluate(f"document.querySelector('{note} span') && document.querySelector('{note} span').getBoundingClientRect().height")
     check("Saved copy: the notice is one line", bool(h) and h < 26, str(h))
+    # Mid-list the in-feed notice is off screen, so the sticky progress row says it too.
+    lbl = await pg.inner_text("#progress-label")
+    check("Saved copy: the sticky progress row starts 'Saved copy · ', on one line", lbl.startswith("Saved copy · ") and await pg.evaluate(ONE_LINE, "#progress-label"), lbl)
     await pg.click('[data-tab="ritholtz"]:visible'); await pg.wait_for_timeout(300)
     if not await pg.evaluate("allData.ritholtz.some((i) => amIsCurrent(i) && i.kind !== 'SATPOST')"):
         st = await pg.inner_text("#feed")
@@ -121,11 +124,14 @@ async def robustness(b):
     except Exception: pass
     txt = await pg.inner_text(note) if await pg.locator(note).count() else ""
     check("Failed refresh: the old list stays and says 'Couldn't refresh'", "Couldn't refresh" in txt and await pg.locator("#feed .item").count() > 0, txt)
+    lbl = await pg.inner_text("#progress-label")
+    check("Failed refresh: the sticky progress row starts 'Couldn't refresh · ', on one line", lbl.startswith("Couldn't refresh · ") and await pg.evaluate(ONE_LINE, "#progress-label"), lbl)
     await ctx.unroute_all(behavior="ignoreErrors")
     if await pg.locator(note).count(): await pg.click(note + " [data-act=reload]")
     try: await pg.wait_for_function(f"!document.querySelector('{note}')", timeout=10000)
     except Exception: pass
-    check("Try again with the site back: the notice goes", bool(txt) and await pg.locator(note).count() == 0)
+    check("Try again with the site back: the notice goes", bool(txt) and await pg.locator(note).count() == 0
+          and "refresh" not in await pg.inner_text("#progress-label"), await pg.inner_text("#progress-label"))
     await ctx.close()
 
     # A 200 that isn't a feed is an error, not "Nothing here today"; so is a tab whose file broke.
