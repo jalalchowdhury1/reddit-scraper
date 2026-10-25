@@ -1442,9 +1442,14 @@ function render() {
     }
     // Reddit comes from the Mac mini's browser twice a day. Past 48h it has missed
     // several runs; GitHub's backup feed then refills lists, with ranks, not upvotes.
+    // Graded on the OLDEST list the tab serves (updated.reddit_oldest): a run that saved only a
+    // few lists makes the newest stamp fresh while the rest sit old. Older servers lack it.
     const redditAt = allData && allData.updated && allData.updated.reddit;
-    if (!query && (currentTab === 'monthly' || currentTab === 'yearly') && redditAt && Date.now() - Date.parse(redditAt) > 48 * 3600e3) {
-        html = `<div class="notice"><i class="ph ph-warning"></i><span>The Mac mini last refreshed Reddit ${esc(clock(redditAt))}. Until it catches up, lists may be older and show each post's rank instead of upvotes.</span></div>` + html;
+    const redditOldest = [allData && allData.updated && allData.updated.reddit_oldest, redditAt].filter(Boolean).sort()[0];   // same ISO format: sort = oldest
+    const over48 = (ts) => ts && Date.now() - Date.parse(ts) > 48 * 3600e3;
+    if (!query && (currentTab === 'monthly' || currentTab === 'yearly') && over48(redditOldest)) {
+        html = `<div class="notice"><i class="ph ph-warning"></i><span>${over48(redditAt) ? `The Mac mini last refreshed Reddit ${esc(clock(redditAt))}. Until it catches up, lists may be older`
+                                                        : `Some Reddit lists last refreshed ${esc(clock(redditOldest))}, so they may be older`} and show each post's rank instead of upvotes.</span></div>` + html;
     }
     // GitHub Trending refreshes every 6 hours; 24h without it = 4 missed runs.
     const githubAt = allData && allData.updated && allData.updated.github;

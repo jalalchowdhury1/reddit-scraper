@@ -10,7 +10,7 @@ profile, and marks read/unread only in that throwaway browser's storage.
 Not collected by pytest (the name doesn't start with test_). Exit 1 = a check failed.
 """
 import sys, asyncio, json
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from playwright.async_api import async_playwright
 
 BASE = sys.argv[1] if len(sys.argv) > 1 else "http://localhost:8791"
@@ -231,6 +231,10 @@ async def one_line(b):
         check(f"One line: paywalled AM Reads card footers (text size {size})", foot["n"] > 0 and foot["tall"] == 0 and await pg.evaluate(no_sideways), str(foot))
     await ctx.close()
 
+# For fixed-height pills, where ONE_LINE can't tell: all text sits on one line (line tops within 8 px).
+TEXT_ONE_LINE = """(s) => { const e = document.querySelector(s); if (!e) return false; const r = document.createRange(); r.selectNodeContents(e);
+    const t = [...r.getClientRects()].filter((x) => x.width).map((x) => x.top); return t.length > 0 && Math.max(...t) - Math.min(...t) < 8; }"""
+
 async def patch_api(ctx, fn, delay_ms=0):
     """Serve /api/data with fn(data) applied (and an optional delay)."""
     async def h(route):
@@ -240,13 +244,17 @@ async def patch_api(ctx, fn, delay_ms=0):
     await ctx.route("**/api/data", h)
 
 async def qol(b):
-    """The daily QoL picks (25 Oct 2026)."""
+    """The daily QoL picks (25 Oct 2026). Firebase is blocked here (none of it needs the cloud):
+    every e2e context signs in anonymously, and too many sign-ins get the test IP blocked."""
+    _nc = b.new_context
+    async def new_context(**kw):
+        ctx = await _nc(**kw); await ctx.route("**/firebasejs/**", lambda r: r.abort()); return ctx
     # News cards: the real publisher, never "· news.google.com" or its favicon (even if the server sends it).
     def news_patch(d):
         d["news"][0]["source"] = "https://businessinbangladesh.com.bd/"
         for i in d["news"]: i["domain"] = "news.google.com"
     for vp in (PHONE, dict(viewport={"width": 1440, "height": 900})):
-        ctx = await b.new_context(service_workers="block", **vp)
+        ctx = await new_context(service_workers="block", **vp)
         await patch_api(ctx, news_patch)
         pg = await ctx.new_page()
         await pg.goto(BASE); await pg.wait_for_selector("#feed .item", timeout=20000)
@@ -262,6 +270,20 @@ async def qol(b):
         async with ctx.expect_page() as pop: await pg.locator("#feed .item .item-title").first.click()
         await (await pop.value).close(); await pg.wait_for_timeout(400)
         check(f"News ({w}): opening a card still leaves it unread", await pg.inner_text("#progress-label") == before)
+        await ctx.close()
+
+    # Reddit's 48 h notice goes by the OLDEST list the tab serves (updated.reddit_oldest), not the newest save.
+    now = datetime.now(timezone.utc)
+    iso = lambda h: (now - timedelta(hours=h)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    for name, upd, want in (("one list 60 h old, newest fresh", {"reddit": iso(2), "reddit_oldest": iso(60)}, "Some Reddit lists"),
+                            ("no reddit_oldest (old server), newest fresh", {"reddit": iso(2)}, None),
+                            ("every list 60 h old", {"reddit": iso(60), "reddit_oldest": iso(61)}, "The Mac mini last refreshed Reddit")):
+        ctx = await new_context(service_workers="block", **PHONE)
+        await patch_api(ctx, lambda d, u=upd: (d["updated"].pop("reddit_oldest", None), d["updated"].update(u)))
+        pg = await ctx.new_page()
+        await pg.goto(BASE); await pg.wait_for_selector("#feed .item", timeout=20000)
+        notes = await pg.locator("#feed .notice:not(.data-note)").all_inner_texts()
+        check(f"Reddit notice: {name}", (not notes) if want is None else any(want in n for n in notes), str(notes)[:160])
         await ctx.close()
 
 async def main():
@@ -531,7 +553,7 @@ async def main():
         async def stale(route):
             r = await route.fetch(); d = await r.json()
             d["updated"]["news"] = "2026-09-20T08:00:00Z"
-            d["updated"]["reddit"] = datetime.now(timezone.utc).isoformat()  # isolate: Reddit fresh
+            d["updated"]["reddit"] = d["updated"]["reddit_oldest"] = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")  # isolate: Reddit fresh
             await route.fulfill(response=r, body=json.dumps(d), headers={**r.headers, "content-type": "application/json"})
         await pg.route("**/api/data", stale)
         await pg.goto(BASE + "/", wait_until="load"); await pg.wait_for_timeout(2500)
@@ -1021,6 +1043,7 @@ async def main():
         await ctx.close()
         await robustness(b)
         await one_line(b)
+        await qol(b)
         await b.close()
     print(f"\n{sum(results)}/{len(results)} passed")
     sys.exit(0 if all(results) else 1)
