@@ -103,6 +103,9 @@ def scrape_google_news(errors: List[str] = None) -> List[Dict]:
             
             for item in channel.findall("item"):
                 source = (item.findtext("source") or "Google News").strip()
+                # <link> is a news.google.com redirect; the outlet's own site is here.
+                source_el = item.find("source")
+                source_url = (source_el.get("url") or "").strip() if source_el is not None else ""
                 
                 # --- FILTER 1: Skip Indian Sources ---
                 if any(blocked in source.lower() for blocked in BLOCKED_SOURCES):
@@ -135,7 +138,8 @@ def scrape_google_news(errors: List[str] = None) -> List[Dict]:
                     "pub_date": pub_date,
                     "author": source, 
                     "category": matched_category, # Uses the exact name from your JS array
-                    "scraped_at": datetime.now().isoformat()
+                    "scraped_at": datetime.now().isoformat(),
+                    "source_url": source_url,
                 })
         except Exception as e:
             print(f"❌ Error fetching '{query_str}': {e}")

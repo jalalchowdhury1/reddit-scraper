@@ -249,3 +249,12 @@ def test_daily_workflow_keeps_committing_when_news_fails():
     # the failing step comes AFTER the commit, so Ritholtz/Trung still land
     assert wf.index("- name: Commit and push changes") < wf.index("- name: Fail the run if a scraper failed")
     assert "steps.scrape.outputs.failed != ''" in wf
+
+
+def test_news_saves_the_publishers_own_url(monkeypatch, tmp_path):
+    class R(_Resp):
+        content = NEWS_RSS.replace(b"<source>", b'<source url="https://www.dhakatribune.com">')
+    _news(monkeypatch, tmp_path, lambda url: R())
+    assert gn.main() == 0
+    import pandas as pd
+    assert list(pd.read_csv(tmp_path / "data/googlenews/articles.csv")["source_url"]) == ["https://www.dhakatribune.com"]

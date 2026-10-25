@@ -394,6 +394,15 @@ def build_data():
                     publisher = str(row.get('author', 'NEWS')).upper()
                     description = str(row.get('description', ''))
                     read_time = calculate_reading_time(description)
+                    # `url` is a news.google.com redirect: name the outlet by its own site
+                    # (source_url, saved since 25 Oct 2026), never by Google's.
+                    author, site = str(row.get('author', '')), str(row.get('source_url', ''))
+                    if author.startswith(("http://", "https://")):   # Google sometimes names it by URL
+                        site = site or author
+                        author = domain_of(author)
+                    domain = domain_of(site) or domain_of(row.get('url', ''))
+                    if domain == "news.google.com":
+                        domain = ""
                     
                     data["news"].append({
                         "id": pid, 
@@ -401,9 +410,9 @@ def build_data():
                         "desc": clean_text(description[:300]),
                         "url": str(row.get('url', '')).replace("http://", "https://"),
                         "meta": f"{publisher} • {row.get('category', '').upper()} • {str(row.get('pub_date', ''))[:10]} • ⏱️ {read_time} min",
-                        "source": str(row.get('author', '')) or domain_of(row.get('url', '')),
+                        "source": author or domain,
                         "category": str(row.get('category', '')),
-                        "domain": domain_of(row.get('url', '')),
+                        "domain": domain,
                         "date": str(row.get('pub_date', ''))[:10],
                         "ts": str(row.get('pub_date', '')),
                         "mins": read_time,

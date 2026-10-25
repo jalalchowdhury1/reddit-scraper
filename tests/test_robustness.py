@@ -397,3 +397,27 @@ def test_wrapper_reinstalls_playwright_after_a_python_upgrade(mac, tmp_path):
     mac.run(REDDIT_BROWSER_PY=str(fake), REDDIT_BROWSER_NEED_MODULE="playwright",
             FAKE_PY_CALLS=str(calls), REAL_PY=sys.executable)
     assert "missing" not in mac.last_block()                   # installed once, not every run
+
+
+# ---------- News: the real publisher, never news.google.com (25 Oct 2026) ----------
+
+def test_news_cards_name_the_real_publisher(site):
+    when = (datetime.now(timezone.utc) - timedelta(hours=1)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    g = "https://news.google.com/rss/articles/CBMi"
+    put(site, "googlenews/articles.csv",
+        "article_id,title,url,description,pub_date,author,category,scraped_at,source_url\n"
+        f"n0,Star story,{g}0?oc=5,,{when},The Daily Star,Good News,{when},https://www.thedailystar.net\n"
+        f"n1,Url-named outlet,{g}1?oc=5,,{when},https://businessinbangladesh.com.bd/,Good News,{when},\n"
+        f"n2,Older row,{g}2?oc=5,,{when},BSS,Good News,{when},\n"
+        f"n3,Direct link,https://www.wsj.com/x,,{when},WSJ,Good News,{when},\n")
+    got = {i["id"]: (i["source"], i["domain"]) for i in server.get_data()["news"]}
+    assert got == {"gn_n0": ("The Daily Star", "thedailystar.net"),
+                   "gn_n1": ("businessinbangladesh.com.bd", "businessinbangladesh.com.bd"),
+                   "gn_n2": ("BSS", ""),                      # no source url saved: no Google domain either
+                   "gn_n3": ("WSJ", "wsj.com")}
+
+
+def test_news_csv_from_before_source_url_still_serves(site):
+    put(site, "googlenews/articles.csv", fresh_news_csv().replace("https://example.com/", "https://news.google.com/rss/articles/"))
+    news = server.get_data()["news"]
+    assert len(news) == 3 and {(i["source"], i["domain"]) for i in news} == {("WSJ", "")}
