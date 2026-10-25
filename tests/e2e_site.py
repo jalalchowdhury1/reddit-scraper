@@ -20,6 +20,30 @@ def check(name, ok, detail=""):
     results.append(ok)
     print(("PASS " if ok else "FAIL ") + name + (f"  [{detail}]" if detail else ""))
 
+PHONE = dict(viewport={"width": 390, "height": 844}, has_touch=True, is_mobile=True)
+
+async def robustness(b):
+    """The app always opens, and says so when what it shows isn't fresh (25 Oct 2026)."""
+    # Firebase's scripts (gstatic) blocked: the feed still renders; ticks say they may not save.
+    ctx = await b.new_context(service_workers="block", **PHONE)
+    await ctx.route("**/firebasejs/**", lambda r: r.abort())
+    pg = await ctx.new_page(); errs = []
+    pg.on("pageerror", lambda e: errs.append(str(e)))
+    await pg.goto(BASE)
+    try: await pg.wait_for_selector("#feed .item", timeout=20000)
+    except Exception: pass
+    check("Firebase blocked: the feed and tab bar still render",
+          await pg.locator("#feed .item").count() > 0 and "Monthly" in await pg.inner_text("#tabbar"))
+    try: await pg.wait_for_function("document.getElementById('sync-state').textContent.includes('offline')", timeout=10000)
+    except Exception: pass
+    check("Firebase blocked: the footer says ticks may not save", "offline" in await pg.inner_text("#sync-state"))
+    before = await pg.inner_text("#progress-label")
+    if await pg.locator("#feed .item [data-act=read]").count(): await pg.locator("#feed .item [data-act=read]").first.click()
+    await pg.wait_for_timeout(300)
+    check("Firebase blocked: a tick still works on the page", await pg.inner_text("#progress-label") != before, before)
+    check("Firebase blocked: no JS errors", not errs, "; ".join(errs)[:200])
+    await ctx.close()
+
 async def main():
     async with async_playwright() as p:
         b = await p.chromium.launch(headless=True)
@@ -775,6 +799,7 @@ async def main():
         await pg.evaluate(f"Promise.all({json.dumps(seed)}.map((k) => col('favorites').doc(k).delete()))")
         check("No JS errors (paywall/favorites)", not errs6, "; ".join(errs6)[:200])
         await ctx.close()
+        await robustness(b)
         await b.close()
     print(f"\n{sum(results)}/{len(results)} passed")
     sys.exit(0 if all(results) else 1)

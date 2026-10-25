@@ -16,10 +16,6 @@
     <link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,500;0,600;1,400&family=Geist:wght@400;500;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@phosphor-icons/web@2.1.1/src/regular/style.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@phosphor-icons/web@2.1.1/src/fill/style.css">
-    <!-- Firebase SDKs (read/favorite sync across devices) -->
-    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
     <style>
         /* ---------- Tokens: one accent (amber), dark default, light + auto ---------- */
         :root {
@@ -313,9 +309,20 @@ const firebaseConfig = {
     appId: "1:132679444670:web:d6eede43f3dbb47a6616ef",
     measurementId: "G-5CWJLL7L66"
 };
-firebase.initializeApp(firebaseConfig);
-const db = firebase.firestore();
-const auth = firebase.auth();
+// The Firebase SDKs load in the background (25 Oct 2026): as blocking tags in <head>,
+// a slow or blocked gstatic left a blank app with no feed. The feed never waits for them.
+let db = null, auth = null;
+const fbReady = Promise.all(['app', 'auth', 'firestore'].map((m) => new Promise((ok, no) => {
+    const s = document.createElement('script');
+    s.src = `https://www.gstatic.com/firebasejs/10.8.0/firebase-${m}-compat.js`;
+    s.async = false;   // run in this order
+    s.onload = ok; s.onerror = () => no(new Error('Firebase did not load'));
+    document.head.appendChild(s);
+}))).then(() => {
+    firebase.initializeApp(firebaseConfig);
+    db = firebase.firestore();
+    auth = firebase.auth();
+});
 
 // localStorage can throw (private mode); never let that break the page.
 const store = {
@@ -341,7 +348,19 @@ const pasteDraft = {};     // its text so far (a re-render must not wipe a half-
 let syncKey = store.raw('dailyReaderSyncKey');
 { const c = store.get('dr_snoozed', null); if (c && c.key === syncKey && c.data && typeof c.data === 'object') snoozed = c.data; }   // no flash of snoozed cards on load
 
-const col = (name) => db.collection('sync_groups').doc(syncKey).collection(name);
+// Before Firebase is up, col()/batch() hand back stand-ins whose writes wait for it,
+// or fail into syncFailed if it never loads (the page's own state already changed).
+const col = (name) => db ? db.collection('sync_groups').doc(syncKey).collection(name) : { doc: (id) => laterDoc(name, id) };
+function laterDoc(name, id) {
+    const run = (op, a) => fbReady.then(() => col(name).doc(id)[op](...a));
+    return { later: [name, id], set: (...a) => run('set', a), update: (...a) => run('update', a), delete: () => run('delete', []) };
+}
+function batch() {
+    if (db) return db.batch();
+    const ops = [], real = (ref) => (ref.later ? col(ref.later[0]).doc(ref.later[1]) : ref);
+    return { set: (ref, ...a) => ops.push((b) => b.set(real(ref), ...a)), delete: (ref) => ops.push((b) => b.delete(real(ref))),
+             commit: () => fbReady.then(() => { const b = db.batch(); ops.forEach((f) => f(b)); return b.commit(); }) };
+}
 
 function initSync() {
     if (!syncKey) {
@@ -349,7 +368,7 @@ function initSync() {
         try { localStorage.setItem('dailyReaderSyncKey', syncKey); } catch {}
     }
     document.getElementById('sync-key').textContent = syncKey;
-    auth.signInAnonymously().then(() => {
+    fbReady.then(() => auth.signInAnonymously()).then(() => {
         migrateLocalToCloud();
         col('favorites').onSnapshot((snap) => {
             cloudFavorites = [];
@@ -419,7 +438,7 @@ const isRead = (item) => cloudReadPosts.has(String(item.id));
 const isFav = (item) => { const s = getSafeId(item); return cloudFavorites.some((f) => getSafeId(f) === s); };
 
 function setRead(ids, value, skip = false) {
-    const b = db.batch();
+    const b = batch();
     ids.forEach((id) => {
         const ref = col('read_posts').doc(String(id));
         const at = new Date().toISOString();
