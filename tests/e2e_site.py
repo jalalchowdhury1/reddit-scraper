@@ -142,6 +142,15 @@ async def robustness(b):
     check("A tab whose file broke says so, with Try again", "couldn't be loaded" in st and await pg.locator("#feed [data-act=reload]").count() == 1, st[:60])
     await ctx.close()
 
+    # Storage blocked (private window): a new key each load, so say this browser can't keep it.
+    ctx = await b.new_context(service_workers="block", **PHONE)
+    await ctx.add_init_script("Object.defineProperty(window, 'localStorage', { get() { throw new Error('blocked'); } })")
+    pg = await ctx.new_page()
+    await pg.goto(BASE); await pg.wait_for_selector("#feed .item", timeout=20000)
+    st = await pg.inner_text("#sync-state")
+    check("Storage blocked: the footer says the key can't be saved", "can't save" in st, st)
+    await ctx.close()
+
 async def main():
     async with async_playwright() as p:
         b = await p.chromium.launch(headless=True)

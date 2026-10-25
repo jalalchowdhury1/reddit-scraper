@@ -376,6 +376,8 @@ function initSync() {
         try { localStorage.setItem('dailyReaderSyncKey', syncKey); } catch {}
     }
     document.getElementById('sync-key').textContent = syncKey;
+    // Storage blocked (private window): this key is new on every load, so ticks won't follow.
+    if (store.raw('dailyReaderSyncKey') !== syncKey) document.getElementById('sync-state').textContent = " (this browser can't save your key)";
     fbReady.then(() => auth.signInAnonymously()).then(() => {
         migrateLocalToCloud();
         col('favorites').onSnapshot((snap) => {
