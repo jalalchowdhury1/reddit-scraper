@@ -1161,17 +1161,20 @@ function upvoteNum(item) {
 const isReddit = (tab) => tab === 'monthly' || tab === 'yearly';
 const subKey = (item) => String(item.source || '').replace(/^r\//, '').toLowerCase();
 const SUB_SHORT = { todayilearned: 'TIL', explainlikeimfive: 'ELI5', unethicallifeprotips: 'ULPT', lifeprotips: 'LPT', coolguides: 'Guides' };
-const subName = (key, item) => SUB_SHORT[key] || String((item && item.source) || key).replace(/^r\//, '');
+// The 'New' chip (25 Oct 2026) is a filter like a sub's: key NEW_SUB = only posts first seen today.
+const NEW_SUB = '__new';
+const subName = (key, item) => key === NEW_SUB ? 'New' : SUB_SHORT[key] || String((item && item.source) || key).replace(/^r\//, '');
+const inSub = (i, sub) => sub === NEW_SUB ? isNew(i) : subKey(i) === sub;
 // The tab's sub filter, or null. A filter whose sub has left the list switches itself off.
 function activeSub(tab) {
     const sub = isReddit(tab) ? subFilter[tab] : null;
-    if (sub && !itemsFor(tab).some((i) => subKey(i) === sub)) { subFilter[tab] = null; return null; }
+    if (sub && !itemsFor(tab).some((i) => inSub(i, sub))) { subFilter[tab] = null; return null; }
     return sub;
 }
 // What the tab shows: itemsFor() narrowed to the chosen sub (Mark all read uses this too).
 function tabItems(tab) {
     const sub = activeSub(tab);
-    return sub ? itemsFor(tab).filter((i) => subKey(i) === sub) : itemsFor(tab);
+    return sub ? itemsFor(tab).filter((i) => inSub(i, sub)) : itemsFor(tab);
 }
 function subChipsHTML(tab) {
     const all = itemsFor(tab), sub = activeSub(tab), subs = new Map();
@@ -1184,9 +1187,9 @@ function subChipsHTML(tab) {
     });
     // A sub with nothing left to read is a dead end, unless read items are showing (or it's the chosen one).
     const list = [...subs].filter(([k, e]) => e.n || showRead || k === sub).sort((a, b) => b[1].n - a[1].n || a[0].localeCompare(b[0]));
-    const total = all.filter((i) => !isRead(i)).length;
+    const total = all.filter((i) => !isRead(i)).length, nNew = all.filter((i) => isNew(i) && !isRead(i)).length;
     const chip = (k, label, n) => `<button class="chip ${(sub || '') === k ? 'on' : ''}" data-act="sub" data-sub="${esc(k)}" aria-pressed="${(sub || '') === k}">${k && quietLevel(k) ? '<i class="ph ph-speaker-simple-low" title="Quieted: only its bigger posts show" aria-label="quieted"></i>' : ''}${esc(label)}${n ? ` <span class="count">${n}</span>` : ''}</button>`;
-    return `<div class="sub-chips" role="group" aria-label="Show one subreddit">${chip('', 'All', total)}${list.map(([k, e]) => chip(k, subName(k, e.item), e.n)).join('')}</div>`;
+    return `<div class="sub-chips" role="group" aria-label="Show one subreddit">${chip('', 'All', total)}${nNew || sub === NEW_SUB ? chip(NEW_SUB, 'New', nNew) : ''}${list.map(([k, e]) => chip(k, subName(k, e.item), e.n)).join('')}</div>`;
 }
 
 function sourceOf(item) {
@@ -1562,7 +1565,7 @@ function setProgress(total, unread) {
     let scope = '';
     const sub = !query && activeSub(currentTab);
     if (sub) {
-        const one = itemsFor(currentTab).find((i) => subKey(i) === sub);
+        const one = itemsFor(currentTab).find((i) => inSub(i, sub));
         scope = ` · ${subName(sub, one)} only`;
     } else if (!query && total && (currentTab === 'monthly' || currentTab === 'yearly')) {
         const nKept = carried(currentTab).length, nLive = total - nKept;

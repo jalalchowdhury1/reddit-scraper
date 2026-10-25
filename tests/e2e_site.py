@@ -286,6 +286,35 @@ async def qol(b):
         check(f"Reddit notice: {name}", (not notes) if want is None else any(want in n for n in notes), str(notes)[:160])
         await ctx.close()
 
+    # 'New N' chip on Monthly: only the posts first seen today; Mark all read stays inside it.
+    for vp in (PHONE, dict(viewport={"width": 1440, "height": 900})):
+        w = vp["viewport"]["width"]
+        ctx = await new_context(service_workers="block", **vp)
+        pg = await ctx.new_page()
+        await pg.goto(BASE); await pg.wait_for_function("allData && (readLoaded || syncBroken)", timeout=20000)
+        new3 = await pg.evaluate("""(() => { const m = {}, y = prevDay(etDate()), ids = allData.monthly.map((i) => String(i.id));
+            Object.keys(store.get('dr_first_seen', {})).forEach((id) => { m[id] = y; });
+            [ids[4], ids[9], ids[20]].forEach((id) => { m[id] = etDate(); }); store.set('dr_first_seen', m); return [ids[4], ids[9], ids[20]]; })()""")
+        await pg.reload(); await pg.wait_for_function("allData && (readLoaded || syncBroken)", timeout=20000); await pg.wait_for_timeout(500)
+        chip = pg.locator("#feed .sub-chips [data-sub='__new']")
+        txt = (await chip.inner_text()).replace("\n", " ") if await chip.count() else ""
+        check(f"New chip ({w}): 'New 3' on one line", txt == "New 3" and await pg.evaluate(TEXT_ONE_LINE, "#feed .sub-chips [data-sub='__new']"), txt)
+        order_all = [i for i in await pg.evaluate("[...document.querySelectorAll('#feed .item')].map((e) => e.dataset.id)") if i in new3]
+        before = await pg.evaluate("itemsFor('monthly').filter((i) => !isRead(i)).length")
+        if await chip.count(): await chip.click(); await pg.wait_for_timeout(300)
+        cards = await pg.evaluate("[...document.querySelectorAll('#feed .item')].map((e) => [e.dataset.id, e.querySelector('.meta').innerText.includes('New')])")
+        label = await pg.inner_text("#progress-label")
+        check(f"New chip ({w}): shows exactly the 3 New posts, same order, label says New only",
+              [c[0] for c in cards] == order_all and len(cards) == 3 and all(c[1] for c in cards) and label.endswith("· New only"), f"{cards} | {label}")
+        await pg.click("#btn-markall"); await pg.wait_for_timeout(300)
+        after = await pg.evaluate("itemsFor('monthly').filter((i) => !isRead(i)).length")
+        check(f"New chip ({w}): Mark all read marks only those 3", before - after == 3, f"{before} -> {after}")
+        await pg.click("#toast-undo"); await pg.wait_for_timeout(300)
+        check(f"New chip ({w}): Undo brings them back", await pg.evaluate("itemsFor('monthly').filter((i) => !isRead(i)).length") == before)
+        await pg.click("#feed .sub-chips [data-sub='__new']"); await pg.wait_for_timeout(300)
+        check(f"New chip ({w}): tap again = All", await pg.locator("#feed .item").count() >= 50)
+        await ctx.close()
+
 async def main():
     async with async_playwright() as p:
         b = await p.chromium.launch(headless=True)
