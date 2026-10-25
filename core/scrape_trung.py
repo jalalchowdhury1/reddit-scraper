@@ -5,6 +5,7 @@ Fetches the latest newsletters from Trung Phan's Substack RSS feed.
 Extracts title, URL, clean description, and publication date.
 """
 import os
+import sys
 import hashlib
 import requests
 import pandas as pd
@@ -27,7 +28,8 @@ def clean_html(raw_html: str) -> str:
     soup = BeautifulSoup(raw_html, "html.parser")
     return soup.get_text(separator=" ", strip=True)
 
-def scrape_satpost():
+def scrape_satpost() -> int:
+    """1 = a real failure (last line `SATPOST FAILED: <why>`), 0 otherwise."""
     print(f"Fetching SatPost RSS from {FEED_URL}...")
     headers = {"User-Agent": "DailyReader/1.0 (SatPost RSS Scraper)"}
     
@@ -35,8 +37,8 @@ def scrape_satpost():
         response = requests.get(FEED_URL, headers=headers, timeout=30)
         response.raise_for_status()
     except Exception as e:
-        print(f"Error fetching RSS feed: {e}")
-        return
+        print(f"SATPOST FAILED: could not fetch {FEED_URL}: {e}")
+        return 1
 
     # Parse XML
     soup = BeautifulSoup(response.content, "xml")
@@ -59,8 +61,10 @@ def scrape_satpost():
         try:
             dt = parsedate_to_datetime(pub_date_str)
             iso_date = dt.strftime("%Y-%m-%d %H:%M:%S")
-        except:
-            iso_date = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        except Exception:
+            # Never "now": an old back issue would show as this week's SatPost.
+            print(f"skipping an issue with no readable date: {title[:60]}")
+            continue
 
         article_id = make_article_id(link)
 
@@ -80,13 +84,14 @@ def scrape_satpost():
         try:
             if list(pd.read_csv(OUTPUT_FILE)["article_id"]) == list(df["article_id"]):
                 print("SatPost unchanged, file left alone")
-                return
+                return 0
         except Exception:
             pass
         df.to_csv(OUTPUT_FILE, index=False)
         print(f"Successfully saved {len(articles)} SatPost articles to {OUTPUT_FILE}")
-    else:
-        print("No articles found in the feed.")
+        return 0
+    print(f"SATPOST FAILED: no issues in the feed at {FEED_URL}")
+    return 1
 
 if __name__ == "__main__":
-    scrape_satpost()
+    sys.exit(scrape_satpost())

@@ -394,6 +394,15 @@ def build_data():
                     publisher = str(row.get('author', 'NEWS')).upper()
                     description = str(row.get('description', ''))
                     read_time = calculate_reading_time(description)
+                    # `url` is a news.google.com redirect: name the outlet by its own site
+                    # (source_url, saved since 25 Oct 2026), never by Google's.
+                    author, site = str(row.get('author', '')), str(row.get('source_url', ''))
+                    if author.startswith(("http://", "https://")):   # Google sometimes names it by URL
+                        site = site or author
+                        author = domain_of(author)
+                    domain = domain_of(site) or domain_of(row.get('url', ''))
+                    if domain == "news.google.com":
+                        domain = ""
                     
                     data["news"].append({
                         "id": pid, 
@@ -401,9 +410,9 @@ def build_data():
                         "desc": clean_text(description[:300]),
                         "url": str(row.get('url', '')).replace("http://", "https://"),
                         "meta": f"{publisher} • {row.get('category', '').upper()} • {str(row.get('pub_date', ''))[:10]} • ⏱️ {read_time} min",
-                        "source": str(row.get('author', '')) or domain_of(row.get('url', '')),
+                        "source": author or domain,
                         "category": str(row.get('category', '')),
-                        "domain": domain_of(row.get('url', '')),
+                        "domain": domain,
                         "date": str(row.get('pub_date', ''))[:10],
                         "ts": str(row.get('pub_date', '')),
                         "mins": read_time,
@@ -533,6 +542,17 @@ def build_data():
 
     stamps = reddit_list_stamps()
     updated["reddit"] = max(stamps.values()) if stamps else ""  # last Mac-browser save
+    # The STALEST list the two tabs show (Mac or GitHub save), for the page's stale notice:
+    # a Mac run that saved 3 lists and stopped keeps `reddit` fresh while 23 lists age.
+    github = reddit_list_stamps("lists", github_meta())
+    served = [frames.parse_stamp(st) for st in served_list_stamps(data["monthly"], "", stamps, github)
+              + served_list_stamps(data["yearly"], "_yearly", stamps, github)]
+    served = [w for w in served if w is not None]
+    updated["reddit_oldest"] = min(served).strftime("%Y-%m-%dT%H:%M:%SZ") if served else ""
+    # When the AM Reads checker last read ritholtz.com (source.json, what am-reads-check grades):
+    # the AM Reads empty state can say the check is alive even on a day with no new post.
+    checked = frames.parse_stamp(str(am_reads_source_meta().get("checked_at") or ""))
+    updated["ritholtz_checked"] = checked.strftime("%Y-%m-%dT%H:%M:%SZ") if checked else ""
     data["updated"] = updated  # when each feed last landed (UTC ISO)
     return data
 
@@ -624,17 +644,22 @@ def am_reads_source_meta() -> dict:
         return {}
 
 
-def served_reddit_age(items, suffix, saved, github, now):
-    """Age of the OLDEST list the tab is showing: each list's newest save, by the Mac
-    (data/reddit_browser.json lists) or GitHub's RSS backup (reddit_github.json),
-    both shipped in the same commit as the CSV. `checked` is NOT used: the Mac writes
-    it even when it kept the old file."""
-    ages = []
+def served_list_stamps(items, suffix, saved, github) -> list:
+    """Each list the tab is showing, its newest save: by the Mac (data/reddit_browser.json
+    lists) or GitHub's RSS backup (reddit_github.json), both shipped in the same commit as
+    the CSV. `checked` is NOT used: the Mac writes it even when it kept the old file."""
+    stamps = []
     for sub in {i["source"][2:] for i in items if str(i.get("source", "")).startswith("r/")}:
         key = f"r_{sub}{suffix}"
         stamp = max(saved.get(key, ""), github.get(key, ""))
         if stamp:
-            ages.append(_age_h(stamp, now))
+            stamps.append(stamp)
+    return stamps
+
+
+def served_reddit_age(items, suffix, saved, github, now):
+    """Age of the OLDEST list the tab is showing (served_list_stamps)."""
+    ages = [_age_h(stamp, now) for stamp in served_list_stamps(items, suffix, saved, github)]
     ages = [a for a in ages if a is not None]
     return max(ages) if ages else None
 
@@ -668,8 +693,9 @@ def freshness_items(now: datetime = None) -> list:
         {"name": "am-reads-check", "inputAgeH": None,
          "servedAgeH": _age_h(src.get("checked_at"), now), "graceH": 0,
          "maxAgeH": AM_READS_CHECK_MAX_H},
-        # SatPost has had no new issue since 26 Jun 2026 (the feed itself), so no cap:
-        # its age is shown, not graded.
+        # SatPost issues are irregular (none 26 Jun -> 19 Oct 2026) and only the last 7 days
+        # are served, so any cap would go red a week after every issue: shown, not graded.
+        # A dead SatPost scraper fails its workflow run instead (SATPOST FAILED, exit 1).
         {"name": "satpost", "inputAgeH": None, "servedAgeH": newest(satpost), "graceH": 0},
         {"name": "github-trending", "inputAgeH": None, "servedAgeH": _age_h(d["updated"]["github"], now),
          "graceH": 0, "maxAgeH": GITHUB_MAX_AGE_H},

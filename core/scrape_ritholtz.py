@@ -33,6 +33,7 @@ IMPORTANT FOR LLMs:
 import requests
 import pandas as pd
 import os
+import sys
 import time
 import hashlib
 import re
@@ -210,22 +211,37 @@ def get_post_date(soup: BeautifulSoup) -> Optional[str]:
         return None
 
 
+class ScrapeFailed(Exception):
+    """A real failure (blocked, 403, a Cloudflare challenge, no post found): main()
+    prints `AM READS FAILED: <why>` and exits 1 so the workflow run goes red. A day
+    with no new post is NOT one: the newest post is simply the one already served."""
+
+
+def fetch(session: requests.Session, url: str):
+    try:
+        resp = session.get(url, timeout=SCRAPER_TIMEOUT)
+    except Exception as e:
+        raise ScrapeFailed(f"could not fetch {url}: {e}")
+    if b"<title>Just a moment" in resp.content[:5000]:
+        raise ScrapeFailed(f"Cloudflare challenge at {url} (HTTP {getattr(resp, 'status_code', '?')})")
+    try:
+        resp.raise_for_status()
+    except Exception as e:
+        raise ScrapeFailed(f"{url}: {e}")
+    return resp
+
+
 # ============================================================================
 # FIND TODAY'S AM READS POST
 # ============================================================================
 
 
-def find_am_reads_url(session: requests.Session) -> Optional[str]:
+def find_am_reads_url(session: requests.Session) -> str:
     """
     Find the URL of today's AM Reads or Weekend Reads post from the category page.
     """
     print(f"  Fetching {CATEGORY_URL}...")
-    try:
-        resp = session.get(CATEGORY_URL, timeout=SCRAPER_TIMEOUT)
-        resp.raise_for_status()
-    except Exception as e:
-        print(f"    Error fetching category page: {e}")
-        return None
+    resp = fetch(session, CATEGORY_URL)
     
     soup = BeautifulSoup(resp.content, "html.parser")
     all_links = soup.find_all("a", href=True)
@@ -257,8 +273,7 @@ def find_am_reads_url(session: requests.Session) -> Optional[str]:
             print(f"    Found reading list post (fallback): {link.get('href', '')}")
             return link.get("href", "")
     
-    print("    WARNING: Could not find AM/Weekend Reads post")
-    return None
+    raise ScrapeFailed(f"no AM/Weekend Reads post on {CATEGORY_URL}")
 
 
 # ============================================================================
@@ -283,20 +298,17 @@ def extract_articles(post_url: str, session: requests.Session, seen_post: Dict =
             - source_post, scraped_at
     """
     print(f"  Fetching AM Reads post: {post_url}...")
-    try:
-        resp = session.get(post_url, timeout=SCRAPER_TIMEOUT)
-        resp.raise_for_status()
-    except Exception as e:
-        print(f"    Error fetching post: {e}")
-        return []
+    resp = fetch(session, post_url)
     
     soup = BeautifulSoup(resp.content, "html.parser")
     articles = []
     seen_titles = set()
-    real_date = get_post_date(soup)
+    post_date = get_post_date(soup)
+    # Never stamp "now": an old post (Saturday's, re-read on Monday) would show as today's.
+    if not post_date:
+        raise ScrapeFailed(f"post has no publish time: {post_url}")
     if seen_post is not None:
-        seen_post["post_date"] = real_date   # the source's real stamp only, never "now"
-    post_date = real_date or datetime.now(ET).isoformat()
+        seen_post["post_date"] = post_date
     print(f"    Post published: {post_date}")
     
     # Find all links in the post content
@@ -304,8 +316,7 @@ def extract_articles(post_url: str, session: requests.Session, seen_post: Dict =
     content = soup.find("div", class_="entry-content") or soup.find("article") or soup.find("div", class_="post-content")
     
     if not content:
-        print("    WARNING: Could not find post content")
-        return []
+        raise ScrapeFailed(f"no post content in {post_url} (layout changed?)")
     
     # Find all list items (li) in the content - each article is typically in an li
     list_items = content.find_all("li")
@@ -563,22 +574,16 @@ def scrape_am_reads() -> List[Dict]:
     
     # Step 1: Find today's AM Reads post
     post_url = find_am_reads_url(session)
-    if not post_url:
-        print("ERROR: Could not find AM Reads post URL")
-        return []
     
     time.sleep(SCRAPER_DELAY)
     
     # Step 2: Extract articles from the post
     seen_post = {}
     articles = extract_articles(post_url, session, seen_post)
-    if seen_post.get("post_date"):
-        meta = write_source_meta(seen_post["post_date"])
-        print(f"    Source check: newest post {meta['source_newest_ts']} (checked {meta['checked_at']})")
-    else:
-        print("    WARNING: newest post has no publish time; source.json not updated")
+    meta = write_source_meta(seen_post["post_date"])
+    print(f"    Source check: newest post {meta['source_newest_ts']} (checked {meta['checked_at']})")
     if not articles:
-        return []
+        raise ScrapeFailed(f"no articles in {post_url}")
 
     # Step 3: drop articles already shown on an earlier day, then cap
     seen = load_seen()
@@ -596,14 +601,20 @@ def scrape_am_reads() -> List[Dict]:
 # ============================================================================
 
 
-def main():
+def main() -> int:
     """
-    Run the complete scraper pipeline.
+    Run the complete scraper pipeline. 1 = a real failure (last line
+    `AM READS FAILED: <why>`), 0 otherwise, including a day with no new post.
     """
-    articles = scrape_am_reads()
+    try:
+        articles = scrape_am_reads()
+    except ScrapeFailed as e:
+        print(f"AM READS FAILED: {e}")
+        return 1
     save_articles(articles)
     print("\nDone! Run: streamlit run dashboard.py")
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

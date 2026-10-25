@@ -74,7 +74,7 @@ the **AM Reads** tab (`AM READS` / `WEEKEND READS` vs `SATPOST` in each item's m
 | `core/scrape_github_trending.py` | GitHub (every 6 h) | github.com/trending HTML (today, all languages) | `data/github_trending/repos.csv` | **overwrite**, only when `list_problem()` passes |
 
 `core/reddit_common.py` (stdlib only) holds what the Reddit scrapers share: **`SUBREDDITS`
-(the authoritative list, 13 entries)**, `SUBREDDIT_TIERS`, `tier_score()`, and the Mac/GitHub
+(the authoritative list, 12 entries)**, `SUBREDDIT_TIERS`, `tier_score()`, and the Mac/GitHub
 freshness handshake (`data/reddit_browser.json`, `FRESH_HOURS = 36`).
 Nothing in `diagnostics/` or `scraper/` runs anywhere (see §6).
 
@@ -400,7 +400,7 @@ post and extract articles.
   `reddit_lists` (each `{list, saved, checked, via}`, **oldest `checked` first**; `""` = no stamp
   yet), `reddit_oldest` (oldest save), `reddit_missing` (tracked lists the Mac has never saved:
   an oldest-stamp check can't see those),
-  `tracked_subs` (13; `null` means the `core` import failed on Vercel), `updated`, `counts`.
+  `tracked_subs` (12; `null` means the `core` import failed on Vercel), `updated`, `counts`.
 
 - `GET /api/freshness` → **Freshness endpoint** (contract v1, 2 Oct 2026; no auth,
   `Cache-Control: no-store`, ages in hours + names only, 500 `{"error"}` if building fails).
@@ -530,7 +530,7 @@ python3 core/scrape_reddit_browser.py --only LifeProTips --visible   # needs Pla
   `templates/**, data/**, server_assets/**, core/**, manifest.json, sw.js`.
 - Vercel installs only `requirements.txt`.
 - After a deploy, check: `curl -s https://reddit-scraper-lyart.vercel.app/api/status` shows
-  `"tracked_subs": 13`, then run `tests/e2e_site.py` against the live URL.
+  `"tracked_subs": 12`, then run `tests/e2e_site.py` against the live URL.
 
 ### CI: the scrape workflows
 - `reddit_backup.yml` (every 3 h at :17): §2c. Python 3.10, `concurrency: reddit-backup`,
