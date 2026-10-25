@@ -74,6 +74,22 @@
         .progress-row { display: flex; align-items: center; gap: 12px; padding: 2px 0 12px; font-size: .8rem; color: var(--muted); }
         .progress-row .label { font-variant-numeric: tabular-nums; white-space: nowrap; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
         .progress-row .text-btn { flex-shrink: 0; }   /* a long label ends in "…"; Mark all read never leaves the screen */
+        /* Freshness dot (25 Oct 2026): green / amber past half the limit / red past it; a tap lists each source */
+        .fresh-dot { flex-shrink: 0; width: 22px; height: 22px; margin: 0 -8px 0 -6px; display: grid; place-items: center; }
+        .fresh-dot::before, .fresh-sheet .dot { content: ""; width: 7px; height: 7px; border-radius: 999px; background: var(--faint); opacity: .7; }
+        [data-grade=green]::before, .dot[data-grade=green] { background: #22a55a; opacity: 1; }
+        [data-grade=amber]::before, .dot[data-grade=amber] { background: var(--accent); opacity: 1; }
+        [data-grade=red]::before, .dot[data-grade=red] { background: #e5484d; opacity: 1; }
+        .fresh-sheet { position: fixed; z-index: 35; left: 16px; max-width: calc(100vw - 32px); padding: 6px; border-radius: 16px;
+                       background: color-mix(in srgb, var(--surface) 88%, transparent); backdrop-filter: blur(22px) saturate(1.8); -webkit-backdrop-filter: blur(22px) saturate(1.8);
+                       border: 1px solid color-mix(in srgb, var(--text) 10%, transparent); box-shadow: 0 10px 30px rgba(0,0,0,.28); }
+        .fresh-sheet[hidden] { display: none; }
+        .fresh-sheet button { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 40px; padding: 0 12px; border-radius: 10px;
+                              font-size: .84rem; white-space: nowrap; text-align: left; }
+        .fresh-sheet button:hover { background: var(--surface-2); }
+        .fresh-sheet .dot { flex-shrink: 0; }
+        .state .checked { font-size: .8rem; color: var(--faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .state .checked.amber { color: var(--accent); }
         .bar { flex: 1; min-width: 16px; height: 3px; border-radius: 999px; overflow: hidden; background: var(--line); }
         .bar > span { display: block; height: 100%; width: 0; background: var(--accent); transition: width .5s cubic-bezier(.16,1,.3,1); }
         .text-btn { font-size: .8rem; font-weight: 500; color: var(--accent); white-space: nowrap; padding: 6px 2px; }
@@ -299,6 +315,7 @@
             <input id="searchInput" type="search" placeholder="Title, source, subreddit" autocomplete="off">
         </div>
         <div class="progress-row" id="progress">
+            <button class="fresh-dot" id="btn-fresh" aria-label="How fresh each list is" title="How fresh each list is"></button>
             <span class="label" id="progress-label"></span>
             <div class="bar"><span id="progress-bar"></span></div>
             <button class="text-btn" id="btn-markall">Mark all read</button>
@@ -314,6 +331,7 @@
     </footer>
 </div>
 <nav class="tabbar" id="tabbar" aria-label="Sections"></nav>
+<div class="fresh-sheet" id="fresh-sheet" role="dialog" aria-label="How fresh each list is" hidden></div>
 <div class="ptr" id="ptr" aria-hidden="true"><i class="ph ph-arrow-down"></i></div>
 <div class="toast" id="toast" role="status"><span id="toast-msg"></span><button id="toast-undo">Undo</button></div>
 
@@ -1139,6 +1157,44 @@ function ago(ts) {
 }
 const clock = (ts) => new Date(ts).toLocaleString('en-US', { weekday: 'short', hour: 'numeric', minute: '2-digit' });
 
+// ---------- Freshness (25 Oct 2026): what the screen serves, graded like the warning cards ----------
+// Hours until a source is overdue (the warning cards' limits; AM Reads' checker = /api/freshness's 26 h).
+// Amber past half, red past the limit, plain grey with no stamp. AM Reads is graded on when the checker
+// last read ritholtz.com (updated.ritholtz_checked), never on his calendar, so weekends stay calm.
+const FRESH_H = { reddit: 48, news: 36, github: 24, amreads: 26 };
+const upd = () => (allData && allData.updated) || {};
+// Reddit: the OLDEST list the tabs serve (updated.reddit_oldest, from lane B); older servers send only the newest.
+const redditOldestAt = () => [upd().reddit_oldest, upd().reddit].filter(Boolean).sort()[0];   // same ISO format: sort = oldest
+const SOURCE_OF = { monthly: 'reddit', yearly: 'reddit', news: 'news', github: 'github', ritholtz: 'amreads' };
+function freshness(src) {
+    const ts = { reddit: redditOldestAt(), news: upd().news, github: upd().github, amreads: upd().ritholtz_checked }[src];
+    const h = ts ? (Date.now() - Date.parse(ts)) / 3600e3 : NaN;
+    return { ts, grade: isNaN(h) ? '' : h > FRESH_H[src] ? 'red' : h > FRESH_H[src] / 2 ? 'amber' : 'green' };
+}
+const clockShort = (ts) => new Date(ts).toDateString() === new Date().toDateString()
+    ? new Date(ts).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) : clock(ts);
+let freshOpen = false;
+function openFresh() {
+    const rows = [['monthly', 'Reddit', 'reddit'], ['news', 'News', 'news'], ['ritholtz', 'AM Reads', 'amreads'], ['github', 'GitHub', 'github']].map(([tab, name, src]) => {
+        const f = freshness(src);
+        // AM Reads: when the checker last looked; before the server sends that, when the list last landed (ungraded).
+        const when = src === 'amreads' ? (f.ts ? 'checked ' + clockShort(f.ts) : upd().ritholtz ? ago(upd().ritholtz) : '') : f.ts ? ago(f.ts) : 'no stamp';
+        return `<button data-fresh="${tab}"><span class="dot" data-grade="${f.grade}"></span>${esc(name)}${when ? ' · ' + esc(when) : ''}</button>`;
+    });
+    const sheet = document.getElementById('fresh-sheet'), r = document.getElementById('progress').getBoundingClientRect();
+    sheet.innerHTML = rows.join('');
+    sheet.style.top = `${Math.round(r.bottom)}px`;   // under the row it came from: the tab bar stays clear
+    sheet.hidden = false; freshOpen = true;
+}
+function closeFresh() { if (freshOpen) { document.getElementById('fresh-sheet').hidden = true; freshOpen = false; } }
+document.getElementById('btn-fresh').addEventListener('click', (e) => { e.stopPropagation(); freshOpen ? closeFresh() : openFresh(); });
+document.getElementById('fresh-sheet').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-fresh]');
+    if (b) { closeFresh(); switchTab(b.dataset.fresh); }
+});
+document.addEventListener('click', (e) => { if (freshOpen && !e.target.closest('#fresh-sheet')) closeFresh(); });
+window.addEventListener('scroll', closeFresh, { passive: true });
+
 // Returns escaped HTML. Upvotes appear only when Reddit itself supplied them;
 // when Reddit blocks the scraper there is no score, so we show the post's real
 // place in its subreddit's top list instead of an invented number.
@@ -1409,7 +1465,8 @@ function render() {
         html = dataNote ? `<div class="state"><i class="ph ph-wifi-slash"></i><h2>Can't check today's list</h2>
                 <p>This page couldn't reach the site, so today's AM Reads may be out already.</p>`
                         : `<div class="state"><i class="ph ph-coffee"></i><h2>Today's AM Reads aren't out yet</h2>
-                <p>Barry Ritholtz posts around 6:30 AM Eastern. This page checks for it three times each morning.</p>`;
+                <p>Barry Ritholtz posts around 6:30 AM Eastern. This page checks for it three times each morning.</p>`
+                          + (upd().ritholtz_checked ? `<p class="checked${freshness('amreads').grade === 'red' ? ' amber' : ''}">Last checked ritholtz.com ${esc(clockShort(upd().ritholtz_checked))}</p>` : '');
         html += `
                 ${prev.length && !amShowOlder ? `<button class="pill-btn" data-act="older"><i class="ph ph-clock-counter-clockwise"></i>Show ${esc(prevDay)}'s list</button>` : ''}</div>`;
         const sat = shown.filter((i) => i.kind === 'SATPOST');
@@ -1467,10 +1524,10 @@ function render() {
     }
     // Reddit comes from the Mac mini's browser twice a day. Past 48h it has missed
     // several runs; GitHub's backup feed then refills lists, with ranks, not upvotes.
-    // Graded on the OLDEST list the tab serves (updated.reddit_oldest): a run that saved only a
-    // few lists makes the newest stamp fresh while the rest sit old. Older servers lack it.
+    // Graded on the OLDEST list the tab serves (redditOldestAt): a run that saved only a
+    // few lists makes the newest stamp fresh while the rest sit old.
     const redditAt = allData && allData.updated && allData.updated.reddit;
-    const redditOldest = [allData && allData.updated && allData.updated.reddit_oldest, redditAt].filter(Boolean).sort()[0];   // same ISO format: sort = oldest
+    const redditOldest = redditOldestAt();
     const over48 = (ts) => ts && Date.now() - Date.parse(ts) > 48 * 3600e3;
     if (!query && (currentTab === 'monthly' || currentTab === 'yearly') && over48(redditOldest)) {
         html = `<div class="notice"><i class="ph ph-warning"></i><span>${over48(redditAt) ? `The Mac mini last refreshed Reddit ${esc(clock(redditAt))}. Until it catches up, lists may be older`
@@ -1598,7 +1655,13 @@ function setProgress(total, unread) {
     if (nQuiet) scope += ` · ${nQuiet} quieted`;
     if (!query && total && currentTab === 'news' && totals.news_days) scope = ` · last ${totals.news_days} days`;
     if (!query && total && currentTab === 'github' && totals.github > total) scope = ` · top ${total} of ${totals.github}`;
-    document.getElementById('progress-label').textContent = (unread ? `${unread} of ${total} left` : `All ${total} read`) + scope;
+    const label = document.getElementById('progress-label'), src = !query && SOURCE_OF[currentTab], f = src ? freshness(src) : null;
+    label.textContent = (unread ? `${unread} of ${total} left` : `All ${total} read`) + scope;
+    // Desktop: "· updated 9h ago" after the count; phones show the dot only (that row is full).
+    if (f && f.ts) label.insertAdjacentHTML('beforeend', `<span class="hide-mobile"> · ${src === 'amreads' ? 'checked' : 'updated'} ${esc(ago(f.ts))}</span>`);
+    const dot = document.getElementById('btn-fresh');
+    dot.style.display = src ? '' : 'none';
+    dot.dataset.grade = f ? f.grade : '';
     document.getElementById('progress-bar').style.width = total ? `${(done / total) * 100}%` : '0';
     const btn = document.getElementById('btn-markall');
     btn.disabled = !unread;
@@ -1710,6 +1773,7 @@ function switchTab(tab) {
     currentTab = tab;
     viewCleared = false;
     snoozeOpen = null;
+    closeFresh();
     if (toastKind === 'done') hideToast();   // the prompt is about the last tab; Undo toasts stay
     store.set('dr_tab', tab);
     focusIndex = -1; focusId = null;
@@ -2052,6 +2116,7 @@ document.addEventListener('keydown', (e) => {
     else if (e.key === 'l' && cur && canSnooze(cur) && !cur._snoozed) { snoozeOpen = snoozeOpen === String(cur.id) ? null : String(cur.id); render(); }
     else if (e.key === 'n') { const t = nextTab(); if (t) switchTab(t.key); }
     else if (e.key === '/') { e.preventDefault(); openSearch(); }
+    else if (e.key === 'Escape' && freshOpen) closeFresh();
     else if (e.key === 'Escape' && viewCleared) closeCleared();
     else if (/^[1-9]$/.test(e.key) && +e.key <= TABS.length) switchTab(TABS[+e.key - 1].key);
     else return;

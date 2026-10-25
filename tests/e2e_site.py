@@ -307,7 +307,7 @@ async def qol(b):
         cards = await pg.evaluate("[...document.querySelectorAll('#feed .item')].map((e) => [e.dataset.id, e.querySelector('.meta').innerText.includes('New')])")
         label = await pg.inner_text("#progress-label")
         check(f"New chip ({w}): shows exactly the 3 New posts, same order, label says New only",
-              [c[0] for c in cards] == order_all and len(cards) == 3 and all(c[1] for c in cards) and label.endswith("· New only"), f"{cards} | {label}")
+              [c[0] for c in cards] == order_all and len(cards) == 3 and all(c[1] for c in cards) and "· New only" in label, f"{cards} | {label}")
         await pg.click("#btn-markall"); await pg.wait_for_timeout(300)
         after = await pg.evaluate("itemsFor('monthly').filter((i) => !isRead(i)).length")
         check(f"New chip ({w}): Mark all read marks only those 3", before - after == 3, f"{before} -> {after}")
@@ -349,6 +349,61 @@ async def qol(b):
     check("n (1440): jumps to the next tab with unread", want is not None and await pg.evaluate("currentTab") == want, str(want))
     check("Footer Keys line lists n", "n next tab" in (await pg.inner_text("#footer")).replace("\n", " "))
     await ctx.close()
+
+    # Freshness dot at the start of the progress row; a tap lists every source's stamp.
+    def fresh_patch(d):
+        d["updated"].update({"reddit": iso(2), "reddit_oldest": iso(30), "news": iso(3), "github": iso(1), "ritholtz_checked": iso(1.5)})
+    ctx = await new_context(service_workers="block", **PHONE)
+    await patch_api(ctx, fresh_patch)
+    pg = await ctx.new_page()
+    await pg.goto(BASE); await pg.wait_for_selector("#feed .item", timeout=20000); await pg.wait_for_timeout(300)
+    row = await pg.evaluate("""(() => { const r = document.getElementById('progress'), d = document.getElementById('btn-fresh'), h = r.offsetHeight;
+        d.style.display = 'none'; const h0 = r.offsetHeight; d.style.display = ''; return [h, h0, d.offsetWidth > 0, d.dataset.grade, document.getElementById('progress-label').innerText]; })()""")
+    check("Fresh dot (390): visible, row height unchanged, amber for a 30 h old list, no text on the phone",
+          row[2] and row[0] == row[1] and row[3] == "amber" and "updated" not in row[4], str(row))
+    await pg.click("#btn-fresh"); await pg.wait_for_timeout(200)
+    rows = await pg.locator("#fresh-sheet [data-fresh]:visible").all_inner_texts()
+    tall = await pg.evaluate("[...document.querySelectorAll('#fresh-sheet [data-fresh]')].filter((e) => e.offsetHeight > 44).length")
+    one = [await pg.evaluate(TEXT_ONE_LINE, f"#fresh-sheet [data-fresh]:nth-child({k + 1})") for k in range(len(rows))]
+    bar_ok = await pg.evaluate("""[...document.querySelectorAll('#tabbar [data-tab]')].every((b) => { const r = b.getBoundingClientRect();
+        return b.contains(document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2)); })""")
+    check("Fresh sheet: 4 one-line rows (Reddit, News, AM Reads checked, GitHub), tab bar uncovered",
+          [r.split(" · ")[0] for r in rows] == ["Reddit", "News", "AM Reads", "GitHub"] and "checked" in rows[2] and "yesterday" in rows[0]
+          and not tall and all(one) and bar_ok, str(rows))
+    await pg.click("#fresh-sheet [data-fresh=news]"); await pg.wait_for_timeout(300)
+    check("Fresh sheet: a row opens its tab and the sheet closes", await pg.evaluate("currentTab") == "news" and not await pg.locator("#fresh-sheet").is_visible())
+    await pg.click("#btn-fresh"); await pg.mouse.click(200, 500); await pg.wait_for_timeout(200)
+    check("Fresh sheet: a tap outside closes it", not await pg.locator("#fresh-sheet").is_visible())
+    await ctx.close()
+    # Desktop: '… · updated Xh ago'; Esc closes. Old server (no new fields): AM Reads has a plain dot, nothing breaks.
+    ctx = await new_context(service_workers="block", viewport={"width": 1440, "height": 900})
+    pg = await ctx.new_page(); errs = []
+    pg.on("pageerror", lambda e: errs.append(str(e)))
+    await patch_api(ctx, lambda d: [d["updated"].pop(k, None) for k in ("reddit_oldest", "ritholtz_checked")])
+    await pg.goto(BASE); await pg.wait_for_selector("#feed .item", timeout=20000)
+    label = await pg.inner_text("#progress-label")
+    check("Fresh dot (1440): the row reads '… · updated …'", " · updated " in label and await pg.evaluate(ONE_LINE, "#progress-label"), label)
+    await pg.click('[data-tab="ritholtz"]:visible'); await pg.wait_for_timeout(200)
+    grade = await pg.evaluate("document.getElementById('btn-fresh').dataset.grade")
+    await pg.click("#btn-fresh"); await pg.wait_for_timeout(200)
+    shown = await pg.locator("#fresh-sheet").is_visible()
+    await pg.keyboard.press("Escape"); await pg.wait_for_timeout(200)
+    check("No new fields: AM Reads dot is plain, sheet opens, Esc closes it, no errors",
+          grade == "" and shown and not await pg.locator("#fresh-sheet").is_visible() and not errs, f"{grade!r} {shown} {errs}")
+    await ctx.close()
+    # AM Reads before today's list: 'Last checked ritholtz.com …', amber when the check is 26 h+ old.
+    for h_ago, amber in ((2, False), (30, True)):
+        ctx = await new_context(service_workers="block", **PHONE)
+        await patch_api(ctx, lambda d, h=h_ago: ([i.update(date="2026-10-01", kind="AM READS") for i in d["ritholtz"]], d["updated"].update(ritholtz_checked=iso(h))))
+        pg = await ctx.new_page()
+        await pg.goto(BASE); await pg.wait_for_selector("#feed .item, #feed .state", timeout=20000)
+        await pg.click('[data-tab="ritholtz"]:visible'); await pg.wait_for_timeout(300)
+        el = pg.locator("#feed .state .checked")
+        txt = await el.inner_text() if await el.count() else ""
+        check(f"AM Reads empty state: 'Last checked ritholtz.com' ({h_ago} h ago{', amber' if amber else ''})",
+              txt.startswith("Last checked ritholtz.com ") and await pg.evaluate(ONE_LINE, "#feed .state .checked")
+              and ("amber" in (await el.get_attribute("class") or "")) == amber, txt)
+        await ctx.close()
 
 async def main():
     async with async_playwright() as p:
