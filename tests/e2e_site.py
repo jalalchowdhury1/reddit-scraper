@@ -219,6 +219,16 @@ async def one_line(b):
     await pg.click("#toast-undo"); await pg.wait_for_timeout(500)
     await pg.click('[data-tab="news"]:visible'); await pg.wait_for_timeout(300)
     check("Undo after a tab switch brings the tab back", "All " not in await pg.inner_text("#progress-label"), await pg.inner_text("#progress-label"))
+    # Paywalled AM Reads cards: Later · Podcast · Option 3 · Backup on one row.
+    for size in ("m", "l"):
+        await pg.click('[data-tab="ritholtz"]:visible'); await pg.wait_for_timeout(300)
+        foot = await pg.evaluate(f"""(() => {{ document.documentElement.dataset.size = '{size}';
+            const urls = ['https://www.nytimes.com/2026/10/04/magazine/gambling.html', 'https://www.wired.com/story/x/', 'https://www.newyorker.com/x'];
+            (allData.ritholtz || []).slice(0, 3).forEach((i, k) => {{ i.url = urls[k]; }}); amShowOlder = true; render();
+            const f = [...document.querySelectorAll('#feed .item .foot')];
+            return {{ n: f.filter((e) => e.querySelector('.wall')).length, tall: f.filter((e) => e.offsetHeight > 30 || e.scrollWidth > e.clientWidth).length,
+                     text: (f.find((e) => e.querySelector('.wall')) || {{ innerText: '' }}).innerText.replace(/\\s+/g, ' ') }}; }})()""")
+        check(f"One line: paywalled AM Reads card footers (text size {size})", foot["n"] > 0 and foot["tall"] == 0 and await pg.evaluate(no_sideways), str(foot))
     await ctx.close()
 
 async def main():
@@ -805,7 +815,7 @@ async def main():
             await pg.evaluate("amShowOlder = true; render()")
             check("Podcast: saved to the cloud (after a reload)", "Podcast requested" in await pg.inner_text(btn))
             await pg.click(btn); await pg.wait_for_timeout(300)
-            check("Podcast: tap again takes it back", "Podcast this" in await pg.inner_text(btn))
+            check("Podcast: tap again takes it back", (await pg.inner_text(btn)).strip() == "Podcast")
             # Live status (10 Oct eve): the Mac mirrors writing -> uploaded | failed onto the doc.
             states = await pg.evaluate(f"""(() => {{ const it = findItem({json.dumps(pid)}), k = getSafeId(it), keep = podcastReq[k];
                 const out = {{}};

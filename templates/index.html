@@ -153,6 +153,13 @@
         .meta { font-size: .72rem; color: var(--faint); font-variant-numeric: tabular-nums; }
         .foot { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; margin-top: 8px; }
         .foot:empty { display: none; }
+        /* Phones: the footer row stays one row (the meta text gives way with "…"), except when it
+           holds the snooze menu or the paste box, which take their own full-width rows. */
+        @media (max-width: 700px) {
+            .foot:not(:has(.snooze-menu, .paste-box)) { flex-wrap: nowrap; column-gap: 6px; }
+            .foot:not(:has(.snooze-menu, .paste-box)) > .meta { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+            .foot > .extras > .mini-btn { white-space: nowrap; flex-shrink: 0; }
+        }
         /* Top comment (10 Oct 2026): 2 lines, tap for all of it, like the blurb. */
         .top-comment { margin: 6px 0 0; font-size: .78rem; color: var(--faint); line-height: 1.5;
                        display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; cursor: pointer; }
@@ -648,7 +655,7 @@ function isPaywalled(url) {
 function paywallHTML(item) {
     if (!isPaywalled(item.url)) return '';
     return `<a class="mini-btn wall" data-act="option3" href="${esc(ARCHIVE(item.url))}" target="_blank" rel="noopener noreferrer"
-        title="${esc(domainOf(item.url))} usually has a paywall. Option 3 = the archive.is copy"><i class="ph ph-lock-simple"></i>Paywall · Open Option 3</a>
+        title="${esc(domainOf(item.url))} usually has a paywall. Option 3 = the archive.is copy"><i class="ph ph-lock-simple"></i>Option 3</a>
         <a class="mini-btn wall" data-act="option3b" href="${esc(ARCHIVE(item.url, 'archive.ph'))}" target="_blank" rel="noopener noreferrer"
         title="Option 3 won't load? The same archive at archive.ph"><i class="ph ph-lifebuoy"></i>Backup</a>`;
 }
@@ -1307,10 +1314,10 @@ function extrasHTML(item) {
         } else if (st === 'uploaded') {
             out.push(`<a class="mini-btn on" href="${esc(ER_SEARCH(item.title))}" target="_blank" rel="noopener" title="Open it in ElevenReader"><i class="ph-fill ph-headphones"></i>In ElevenReader ✓${d.minutes ? ` · ${esc(d.minutes)} min` : ''}</a>`);
         } else {
-            const label = !d ? 'Podcast this' : st === 'pasted' ? 'Pasted · Mac picks it up soon' : st === 'writing' ? 'Writing the script…'
+            const label = !d ? 'Podcast' : st === 'pasted' ? 'Pasted · Mac picks it up soon' : st === 'writing' ? 'Writing the script…'
                         : st === 'failed' ? 'Problem: see Telegram' : st ? 'In the podcast queue' : 'Podcast requested';
             out.push(d ? `<button class="mini-btn on" data-act="podcast" ${st ? 'disabled' : ''} title="${st ? 'The Mac mini has it' : 'Requested; tap to take it back'}"><i class="ph-fill ph-headphones"></i>${label}</button>`
-                       : `<button class="mini-btn" data-act="podcast" title="Add this article to the podcast queue"><i class="ph ph-headphones"></i>Podcast this</button>`);
+                       : `<button class="mini-btn" data-act="podcast" title="Add this article to the podcast queue"><i class="ph ph-headphones"></i>Podcast</button>`);
         }
     }
     const pw = pasteShown ? '' : paywallHTML(item);
