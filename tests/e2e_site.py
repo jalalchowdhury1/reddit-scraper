@@ -231,6 +231,39 @@ async def one_line(b):
         check(f"One line: paywalled AM Reads card footers (text size {size})", foot["n"] > 0 and foot["tall"] == 0 and await pg.evaluate(no_sideways), str(foot))
     await ctx.close()
 
+async def patch_api(ctx, fn, delay_ms=0):
+    """Serve /api/data with fn(data) applied (and an optional delay)."""
+    async def h(route):
+        r = await route.fetch(); d = await r.json(); fn(d)
+        if delay_ms: await asyncio.sleep(delay_ms / 1000)
+        await route.fulfill(response=r, json=d)
+    await ctx.route("**/api/data", h)
+
+async def qol(b):
+    """The daily QoL picks (25 Oct 2026)."""
+    # News cards: the real publisher, never "· news.google.com" or its favicon (even if the server sends it).
+    def news_patch(d):
+        d["news"][0]["source"] = "https://businessinbangladesh.com.bd/"
+        for i in d["news"]: i["domain"] = "news.google.com"
+    for vp in (PHONE, dict(viewport={"width": 1440, "height": 900})):
+        ctx = await b.new_context(service_workers="block", **vp)
+        await patch_api(ctx, news_patch)
+        pg = await ctx.new_page()
+        await pg.goto(BASE); await pg.wait_for_selector("#feed .item", timeout=20000)
+        await pg.click('[data-tab="news"]:visible'); await pg.wait_for_timeout(400)
+        names = await pg.locator("#feed .item .src .name").all_inner_texts()
+        icons = await pg.locator("#feed .item .src img[src*='news.google.com']").count()
+        tall = await pg.evaluate("[...document.querySelectorAll('#feed .item .src')].filter((e) => e.offsetHeight > 1.6 * parseFloat(getComputedStyle(e).fontSize) + 1).length")
+        w = vp["viewport"]["width"]
+        check(f"News ({w}): source lines show the publisher, no news.google.com, no raw URL, no Google icon",
+              names and not any("news.google.com" in n or n.startswith("http") for n in names) and not icons and not tall
+              and names[0] == "businessinbangladesh.com.bd", str(names[:3]))
+        before = await pg.inner_text("#progress-label")
+        async with ctx.expect_page() as pop: await pg.locator("#feed .item .item-title").first.click()
+        await (await pop.value).close(); await pg.wait_for_timeout(400)
+        check(f"News ({w}): opening a card still leaves it unread", await pg.inner_text("#progress-label") == before)
+        await ctx.close()
+
 async def main():
     async with async_playwright() as p:
         b = await p.chromium.launch(headless=True)

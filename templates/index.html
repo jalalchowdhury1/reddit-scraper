@@ -1263,9 +1263,10 @@ function setBadge() {
 
 function cardHTML(item) {
     const read = isRead(item), fav = isFav(item);
-    const dom = item.domain || domainOf(item.url);
+    // News links all go through news.google.com: that says nothing, so no domain or icon for it.
+    const dom = [item.domain || domainOf(item.url)].find((d) => d !== 'news.google.com') || '';
     const icon = dom && dom !== 'reddit.com' ? `<img src="https://www.google.com/s2/favicons?domain=${encodeURIComponent(dom)}&sz=64" alt="" loading="lazy" onerror="this.style.visibility='hidden'">` : '';
-    const src = sourceOf(item);
+    const src = /^https?:\/\//i.test(sourceOf(item)) ? domainOf(sourceOf(item)) : sourceOf(item);   // a publisher named by its URL
     const srcLine = [src, dom && dom !== 'reddit.com' && !src.toLowerCase().includes(dom.split('.')[0]) ? dom : '', item._tab ? 'in ' + item._tab : ''].filter(Boolean).join(' · ');
     const meta = metaHTML(item);
     return `
