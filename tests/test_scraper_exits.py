@@ -101,6 +101,19 @@ def test_real_failure_exits_1_with_one_fixed_line(monkeypatch, tmp_path, capsys,
     assert not (tmp_path / "data/ritholtz/articles.csv").exists()
 
 
+def test_post_without_publish_time_keeps_the_old_list(monkeypatch, tmp_path, capsys):
+    """No article:published_time and no <time>: it used to stamp the scrape time, so
+    Saturday's Weekend Reads re-scraped on Monday showed as Monday's list."""
+    pages = {rt.CATEGORY_URL: category(SAT_POST), SAT_POST: post_html()}
+    run_rt(monkeypatch, tmp_path, capsys, pages)
+    csv = tmp_path / "data/ritholtz/articles.csv"
+    before = csv.read_text()
+    pages[SAT_POST] = post_html().split(">", 1)[1]       # the meta tag dropped
+    code, last = run_rt(monkeypatch, tmp_path, capsys, pages)
+    assert code == 1 and last.startswith("AM READS FAILED: ") and "no publish time" in last, last
+    assert csv.read_text() == before
+
+
 def test_ritholtz_script_exits_with_mains_code():
     src = (ROOT / "core/scrape_ritholtz.py").read_text()
     assert "sys.exit(main())" in src

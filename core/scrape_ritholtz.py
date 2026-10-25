@@ -303,10 +303,12 @@ def extract_articles(post_url: str, session: requests.Session, seen_post: Dict =
     soup = BeautifulSoup(resp.content, "html.parser")
     articles = []
     seen_titles = set()
-    real_date = get_post_date(soup)
+    post_date = get_post_date(soup)
+    # Never stamp "now": an old post (Saturday's, re-read on Monday) would show as today's.
+    if not post_date:
+        raise ScrapeFailed(f"post has no publish time: {post_url}")
     if seen_post is not None:
-        seen_post["post_date"] = real_date   # the source's real stamp only, never "now"
-    post_date = real_date or datetime.now(ET).isoformat()
+        seen_post["post_date"] = post_date
     print(f"    Post published: {post_date}")
     
     # Find all links in the post content
@@ -578,11 +580,8 @@ def scrape_am_reads() -> List[Dict]:
     # Step 2: Extract articles from the post
     seen_post = {}
     articles = extract_articles(post_url, session, seen_post)
-    if seen_post.get("post_date"):
-        meta = write_source_meta(seen_post["post_date"])
-        print(f"    Source check: newest post {meta['source_newest_ts']} (checked {meta['checked_at']})")
-    else:
-        print("    WARNING: newest post has no publish time; source.json not updated")
+    meta = write_source_meta(seen_post["post_date"])
+    print(f"    Source check: newest post {meta['source_newest_ts']} (checked {meta['checked_at']})")
     if not articles:
         raise ScrapeFailed(f"no articles in {post_url}")
 
