@@ -37,10 +37,20 @@ jobs:
         run: pip install -r requirements-scraper.txt
 
       - name: Scrape AM Reads + SatPost
+        # Both run even if one fails, the commit step still saves what the other
+        # wrote, and the LAST step fails the run (same as daily_scrape.yml). A day
+        # with no new post exits 0; a block / 403 / missing post exits 1.
+        id: scrape
         timeout-minutes: 3
         run: |
-          python core/scrape_ritholtz.py
-          python core/scrape_trung.py
+          set +e
+          python core/scrape_ritholtz.py; R=$?
+          python core/scrape_trung.py; T=$?
+          echo "scraper exits: ritholtz=$R trung=$T"
+          BAD=""
+          [ "$R" = 0 ] || BAD="$BAD ritholtz=$R"
+          [ "$T" = 0 ] || BAD="$BAD trung=$T"
+          echo "failed=${BAD# }" >> "$GITHUB_OUTPUT"
 
       - name: Commit if the list changed
         timeout-minutes: 2
@@ -62,3 +72,10 @@ jobs:
           done
           [ "$ok" = 1 ] || { echo "PUSH FAILED after 3 tries"; exit 1; }
           echo "AM READS PUSHED: $(git rev-parse --short HEAD)"
+
+      - name: Fail the run if a scraper failed
+        # After the commit on purpose: the other scraper's data is already pushed.
+        if: steps.scrape.outputs.failed != ''
+        run: |
+          echo "SCRAPERS FAILED: ${{ steps.scrape.outputs.failed }}"
+          exit 1
