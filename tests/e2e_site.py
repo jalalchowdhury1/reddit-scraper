@@ -195,6 +195,16 @@ async def one_line(b):
             for (let k = 0; k < {15 if n == 0 else 14}; k++) {{ readByDay[d] = k ? 3 : {n}; d = prevDay(d); }}
             render(); return document.getElementById('streak').innerText; }})()""")
         check(f"One line: today line with {n} cleared + 14-day streak", await pg.evaluate(ONE_LINE, "#streak") and "14-day" in txt, txt)
+    # Footer stamps: one short line; a tap lists each feed, a stamp opens its tab.
+    check("One line: footer 'Updated' stamp", await pg.evaluate(ONE_LINE, "#updated") and "Updated " in await pg.inner_text("#updated"),
+          await pg.inner_text("#updated"))
+    await pg.click("#updated [data-upd=open]")
+    rows = await pg.locator("#updated [data-upd]:visible").all_inner_texts()
+    tall = await pg.evaluate("[...document.querySelectorAll('#updated [data-upd]')].filter((e) => e.offsetHeight && e.getBoundingClientRect().height > 1.6 * parseFloat(getComputedStyle(e).fontSize) + 1).length")
+    check("Footer: tap lists every feed's stamp, each on one line", len(rows) == 4 and not tall and any(r.startswith("News ") for r in rows), str(rows))
+    await pg.click("#updated [data-upd=news]"); await pg.wait_for_timeout(300)
+    check("Footer: a stamp opens its tab", await pg.evaluate("currentTab") == "news")
+    await pg.click('[data-tab="monthly"]:visible'); await pg.wait_for_timeout(300)
     await ctx.close()
 
 async def main():
@@ -387,7 +397,7 @@ async def main():
         check("Streak: nothing today asks to keep it; one today extends it",
               s[0] == "Keep your 2-day streak" and s[1].startswith("1 cleared today") and s[1].endswith("3-day"), str(s))   # phone wording
         print("   footer:", await pg.inner_text("#updated"))
-        footer = await pg.inner_text("#updated")
+        footer = await pg.text_content("#updated")   # the full line (phones show the newest stamp, tap for all)
         check("Footer shows update times", "Updated:" in footer)
         if api["updated"].get("reddit"):
             check("Footer shows when Reddit last came from the Mac", "Reddit " in footer, footer)

@@ -212,7 +212,10 @@
 
         footer { margin-top: 36px; padding-top: 16px; border-top: 1px solid var(--line); display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; font-size: .8rem; color: var(--faint); }
         footer button { color: var(--accent); font-size: .8rem; }
-        @media (max-width: 700px) { .hide-mobile { display: none; } }
+        .show-mobile { display: none; }
+        @media (max-width: 700px) { .hide-mobile { display: none; } .show-mobile { display: inline; } }
+        #updated { white-space: nowrap; }
+        #updated [data-upd]:not([data-upd=open]) { display: block; line-height: 1.6; }
 
         /* ---------- Today line: "12 cleared today · 4-day streak" ---------- */
         .streak { font-size: .74rem; color: var(--muted); margin-top: 1px; font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -1479,10 +1482,15 @@ function paintFeed(html) {
     feed.innerHTML = html;
     const chipsNow = feed.querySelector('.sub-chips');
     if (chipsNow) chipsNow.scrollLeft = chipsLeft;   // a tick re-renders; the chip row must not jump back
-    const up = allData && allData.updated;
-    const stamps = up ? [up.ritholtz && 'AM Reads ' + clock(up.ritholtz), up.news && 'News ' + clock(up.news),
-                         up.reddit && 'Reddit ' + clock(up.reddit), up.github && 'GitHub ' + clock(up.github)].filter(Boolean) : [];
-    document.getElementById('updated').textContent = stamps.length ? 'Updated: ' + stamps.join(' · ') : '';
+    const up = (allData && allData.updated) || {};
+    const stamps = [['ritholtz', 'AM Reads', up.ritholtz], ['news', 'News', up.news], ['monthly', 'Reddit', up.reddit], ['github', 'GitHub', up.github]]
+        .filter((s) => s[2]).map(([tab, name, ts]) => ({ tab, ts, text: name + ' ' + clock(ts) }));
+    // Phones: one short line (the newest stamp); a tap lists each feed's, and each one opens its tab.
+    const newest = stamps.reduce((a, s) => (!a || Date.parse(s.ts) > Date.parse(a.ts) ? s : a), null);
+    document.getElementById('updated').innerHTML = !stamps.length ? '' :
+        `<span class="hide-mobile">Updated: ${esc(stamps.map((s) => s.text).join(' · '))}</span><span class="show-mobile">`
+        + (updOpen ? stamps.map((s) => `<button data-upd="${s.tab}">${esc(s.text)}</button>`).join('')
+                   : `<button data-upd="open">Updated ${esc(clock(newest.ts))} <i class="ph ph-caret-down" aria-hidden="true"></i></button>`) + '</span>';
     // Keep focus on the same item. If that item left the list (marked read), stay
     // at the same position, i.e. the next card, like Gmail.
     const at = focusId === null ? -1 : visibleItems.findIndex((i) => String(i.id) === focusId);
@@ -1523,6 +1531,14 @@ function openCleared() {
 }
 function closeCleared() { viewCleared = false; focusIndex = -1; focusId = null; render(); window.scrollTo(0, scrollPos[currentTab] || 0); }
 document.getElementById('streak').addEventListener('click', (e) => { if (e.target.closest('#btn-cleared')) openCleared(); });
+
+let updOpen = false;   // phones: the footer's per-feed stamps are showing
+document.getElementById('updated').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-upd]');
+    if (!b) return;
+    updOpen = b.dataset.upd === 'open';
+    if (updOpen) render(); else switchTab(b.dataset.upd);
+});
 
 function setProgress(total, unread) {
     const row = document.getElementById('progress');
