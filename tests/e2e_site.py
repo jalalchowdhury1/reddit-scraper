@@ -9,7 +9,7 @@ Every run is a fresh throwaway headless browser: it never touches a real Chrome
 profile, and marks read/unread only in that throwaway browser's storage.
 Not collected by pytest (the name doesn't start with test_). Exit 1 = a check failed.
 """
-import sys, asyncio, json
+import sys, asyncio, json, os
 from datetime import datetime, timezone, timedelta
 from playwright.async_api import async_playwright
 
@@ -403,6 +403,45 @@ async def qol(b):
         check(f"AM Reads empty state: 'Last checked ritholtz.com' ({h_ago} h ago{', amber' if amber else ''})",
               txt.startswith("Last checked ritholtz.com ") and await pg.evaluate(ONE_LINE, "#feed .state .checked")
               and ("amber" in (await el.get_attribute("class") or "")) == amber, txt)
+        await ctx.close()
+
+    # Instant open: the last good copy paints at once ('Updating…'), read ticks from the cached read list;
+    # the fresh list swaps in and only then scrolls. A failed refresh keeps the copy with "Couldn't refresh".
+    shots = os.environ.get("QOL_SHOTS")
+    for vp, fail in ((PHONE, False), (dict(viewport={"width": 1440, "height": 900}), False), (PHONE, True)):
+        w = vp["viewport"]["width"]; tag = f"{w}{' failed refresh' if fail else ''}"
+        ctx = await new_context(service_workers="block", **vp)
+        pg = await ctx.new_page()
+        await pg.goto(BASE); await pg.wait_for_function("allData && (readLoaded || syncBroken)", timeout=20000)
+        seed = await pg.evaluate("""(() => { const x = String(allData.monthly[0].id), y = String(allData.monthly[7].id);
+            setRead([x], true); cacheRead();
+            const m = store.get('dr_first_seen', {}); delete m[y]; store.set('dr_first_seen', m); window.scrollTo(0, 1200);
+            return [x, y, document.getElementById('progress-label').innerText, !!(store.get('dr_last', {}).data || {}).monthly]; })()""")
+        check(f"Instant open ({tag}): a fresh load saves the last good copy", seed[3])
+        async def slow(route):   # (no fail=fail default: Playwright passes the request as a 2nd arg)
+            await asyncio.sleep(3)
+            if fail: await route.abort()
+            else: await route.fulfill(response=await route.fetch())
+        await ctx.route("**/api/data", slow)
+        await pg.reload(wait_until="domcontentloaded"); await pg.wait_for_timeout(400)
+        early = await pg.evaluate(f"""(() => ({{ items: document.querySelectorAll('#feed .item').length, skel: document.querySelectorAll('.skeleton').length,
+            label: document.getElementById('progress-label').innerText, xShown: !!document.querySelector('#feed .item[data-id="{seed[0]}"]'),
+            yStamped: '{seed[1]}' in store.get('dr_first_seen', {{}}), y: window.scrollY }}))()""")
+        if shots: await pg.screenshot(path=f"{shots}/instant-{w}{'-fail' if fail else ''}-early.png")
+        check(f"Instant open ({tag}): cards within 400 ms, no skeleton, read item hidden, same count, 'Updating…' on one line, not scrolled anywhere else",
+              early["items"] > 0 and not early["skel"] and not early["xShown"] and early["label"] == "Updating… · " + seed[2]
+              and await pg.evaluate(ONE_LINE, "#progress-label") and (early["y"] == 0 or abs(early["y"] - 1200) <= 2), f"{early} vs {seed[2]!r}")
+        check(f"Instant open ({tag}): the old copy stamps nothing (no New / kept / quiet tracking)", not early["yStamped"])
+        await pg.wait_for_function("!document.getElementById('progress-label').innerText.startsWith('Updating')", timeout=8000)
+        await pg.wait_for_timeout(300)
+        late = await pg.evaluate(f"""(() => ({{ y: window.scrollY, note: (document.querySelector('#feed .data-note') || {{}}).innerText || '',
+            yStamped: '{seed[1]}' in store.get('dr_first_seen', {{}}) }}))()""")
+        if shots: await pg.screenshot(path=f"{shots}/instant-{w}{'-fail' if fail else ''}-late.png")
+        if fail:
+            check("Instant open (failed refresh): the copy stays, says \"Couldn't refresh\", no 'Updating…'", "Couldn't refresh" in late["note"], str(late))
+        else:
+            check(f"Instant open ({tag}): fresh list in, 'Updating…' gone, scrolled to the saved spot, New tracking runs",
+                  abs(late["y"] - 1200) <= 2 and late["yStamped"], str(late))
         await ctx.close()
 
 async def main():

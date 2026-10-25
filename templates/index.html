@@ -445,6 +445,7 @@ function initSync() {
             snap.forEach((d) => { const v = d.data() || {}; cloudReadPosts.add(d.id); cloudReadAt[d.id] = v.readAt || ''; if (v.skip) cloudSkip.add(d.id); });
             countReadDays();
             readLoaded = true;
+            cacheRead();
             syncOk();
             render();
             refreshQuiet();   // once a day: needs the read list
@@ -452,6 +453,10 @@ function initSync() {
         }, syncFailed);
     }).catch(syncFailed);
 }
+
+// Instant open (25 Oct 2026): the read list as last seen, so the saved copy painted at
+// boot never shows read cards as unread. Used only until the live list arrives.
+function cacheRead() { store.set('dr_read_cache', { key: syncKey, at: cloudReadAt }); }
 
 // Say so when ticks can't reach the cloud, instead of letting them vanish on reload.
 let syncBroken = false;
@@ -795,6 +800,7 @@ let allData = null, rawData = null, loadError = false, lastLoad = 0;
 // Not fresh = said on the page (25 Oct 2026): the service worker's saved copy, or a
 // refresh that failed while an older list stays up. '' = fresh.
 let dataNote = '', shownAt = 0;
+let snapshotOn = false, readCached = false;   // painting the last good copy (bootFromCopy) / its read list
 let currentTab = store.get('dr_tab', 'monthly');
 if (!TABS.some((t) => t.key === currentTab)) currentTab = 'monthly';
 let showRead = store.get('reddit_dash_show_read', false);
@@ -899,7 +905,7 @@ function trackKept() {
 // button on (or in search), like read posts everywhere else. Waits for the read
 // list (or a sync failure) so already-read posts never flash up as unread.
 function carried(tab, withRead = showRead) {
-    if ((tab !== 'monthly' && tab !== 'yearly') || !allData || !(readLoaded || syncBroken)) return [];
+    if ((tab !== 'monthly' && tab !== 'yearly') || !allData || !(readLoaded || syncBroken || readCached)) return [];
     const live = liveIds();
     return Object.entries(kept[tab] || {})
         .filter(([id, e]) => e && e.item && !live.has(id) && !snoozed[id] && subOk(e.item) && (withRead || !cloudReadPosts.has(id)) && !quietHides(e.item, tab))
@@ -1054,7 +1060,7 @@ function noteEngaged(item) {   // opened or favorited
 // Once a day (Eastern), when the synced read list is in: re-score every sub.
 function scoreQuiet(force = false) {
     const today = etDate();
-    if (!readLoaded || !rawData || (!force && quiet.day === today)) return false;
+    if (!readLoaded || !rawData || snapshotOn || (!force && quiet.day === today)) return false;
     const perSec = {};
     for (const t of Object.values(cloudReadAt)) if (t) perSec[t.slice(0, 19)] = (perSec[t.slice(0, 19)] || 0) + 1;
     const stats = {};
@@ -1656,7 +1662,7 @@ function setProgress(total, unread) {
     if (!query && total && currentTab === 'news' && totals.news_days) scope = ` · last ${totals.news_days} days`;
     if (!query && total && currentTab === 'github' && totals.github > total) scope = ` · top ${total} of ${totals.github}`;
     const label = document.getElementById('progress-label'), src = !query && SOURCE_OF[currentTab], f = src ? freshness(src) : null;
-    label.textContent = (unread ? `${unread} of ${total} left` : `All ${total} read`) + scope;
+    label.textContent = (snapshotOn ? 'Updating… · ' : '') + (unread ? `${unread} of ${total} left` : `All ${total} read`) + scope;
     // Desktop: "· updated 9h ago" after the count; phones show the dot only (that row is full).
     if (f && f.ts) label.insertAdjacentHTML('beforeend', `<span class="hide-mobile"> · ${src === 'amreads' ? 'checked' : 'updated'} ${esc(ago(f.ts))}</span>`);
     const dot = document.getElementById('btn-fresh');
@@ -2142,17 +2148,18 @@ async function loadData(restoreScroll = true) {
         const offline = res.headers.get('X-Offline-Copy') === '1';
         shownAt = offline ? Date.parse(res.headers.get('Date')) || 0 : Date.now();
         dataNote = offline ? 'Saved copy' + (shownAt ? ' · ' + clock(shownAt) : '') : '';
-        rawData = data;
+        rawData = data; snapshotOn = false;
         applyQuiet();          // yesterday's quiet levels: the list holds still while reading
         trackFirstSeen();
         trackKept();
         logShown();
         scoreQuiet() && (applyQuiet(), trackFirstSeen(), trackKept(), logShown());
-        if (!offline) lastLoad = Date.now();   // a saved copy: try again on the next return to the app
+        if (!offline) { lastLoad = Date.now(); store.set('dr_last', { at: lastLoad, data }); }   // a saved copy: try again on the next return to the app
         loadError = false;
         ok = offline ? 'offline' : 'fresh';
     } catch (e) {
         console.error('Load failed:', e);
+        snapshotOn = false;
         loadError = !allData;
         if (allData) dataNote = "Couldn't refresh" + (shownAt ? ' · ' + clock(shownAt) : '');
     }
@@ -2183,7 +2190,24 @@ document.addEventListener('visibilitychange', () => {
 window.addEventListener('focus', () => refreshIfStale(false));
 setInterval(() => refreshIfStale(false), 5 * 60e3);
 
+// Instant open (25 Oct 2026): paint the last good /api/data copy at once, with the cached
+// read list, while the fresh one loads ('Updating…'). Nothing is tracked from it (New,
+// kept, quiet, shown log) and lastLoad stays 0; loadData swaps in the real list.
+function bootFromCopy() {
+    const c = store.get('dr_last', null);
+    if (!c || !c.data || !Array.isArray(c.data.monthly) || !Array.isArray(c.data.news)) return;
+    const r = store.get('dr_read_cache', null);
+    if (r && r.key === syncKey && r.at && typeof r.at === 'object') {
+        cloudReadAt = r.at; cloudReadPosts = new Set(Object.keys(r.at)); readCached = true; countReadDays();
+    }
+    firstSeen = store.get('dr_first_seen', {}) || {};
+    kept = store.get('dr_kept', null) || kept;
+    rawData = c.data; shownAt = c.at || 0; snapshotOn = true;
+    applyQuiet();
+}
+
 applyPrefs();
+bootFromCopy();
 render();
 initSync();
 loadData();
