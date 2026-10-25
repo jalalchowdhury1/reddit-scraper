@@ -1385,8 +1385,12 @@ function render() {
     } else if (total === 0 && snoozeList.length) {
         html = `<div class="state"><i class="ph ph-alarm"></i><h2>All snoozed</h2><p>Everything left in this tab is snoozed. It comes back at the time you picked.</p></div>`;
     } else if (total === 0) {
+        // No stamp = the server couldn't read this tab's file (each tab is built on its own).
+        const stamp = (allData.updated || {})[{ monthly: 'reddit', yearly: 'reddit', news: 'news', github: 'github' }[currentTab]];
         html = currentTab === 'favorites'
             ? `<div class="state"><i class="ph ph-star"></i><h2>No favorites yet</h2><p>Tap the star on any item, or swipe it right, to keep it here.</p></div>`
+            : stamp === ''
+            ? `<div class="state"><i class="ph ph-warning"></i><h2>This list couldn't be loaded</h2><p>The other tabs are fine.</p><button class="pill-btn" data-act="reload"><i class="ph ph-arrow-clockwise"></i>Try again</button></div>`
             : `<div class="state"><i class="ph ph-tray"></i><h2>Nothing here today</h2><p>${currentTab === 'github' ? 'GitHub Trending refreshes every 6 hours.' : 'The next scrape runs overnight.'}</p></div>`;
     } else {
         if (currentTab === 'ritholtz' && items[0] && items[0].kind) {
@@ -1992,6 +1996,7 @@ async function loadData(restoreScroll = true) {
             res = await fetch('/api/data', { cache: 'no-store', signal: ctl.signal });
             if (!res.ok) throw new Error(res.status);
             data = await res.json();
+            if (!data || !Array.isArray(data.monthly) || !Array.isArray(data.news)) throw new Error('not a feed');   // e.g. {"error": …}
         } finally { clearTimeout(timer); }
         const offline = res.headers.get('X-Offline-Copy') === '1';
         shownAt = offline ? Date.parse(res.headers.get('Date')) || 0 : Date.now();

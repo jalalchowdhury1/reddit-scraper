@@ -123,6 +123,25 @@ async def robustness(b):
     check("Try again with the site back: the notice goes", bool(txt) and await pg.locator(note).count() == 0)
     await ctx.close()
 
+    # A 200 that isn't a feed is an error, not "Nothing here today"; so is a tab whose file broke.
+    ctx = await b.new_context(service_workers="block", **PHONE)
+    await ctx.route("**/api/data", lambda r: r.fulfill(status=200, content_type="application/json", body='{"error": "build failed"}'))
+    pg = await ctx.new_page()
+    await pg.goto(BASE); await pg.wait_for_timeout(1500)
+    st = await pg.inner_text("#feed")
+    check("200 with an error body: 'Couldn't load the feed', not 'Nothing here'", "Couldn't load the feed" in st, st[:60])
+    await ctx.unroute_all(behavior="ignoreErrors")
+    async def no_news(r):
+        res = await r.fetch(); d = await res.json()
+        d["news"] = []; d["updated"]["news"] = ""
+        await r.fulfill(response=res, body=json.dumps(d))
+    await ctx.route("**/api/data", no_news)
+    await pg.reload(); await pg.wait_for_selector("#feed .item", timeout=20000)
+    await pg.click('[data-tab="news"]:visible'); await pg.wait_for_timeout(300)
+    st = await pg.inner_text("#feed")
+    check("A tab whose file broke says so, with Try again", "couldn't be loaded" in st and await pg.locator("#feed [data-act=reload]").count() == 1, st[:60])
+    await ctx.close()
+
 async def main():
     async with async_playwright() as p:
         b = await p.chromium.launch(headless=True)
