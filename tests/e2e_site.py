@@ -41,6 +41,9 @@ async def robustness(b):
     if await pg.locator("#feed .item [data-act=read]").count(): await pg.locator("#feed .item [data-act=read]").first.click()
     await pg.wait_for_timeout(300)
     check("Firebase blocked: a tick still works on the page", await pg.inner_text("#progress-label") != before, before)
+    await pg.evaluate("toast(\"Sync isn't working. Read ticks may not save.\")")
+    h = await pg.evaluate("document.getElementById('toast-msg').getBoundingClientRect().height")
+    check("Toasts stay on one line at phone width", h < 26, str(h))
     check("Firebase blocked: no JS errors", not errs, "; ".join(errs)[:200])
     await ctx.close()
 
