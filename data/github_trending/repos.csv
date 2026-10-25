@@ -1,11 +1,11 @@
 rank,repo,url,description,language,stars,forks,stars_today,scraped_at
-1,cloudflare/security-audit-skill,https://github.com/cloudflare/security-audit-skill,"A coding-agent skill for multi-phase security audits with independently verified, machine-readable findings",JavaScript,44233,2756,2271,2026-10-24T21:09:55
-2,NVIDIA/OpenShell,https://github.com/NVIDIA/OpenShell,"OpenShell is the safe, private runtime for autonomous AI agents.",Rust,19397,1927,893,2026-10-24T21:09:55
-3,aws/agent-toolkit-for-aws,https://github.com/aws/agent-toolkit-for-aws,"Official, AWS-supported MCP servers, skills, and plugins to help AI agents build on AWS",Python,3090,396,11,2026-10-24T21:09:55
-4,Nutlope/hallmark,https://github.com/Nutlope/hallmark,"Anti-AI-slop design skill for Claude Code, Cursor, and Codex.",CSS,32006,1644,570,2026-10-24T21:09:55
-5,luongnv89/claude-howto,https://github.com/luongnv89/claude-howto,"A visual, example-driven guide to Claude Code — from basic concepts to advanced agents, with copy-paste templates that bring immediate value.",Python,44449,5485,442,2026-10-24T21:09:55
-6,pbakaus/impeccable,https://github.com/pbakaus/impeccable,The design language that makes your AI harness better at design.,Rust,86285,5151,733,2026-10-24T21:09:55
-7,pollen-robotics/microduck,https://github.com/pollen-robotics/microduck,A Tiny biped duck robot 🦆,Rust,10902,1399,381,2026-10-24T21:09:55
-8,google-gemini/gemini-cli,https://github.com/google-gemini/gemini-cli,An open-source AI agent that brings the power of Gemini directly into your terminal.,TypeScript,107945,14805,38,2026-10-24T21:09:55
-9,jbiaojerry/ebook-treasure-chest,https://github.com/jbiaojerry/ebook-treasure-chest,欢迎来到电子书下载宝库，一个汇聚了各类电子书下载链接的地方。无论你是喜欢阅读经典文学、经管励志、终身学习、职场创业、技术手册还是其他类型的书籍，这里都能满足你的需求。 该库涵盖了帆书app(原樊登读书)、微信读书、京东读书、喜马拉雅等读书app的大部分电子书。,Python,22539,3184,220,2026-10-24T21:09:55
-10,makecindy/cindy,https://github.com/makecindy/cindy,Consider it done. The open-source AI agent that works out of the box · 想到，就能做到。开源、开箱即用的 AI Agent。,TypeScript,4022,577,471,2026-10-24T21:09:55
+1,cloudflare/security-audit-skill,https://github.com/cloudflare/security-audit-skill,"A coding-agent skill for multi-phase security audits with independently verified, machine-readable findings",JavaScript,45023,2794,2264,2026-10-25T05:15:10
+2,NVIDIA/OpenShell,https://github.com/NVIDIA/OpenShell,"OpenShell is the safe, private runtime for autonomous AI agents.",Rust,19585,1939,896,2026-10-25T05:15:10
+3,aws/agent-toolkit-for-aws,https://github.com/aws/agent-toolkit-for-aws,"Official, AWS-supported MCP servers, skills, and plugins to help AI agents build on AWS",Python,3187,403,13,2026-10-25T05:15:10
+4,Nutlope/hallmark,https://github.com/Nutlope/hallmark,"Anti-AI-slop design skill for Claude Code, Cursor, and Codex.",CSS,32377,1662,455,2026-10-25T05:15:10
+5,luongnv89/claude-howto,https://github.com/luongnv89/claude-howto,"A visual, example-driven guide to Claude Code — from basic concepts to advanced agents, with copy-paste templates that bring immediate value.",Python,44681,5498,392,2026-10-25T05:15:10
+6,pbakaus/impeccable,https://github.com/pbakaus/impeccable,The design language that makes your AI harness better at design.,Rust,86585,5168,619,2026-10-25T05:15:10
+7,pollen-robotics/microduck,https://github.com/pollen-robotics/microduck,A Tiny biped duck robot 🦆,Rust,11103,1419,319,2026-10-25T05:15:10
+8,google-gemini/gemini-cli,https://github.com/google-gemini/gemini-cli,An open-source AI agent that brings the power of Gemini directly into your terminal.,TypeScript,108184,14817,44,2026-10-25T05:15:10
+9,jbiaojerry/ebook-treasure-chest,https://github.com/jbiaojerry/ebook-treasure-chest,欢迎来到电子书下载宝库，一个汇聚了各类电子书下载链接的地方。无论你是喜欢阅读经典文学、经管励志、终身学习、职场创业、技术手册还是其他类型的书籍，这里都能满足你的需求。 该库涵盖了帆书app(原樊登读书)、微信读书、京东读书、喜马拉雅等读书app的大部分电子书。,Python,22790,3198,227,2026-10-25T05:15:10
+10,makecindy/cindy,https://github.com/makecindy/cindy,Consider it done. The open-source AI agent that works out of the box · 想到，就能做到。开源、开箱即用的 AI Agent。,TypeScript,4210,604,477,2026-10-25T05:15:10
