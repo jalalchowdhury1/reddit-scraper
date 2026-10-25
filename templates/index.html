@@ -1951,10 +1951,20 @@ document.getElementById('btn-search').onclick = () => {
     else openSearch();
 };
 document.getElementById('searchInput').addEventListener('input', (e) => { query = e.target.value.trim(); focusIndex = -1; focusId = null; snoozeOpen = null; render(); });
+// A typo would move this device to an empty group and forget the old key, so check the
+// shape and keep the old key for one Undo.
 document.getElementById('btn-link').onclick = () => {
-    const k = prompt('Enter the sync key from your other device:');
-    if (k && k.trim()) { try { localStorage.setItem('dailyReaderSyncKey', k.trim().toUpperCase()); } catch {} location.reload(); }
+    const k = (prompt('Enter the sync key from your other device:') || '').trim().toUpperCase();
+    if (!k || k === syncKey) return;
+    if (!/^[A-Z0-9]{6}$/.test(k)) { toast('Keys are 6 letters or numbers'); return; }
+    try { localStorage.setItem('dr_prev_key', syncKey); localStorage.setItem('dailyReaderSyncKey', k); } catch {}
+    location.reload();
 };
+{ const prev = store.raw('dr_prev_key');
+  if (prev) {
+      try { localStorage.removeItem('dr_prev_key'); } catch {}
+      toast(`Switched from ${prev}`, () => { try { localStorage.setItem('dailyReaderSyncKey', prev); } catch {} location.reload(); }, 'Undo', 10000);
+  } }
 
 // ---------- Keyboard (desktop): j/k move, o open, r read, f favorite, / search, 1-6 tabs ----------
 function paintFocus(scroll = true) {

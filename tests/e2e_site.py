@@ -151,6 +151,27 @@ async def robustness(b):
     check("Storage blocked: the footer says the key can't be saved", "can't save" in st, st)
     await ctx.close()
 
+    # Link another device: a typo is refused; a real switch can be undone.
+    ctx = await b.new_context(service_workers="block", **PHONE)
+    pg = await ctx.new_page()
+    await pg.goto(BASE); await pg.wait_for_selector("#feed .item", timeout=20000)
+    old = await pg.inner_text("#sync-key")
+    answer = ["ab12"]
+    pg.on("dialog", lambda d: asyncio.ensure_future(d.accept(answer[0])))
+    await pg.click("#btn-link"); await pg.wait_for_timeout(500)
+    check("Link: a typo is refused, key unchanged", "6 letters" in await pg.inner_text("#toast-msg") and await pg.inner_text("#sync-key") == old,
+          await pg.inner_text("#toast-msg"))
+    answer[0] = "zz9e2q"
+    async with pg.expect_navigation(): await pg.click("#btn-link")
+    await pg.wait_for_selector("#feed .item", timeout=20000); await pg.wait_for_timeout(300)
+    msg = await pg.inner_text("#toast-msg")
+    check("Link: the switch says where it came from, with Undo", await pg.inner_text("#sync-key") == "ZZ9E2Q" and f"Switched from {old}" in msg, msg)
+    if await pg.is_visible("#toast-undo"):
+        async with pg.expect_navigation(): await pg.click("#toast-undo")
+        await pg.wait_for_selector("#feed .item", timeout=20000)
+    check("Link: Undo goes back to the old key", await pg.inner_text("#sync-key") == old)
+    await ctx.close()
+
 async def main():
     async with async_playwright() as p:
         b = await p.chromium.launch(headless=True)
