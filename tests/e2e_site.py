@@ -189,6 +189,12 @@ async def one_line(b):
           await pg.evaluate(no_sideways) and await pg.evaluate("document.getElementById('btn-markall').getBoundingClientRect().right <= 390")
           and await pg.evaluate(ONE_LINE, "#progress-label"),
           str(await pg.evaluate("[document.scrollingElement.scrollWidth, innerWidth]")))
+    # 12 cleared today + a 14-day streak; then no ticks today (the "keep your streak" form).
+    for n in (12, 0):
+        txt = await pg.evaluate(f"""(() => {{ readByDay = {{}}; let d = etDate();
+            for (let k = 0; k < {15 if n == 0 else 14}; k++) {{ readByDay[d] = k ? 3 : {n}; d = prevDay(d); }}
+            render(); return document.getElementById('streak').innerText; }})()""")
+        check(f"One line: today line with {n} cleared + 14-day streak", await pg.evaluate(ONE_LINE, "#streak") and "14-day" in txt, txt)
     await ctx.close()
 
 async def main():
@@ -379,7 +385,7 @@ async def main():
             const b = document.getElementById('streak').textContent;
             cloudReadAt = saved; countReadDays(); render(); return [a, b]; })()""")
         check("Streak: nothing today asks to keep it; one today extends it",
-              s[0] == "Clear one to keep your 2-day streak" and s[1].startswith("1 cleared today") and "3-day streak" in s[1], str(s))
+              s[0] == "Keep your 2-day streak" and s[1].startswith("1 cleared today") and s[1].endswith("3-day"), str(s))   # phone wording
         print("   footer:", await pg.inner_text("#updated"))
         footer = await pg.inner_text("#updated")
         check("Footer shows update times", "Updated:" in footer)

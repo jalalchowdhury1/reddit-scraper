@@ -215,7 +215,8 @@
         @media (max-width: 700px) { .hide-mobile { display: none; } }
 
         /* ---------- Today line: "12 cleared today · 4-day streak" ---------- */
-        .streak { font-size: .74rem; color: var(--muted); margin-top: 1px; font-variant-numeric: tabular-nums; }
+        .streak { font-size: .74rem; color: var(--muted); margin-top: 1px; font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .topbar > div:first-child { min-width: 0; }
         .streak:empty { display: none; }
         .streak i { color: var(--accent); vertical-align: -1px; }
 
@@ -902,8 +903,10 @@ function streakHTML() {
     while (readByDay[day]) { streak++; day = prevDay(day); }
     const parts = [];
     if (n) parts.push(`<button class="streak-link" id="btn-cleared" aria-label="Show the ${n} items cleared today">${n} cleared today <i class="ph ph-caret-right" aria-hidden="true"></i></button>`);
-    if (streak >= 2) parts.push(n ? `<i class="ph-fill ph-fire" aria-hidden="true"></i> ${streak}-day streak`
-                                  : `Clear one to keep your ${streak}-day streak`);
+    // Phones: the 4 header icons leave ~180 px, so the short form ("🔥 14-day", "Keep your 14-day streak").
+    const phone = matchMedia('(max-width: 700px)').matches;
+    if (streak >= 2) parts.push(n ? `<i class="ph-fill ph-fire" aria-hidden="true"></i> ${streak}-day${phone ? '' : ' streak'}`
+                                  : `${phone ? 'Keep' : 'Clear one to keep'} your ${streak}-day streak`);
     return parts.join(' · ');
 }
 
