@@ -542,6 +542,13 @@ def build_data():
 
     stamps = reddit_list_stamps()
     updated["reddit"] = max(stamps.values()) if stamps else ""  # last Mac-browser save
+    # The STALEST list the two tabs show (Mac or GitHub save), for the page's stale notice:
+    # a Mac run that saved 3 lists and stopped keeps `reddit` fresh while 23 lists age.
+    github = reddit_list_stamps("lists", github_meta())
+    served = [frames.parse_stamp(st) for st in served_list_stamps(data["monthly"], "", stamps, github)
+              + served_list_stamps(data["yearly"], "_yearly", stamps, github)]
+    served = [w for w in served if w is not None]
+    updated["reddit_oldest"] = min(served).strftime("%Y-%m-%dT%H:%M:%SZ") if served else ""
     data["updated"] = updated  # when each feed last landed (UTC ISO)
     return data
 
@@ -633,17 +640,22 @@ def am_reads_source_meta() -> dict:
         return {}
 
 
-def served_reddit_age(items, suffix, saved, github, now):
-    """Age of the OLDEST list the tab is showing: each list's newest save, by the Mac
-    (data/reddit_browser.json lists) or GitHub's RSS backup (reddit_github.json),
-    both shipped in the same commit as the CSV. `checked` is NOT used: the Mac writes
-    it even when it kept the old file."""
-    ages = []
+def served_list_stamps(items, suffix, saved, github) -> list:
+    """Each list the tab is showing, its newest save: by the Mac (data/reddit_browser.json
+    lists) or GitHub's RSS backup (reddit_github.json), both shipped in the same commit as
+    the CSV. `checked` is NOT used: the Mac writes it even when it kept the old file."""
+    stamps = []
     for sub in {i["source"][2:] for i in items if str(i.get("source", "")).startswith("r/")}:
         key = f"r_{sub}{suffix}"
         stamp = max(saved.get(key, ""), github.get(key, ""))
         if stamp:
-            ages.append(_age_h(stamp, now))
+            stamps.append(stamp)
+    return stamps
+
+
+def served_reddit_age(items, suffix, saved, github, now):
+    """Age of the OLDEST list the tab is showing (served_list_stamps)."""
+    ages = [_age_h(stamp, now) for stamp in served_list_stamps(items, suffix, saved, github)]
     ages = [a for a in ages if a is not None]
     return max(ages) if ages else None
 

@@ -421,3 +421,28 @@ def test_news_csv_from_before_source_url_still_serves(site):
     put(site, "googlenews/articles.csv", fresh_news_csv().replace("https://example.com/", "https://news.google.com/rss/articles/"))
     news = server.get_data()["news"]
     assert len(news) == 3 and {(i["source"], i["domain"]) for i in news} == {("WSJ", "")}
+
+
+# ---------- updated.reddit_oldest: the stalest list the tabs serve (25 Oct 2026) ----------
+
+def test_reddit_oldest_is_the_stalest_served_list_not_the_newest(site):
+    """A Mac run that saved a few lists then stopped makes `updated.reddit` (newest) look
+    fresh; the page's stale notice needs the oldest list it actually shows."""
+    u = server.get_data()["updated"]
+    assert u["reddit"] == "2026-09-26T11:35:00+00:00"            # newest, kept as is for the footer
+    assert u["reddit_oldest"] == "2026-09-25T23:35:00Z"          # untracked r_Fitness never counts
+    # GitHub's RSS backup refilled the yearly list after the Mac: that copy is what's served
+    (site / "reddit_github.json").write_text(json.dumps({"lists": {"r_LifeProTips_yearly": "2026-09-27T09:17:00Z"}}))
+    assert server.get_data()["updated"]["reddit_oldest"] == "2026-09-26T11:35:00Z"
+
+
+def test_reddit_oldest_ignores_a_stamped_list_the_tabs_do_not_show(site):
+    (site / "reddit_browser.json").write_text(json.dumps({"lists": {
+        "r_LifeProTips": "2026-09-26T11:35:00Z", "r_LifeProTips_yearly": "2026-09-26T11:35:00Z",
+        "r_bestof": "2026-09-01T00:00:00Z"}}))                    # tracked, but no CSV = not on screen
+    assert server.get_data()["updated"]["reddit_oldest"] == "2026-09-26T11:35:00Z"
+
+
+def test_reddit_oldest_is_empty_without_stamps(site):
+    (site / "reddit_browser.json").write_text("{not json")
+    assert server.get_data()["updated"]["reddit_oldest"] == ""
