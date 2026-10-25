@@ -412,7 +412,7 @@ function initSync() {
     }
     document.getElementById('sync-key').textContent = syncKey;
     // Storage blocked (private window): this key is new on every load, so ticks won't follow.
-    if (store.raw('dailyReaderSyncKey') !== syncKey) document.getElementById('sync-state').textContent = " (this browser can't save your key)";
+    if (store.raw('dailyReaderSyncKey') !== syncKey) document.getElementById('sync-state').innerHTML = `<span class="hide-mobile"> (this browser can't save your key)</span><span class="show-mobile"> (can't save key)</span>`;   // phones: short, so the footer line never wraps
     fbReady.then(() => auth.signInAnonymously()).then(() => {
         migrateLocalToCloud();
         col('favorites').onSnapshot((snap) => {
@@ -462,7 +462,7 @@ function cacheRead() { store.set('dr_read_cache', { key: syncKey, at: cloudReadA
 let syncBroken = false;
 function syncFailed(e) {
     console.error('Sync failed:', e);
-    document.getElementById('sync-state').textContent = ' (offline: ticks may not save)';
+    document.getElementById('sync-state').innerHTML = '<span class="hide-mobile"> (offline: ticks may not save)</span><span class="show-mobile"> (offline)</span>';
     if (!syncBroken) toast("Sync isn't working. Read ticks may not save.");
     syncBroken = true;
 }

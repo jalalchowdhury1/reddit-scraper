@@ -37,6 +37,8 @@ async def robustness(b):
     try: await pg.wait_for_function("document.getElementById('sync-state').textContent.includes('offline')", timeout=10000)
     except Exception: pass
     check("Firebase blocked: the footer says ticks may not save", "offline" in await pg.inner_text("#sync-state"))
+    check("Firebase blocked: the footer's sync key line stays on one line", await pg.evaluate(ONE_LINE, "footer > span:first-child"),
+          await pg.inner_text("footer > span:first-child"))
     before = await pg.inner_text("#progress-label")
     if await pg.locator("#feed .item [data-act=read]").count(): await pg.locator("#feed .item [data-act=read]").first.click()
     await pg.wait_for_timeout(300)
@@ -152,6 +154,8 @@ async def robustness(b):
     await pg.goto(BASE); await pg.wait_for_selector("#feed .item", timeout=20000)
     st = await pg.inner_text("#sync-state")
     check("Storage blocked: the footer says the key can't be saved", "can't save" in st, st)
+    check("Storage blocked: the footer's sync key line stays on one line", await pg.evaluate(ONE_LINE, "footer > span:first-child"),
+          await pg.inner_text("footer > span:first-child"))
     await ctx.close()
 
     # Link another device: a typo is refused; a real switch can be undone.
