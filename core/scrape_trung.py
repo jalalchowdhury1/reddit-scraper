@@ -61,8 +61,10 @@ def scrape_satpost() -> int:
         try:
             dt = parsedate_to_datetime(pub_date_str)
             iso_date = dt.strftime("%Y-%m-%d %H:%M:%S")
-        except:
-            iso_date = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        except Exception:
+            # Never "now": an old back issue would show as this week's SatPost.
+            print(f"skipping an issue with no readable date: {title[:60]}")
+            continue
 
         article_id = make_article_id(link)
 

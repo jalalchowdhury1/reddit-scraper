@@ -154,6 +154,14 @@ def test_satpost_failure_exits_1_with_one_fixed_line(monkeypatch, tmp_path, caps
     assert code == 1 and last.startswith("SATPOST FAILED: ") and why in last, last
 
 
+def test_satpost_issue_with_bad_date_is_dropped_not_dated_today(monkeypatch, tmp_path, capsys):
+    feed = FEED.replace("</channel>", "<item><title>Old issue</title><link>https://www.readtrung.com/p/old</link>"
+                                      "<pubDate>someday</pubDate></item></channel>")
+    assert run_tr(monkeypatch, tmp_path, capsys, Resp(feed))[0] == 0
+    import pandas as pd
+    assert list(pd.read_csv(tmp_path / tr.OUTPUT_FILE)["title"]) == ["Issue 1"]
+
+
 def test_trung_script_exits_with_its_code():
     assert "sys.exit(scrape_satpost())" in (ROOT / "core/scrape_trung.py").read_text()
 

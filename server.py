@@ -668,8 +668,9 @@ def freshness_items(now: datetime = None) -> list:
         {"name": "am-reads-check", "inputAgeH": None,
          "servedAgeH": _age_h(src.get("checked_at"), now), "graceH": 0,
          "maxAgeH": AM_READS_CHECK_MAX_H},
-        # SatPost has had no new issue since 26 Jun 2026 (the feed itself), so no cap:
-        # its age is shown, not graded.
+        # SatPost issues are irregular (none 26 Jun -> 19 Oct 2026) and only the last 7 days
+        # are served, so any cap would go red a week after every issue: shown, not graded.
+        # A dead SatPost scraper fails its workflow run instead (SATPOST FAILED, exit 1).
         {"name": "satpost", "inputAgeH": None, "servedAgeH": newest(satpost), "graceH": 0},
         {"name": "github-trending", "inputAgeH": None, "servedAgeH": _age_h(d["updated"]["github"], now),
          "graceH": 0, "maxAgeH": GITHUB_MAX_AGE_H},
