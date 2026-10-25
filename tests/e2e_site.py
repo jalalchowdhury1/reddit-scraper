@@ -175,6 +175,22 @@ async def robustness(b):
     check("Link: Undo goes back to the old key", await pg.inner_text("#sync-key") == old)
     await ctx.close()
 
+ONE_LINE = "(s) => { const e = document.querySelector(s); if (!e) return false; return e.getBoundingClientRect().height <= 1.6 * parseFloat(getComputedStyle(e).fontSize) + 1; }"
+
+async def one_line(b):
+    """Phone 390: the long-text states stay on one line, no sideways scroll (25 Oct 2026)."""
+    ctx = await b.new_context(service_workers="block", **PHONE)
+    pg = await ctx.new_page()
+    await pg.goto(BASE); await pg.wait_for_selector("#feed .item", timeout=20000); await pg.wait_for_timeout(800)
+    no_sideways = "document.scrollingElement.scrollWidth <= 390 && innerWidth === 390"
+    # Kept + quieted: the longest progress label.
+    await pg.evaluate("document.getElementById('progress-label').textContent = '48 of 53 left · top 50 of 479 + 3 kept · 8 quieted'")
+    check("One line: kept + quieted label, no sideways scroll, Mark all read on screen",
+          await pg.evaluate(no_sideways) and await pg.evaluate("document.getElementById('btn-markall').getBoundingClientRect().right <= 390")
+          and await pg.evaluate(ONE_LINE, "#progress-label"),
+          str(await pg.evaluate("[document.scrollingElement.scrollWidth, innerWidth]")))
+    await ctx.close()
+
 async def main():
     async with async_playwright() as p:
         b = await p.chromium.launch(headless=True)
@@ -931,6 +947,7 @@ async def main():
         check("No JS errors (paywall/favorites)", not errs6, "; ".join(errs6)[:200])
         await ctx.close()
         await robustness(b)
+        await one_line(b)
         await b.close()
     print(f"\n{sum(results)}/{len(results)} passed")
     sys.exit(0 if all(results) else 1)
