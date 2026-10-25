@@ -232,8 +232,10 @@ async def one_line(b):
     await ctx.close()
 
 # For fixed-height pills, where ONE_LINE can't tell: all text sits on one line (line tops within 8 px).
-TEXT_ONE_LINE = """(s) => { const e = document.querySelector(s); if (!e) return false; const r = document.createRange(); r.selectNodeContents(e);
-    const t = [...r.getClientRects()].filter((x) => x.width).map((x) => x.top); return t.length > 0 && Math.max(...t) - Math.min(...t) < 8; }"""
+TEXT_ONE_LINE = """(s) => { const e = document.querySelector(s); if (!e) return false; const t = [], w = document.createTreeWalker(e, NodeFilter.SHOW_TEXT);
+    while (w.nextNode()) { if (!w.currentNode.textContent.trim()) continue; const r = document.createRange(); r.selectNodeContents(w.currentNode);
+        [...r.getClientRects()].filter((x) => x.width).forEach((x) => t.push(x.top)); }
+    return t.length > 0 && Math.max(...t) - Math.min(...t) < 8; }"""
 
 async def patch_api(ctx, fn, delay_ms=0):
     """Serve /api/data with fn(data) applied (and an optional delay)."""
@@ -314,6 +316,39 @@ async def qol(b):
         await pg.click("#feed .sub-chips [data-sub='__new']"); await pg.wait_for_timeout(300)
         check(f"New chip ({w}): tap again = All", await pg.locator("#feed .item").count() >= 50)
         await ctx.close()
+
+    # 'All caught up' offers 'Next: <tab> · N left'; n jumps there on the Mac; all clear = 'Done for today'.
+    ctx = await new_context(service_workers="block", **PHONE)
+    pg = await ctx.new_page()
+    await pg.goto(BASE); await pg.wait_for_function("allData && (readLoaded || syncBroken)", timeout=20000)
+    await pg.click('[data-tab="github"]:visible'); await pg.wait_for_timeout(300)
+    await pg.click("#btn-markall"); await pg.wait_for_timeout(300)
+    nb = pg.locator("#feed .state [data-act=nexttab]")
+    txt = await nb.inner_text() if await nb.count() else ""
+    want = await pg.evaluate("(() => { const t = nextTab(); return t && [t.key, `Next: ${t.label} · ${itemsFor(t.key).filter((i) => !isRead(i)).length} left`]; })()")
+    h = await pg.evaluate("(document.querySelector('#feed .state [data-act=nexttab]') || {}).offsetHeight || 0")
+    check("Caught up (390): 'Next: <tab> · N left' button, one line, 44 px or less",
+          bool(want) and txt.strip() == want[1] and 0 < h <= 44 and await pg.evaluate(TEXT_ONE_LINE, "#feed .state [data-act=nexttab]"), f"{txt!r} vs {want} h={h}")
+    if await nb.count():
+        n_before = await pg.evaluate(f"itemsFor('{want[0]}').filter((i) => !isRead(i)).length")
+        await nb.click(); await pg.wait_for_timeout(300)
+        check("Caught up: Next opens that tab, nothing marked read", await pg.evaluate("currentTab") == want[0]
+              and await pg.evaluate(f"itemsFor('{want[0]}').filter((i) => !isRead(i)).length") == n_before)
+    await pg.evaluate("(() => { TABS.forEach((t) => itemsFor(t.key).forEach((i) => cloudReadPosts.add(String(i.id)))); for (let k = 0, d = etDate(); k < 4; k++, d = prevDay(d)) readByDay[d] = 2; render(); })()")
+    h2 = await pg.inner_text("#feed .state h2") if await pg.locator("#feed .state h2").count() else ""
+    check("Everything read: 'Done for today · 4-day streak', on one line", h2 == "Done for today · 4-day streak"
+          and await pg.evaluate("document.querySelector('#feed .state h2').scrollWidth <= document.querySelector('#feed .state h2').clientWidth")
+          and await pg.evaluate(ONE_LINE, "#feed .state h2") and await pg.locator("#feed .state [data-act=nexttab]").count() == 0, h2)
+    await ctx.close()
+    ctx = await new_context(service_workers="block", viewport={"width": 1440, "height": 900})
+    pg = await ctx.new_page()
+    await pg.goto(BASE); await pg.wait_for_function("allData && (readLoaded || syncBroken)", timeout=20000)
+    await pg.click('[data-tab="github"]:visible'); await pg.wait_for_timeout(300)
+    want = await pg.evaluate("(nextTab() || {}).key")
+    await pg.keyboard.press("n"); await pg.wait_for_timeout(300)
+    check("n (1440): jumps to the next tab with unread", want is not None and await pg.evaluate("currentTab") == want, str(want))
+    check("Footer Keys line lists n", "n next tab" in (await pg.inner_text("#footer")).replace("\n", " "))
+    await ctx.close()
 
 async def main():
     async with async_playwright() as p:
@@ -533,7 +568,7 @@ async def main():
         # Sub chips: one tap = one subreddit; the label says so; Mark all read stays inside it; tap again = All.
         await pg.click('[data-tab="monthly"]:visible'); await pg.wait_for_timeout(400)
         all_cards = await pg.locator("#feed .item").count()
-        chip = pg.locator('#feed .sub-chips [data-act="sub"]').nth(1)
+        chip = pg.locator('#feed .sub-chips [data-act="sub"]:not([data-sub=""]):not([data-sub="__new"])').first
         sub, chip_n = await chip.get_attribute("data-sub"), int(await chip.locator(".count").inner_text())
         await chip.click(); await pg.wait_for_timeout(400)
         subs_shown = await pg.evaluate("[...new Set(visibleItems.map(subKey))]")

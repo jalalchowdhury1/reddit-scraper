@@ -204,6 +204,10 @@
         .state p { color: var(--muted); font-size: .9rem; line-height: 1.55; margin: 0 0 16px; max-width: 52ch; }
         .pill-btn { height: 40px; padding: 0 16px; border-radius: 999px; border: 1px solid var(--line); background: var(--surface); font-size: .86rem; font-weight: 500; display: inline-flex; align-items: center; gap: 8px; }
         .pill-btn:active { transform: scale(.98); }
+        .state h2.one-line { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .state-btns { display: flex; flex-wrap: wrap; gap: 8px; }   /* a button that doesn't fit takes the next row; its label never wraps */
+        .state-btns .pill-btn { max-width: 100%; white-space: nowrap; overflow: hidden; }
+        .state-btns i { font-size: 1rem; }
         .skeleton { padding: 16px 14px; }
         .skeleton div { background: var(--surface-2); border-radius: 6px; height: 12px; margin-bottom: 9px; animation: pulse 1.4s ease-in-out infinite; }
         @keyframes pulse { 50% { opacity: .45; } }
@@ -306,7 +310,7 @@
     <footer id="footer">
         <span>Sync key <strong id="sync-key"></strong><span id="sync-state"></span> · <button id="btn-link">Link another device</button></span>
         <span id="updated"></span>
-        <span class="hide-mobile">Keys: <kbd>j</kbd> <kbd>k</kbd> move, <kbd>o</kbd> open, <kbd>r</kbd> read, <kbd>x</kbd> skip, <kbd>f</kbd> favorite, <kbd>l</kbd> later, <kbd>u</kbd> undo</span>
+        <span class="hide-mobile">Keys: <kbd>j</kbd> <kbd>k</kbd> move, <kbd>o</kbd> open, <kbd>r</kbd> read, <kbd>x</kbd> skip, <kbd>f</kbd> favorite, <kbd>l</kbd> later, <kbd>u</kbd> undo, <kbd>n</kbd> next tab</span>
     </footer>
 </div>
 <nav class="tabbar" id="tabbar" aria-label="Sections"></nav>
@@ -907,10 +911,14 @@ function countReadDays() {
         if (d) readByDay[d] = (readByDay[d] || 0) + 1;
     }
 }
-function streakHTML() {
-    const today = etDate(), n = readByDay[today] || 0;
-    let day = n ? today : prevDay(today), streak = 0;
+function streakCount() {   // days in a row with a tick, counting today only once it has one
+    const today = etDate();
+    let day = readByDay[today] ? today : prevDay(today), streak = 0;
     while (readByDay[day]) { streak++; day = prevDay(day); }
+    return streak;
+}
+function streakHTML() {
+    const n = readByDay[etDate()] || 0, streak = streakCount();
     const parts = [];
     if (n) parts.push(`<button class="streak-link" id="btn-cleared" aria-label="Show the ${n} items cleared today">${n} cleared today <i class="ph ph-caret-right" aria-hidden="true"></i></button>`);
     // Phones: the 4 header icons leave ~180 px, so the short form ("🔥 14-day", "Keep your 14-day streak").
@@ -1254,10 +1262,21 @@ function renderTabs() {
 // "(7) Daily Reader" on the browser tab, and the same number on the home-screen
 // icon where the browser allows it: today's AM Reads + posts new today, unread.
 let lastBadge = -1;
+// The day's to-do: the same number the badge shows and 'Done for today' waits for.
+const todayLeft = () => itemsFor('ritholtz').filter((i) => !isRead(i)).length
+    + ['monthly', 'yearly', 'github'].reduce((a, k) => a + itemsFor(k).filter((i) => isNew(i) && !isRead(i)).length, 0);
+// The next tab after this one (tab-bar order, wrapping) with something unread; never Favorites.
+function nextTab() {
+    const at = TABS.findIndex((t) => t.key === currentTab);
+    for (let s = 1; s < TABS.length; s++) {
+        const t = TABS[(at + s) % TABS.length];
+        if (t.key !== 'favorites' && itemsFor(t.key).some((i) => !isRead(i))) return t;
+    }
+    return null;
+}
 function setBadge() {
     if (!allData) return;
-    const n = itemsFor('ritholtz').filter((i) => !isRead(i)).length
-            + ['monthly', 'yearly', 'github'].reduce((a, k) => a + itemsFor(k).filter((i) => isNew(i) && !isRead(i)).length, 0);
+    const n = todayLeft();
     if (n === lastBadge) return;
     lastBadge = n;
     document.title = n ? `(${n}) Daily Reader` : 'Daily Reader';
@@ -1399,10 +1418,13 @@ function render() {
         html = isReddit(currentTab) ? sortRowHTML() + subChipsHTML(currentTab) + quietHTML(quietList) : '';   // woken items are painted above; keep the way back to All
     } else if (total > 0 && shown.length === 0) {
         const doneToday = readByDay[etDate()] || 0, sub = activeSub(currentTab);
-        // Filtered to one sub: keep the chips so there's a way back to All.
-        html = (sub ? subChipsHTML(currentTab) : '') + `<div class="state"><i class="ph ph-check-circle"></i><h2>All caught up</h2>
+        // Filtered to one sub: keep the chips so there's a way back to All (and no Next).
+        const next = !sub && nextTab(), streak = streakCount();
+        const head = !sub && !todayLeft() ? `Done for today${streak >= 2 ? ` · ${streak}-day streak` : ''}` : 'All caught up';
+        html = (sub ? subChipsHTML(currentTab) : '') + `<div class="state"><i class="ph ph-check-circle"></i><h2 class="one-line">${head}</h2>
                 <p>You've read all ${total} ${currentTab === 'ritholtz' ? "of today's AM Reads" : sub ? `${esc(subName(sub, items[0]))} posts in this tab` : 'items in this tab'}.${doneToday > 1 ? ` ${doneToday} items cleared today across every tab.` : ''}</p>
-                <button class="pill-btn" data-act="showread"><i class="ph ph-eye"></i>Show read items</button></div>` + quietHTML(quietList);
+                <div class="state-btns">${next ? `<button class="pill-btn" data-act="nexttab" data-next="${next.key}"><i class="ph ph-arrow-right"></i>Next: ${esc(next.label)} · ${itemsFor(next.key).filter((i) => !isRead(i)).length} left</button>` : ''}
+                <button class="pill-btn" data-act="showread"><i class="ph ph-eye"></i>Show read items</button></div></div>` + quietHTML(quietList);
     } else if (total === 0 && snoozeList.length) {
         html = `<div class="state"><i class="ph ph-alarm"></i><h2>All snoozed</h2><p>Everything left in this tab is snoozed. It comes back at the time you picked.</p></div>`;
     } else if (total === 0) {
@@ -1743,6 +1765,7 @@ document.getElementById('feed').addEventListener('click', (e) => {
         if (a === 'reload') { loadError = false; render(); loadData(); return; }
         if (a === 'older') { amShowOlder = true; render(); return; }
         if (a === 'showread') { setShowRead(true); return; }
+        if (a === 'nexttab') { switchTab(act.dataset.next); return; }
         if (a === 'keptread') { markKeptRead(); return; }
         if (a === 'quietshow') { showQuieted = !showQuieted; render(); return; }
         if (a === 'snoozeshow') { showSnoozed = !showSnoozed; render(); return; }
@@ -2027,6 +2050,7 @@ document.addEventListener('keydown', (e) => {
     else if (e.key === 'x' && cur && !isRead(cur) && String(cur.source || '').startsWith('r/')) skipItem(cur);
     else if ((e.key === 'f' || e.key === 's') && cur) favItem(cur);
     else if (e.key === 'l' && cur && canSnooze(cur) && !cur._snoozed) { snoozeOpen = snoozeOpen === String(cur.id) ? null : String(cur.id); render(); }
+    else if (e.key === 'n') { const t = nextTab(); if (t) switchTab(t.key); }
     else if (e.key === '/') { e.preventDefault(); openSearch(); }
     else if (e.key === 'Escape' && viewCleared) closeCleared();
     else if (/^[1-9]$/.test(e.key) && +e.key <= TABS.length) switchTab(TABS[+e.key - 1].key);
