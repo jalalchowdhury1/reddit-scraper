@@ -844,7 +844,7 @@ async def main():
             box = f"#feed .item[data-id='{pid}'] .paste-box"
             href = await pg.get_attribute(box + " a", "href")
             url = await pg.evaluate(f"findItem({sid_js}).url")
-            check("Paywalled: card shows the Option 3 link", href == "https://archive.is/oldest/" + url, href)
+            check("Paywalled: card shows the Option 3 link", href == "https://archive.is/oldest/" + url.split("#")[0].split("?")[0], href)   # query dropped
             hrefs = await pg.eval_on_selector_all(box + " a", "els => els.map((a) => a.getAttribute('href'))")
             check("Paywalled: paste box has the archive.ph backup too",
                   (href or "").replace("https://archive.is/", "https://archive.ph/", 1) in hrefs and len(hrefs) == 2, str(hrefs))
