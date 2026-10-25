@@ -179,6 +179,26 @@ async def robustness(b):
     check("Link: Undo goes back to the old key", await pg.inner_text("#sync-key") == old)
     await ctx.close()
 
+    # Quiet subs are scored from the server's read list, never Firestore's on-device copy
+    # (persistence): that copy misses ticks made on other devices since the last visit.
+    ctx = await b.new_context(service_workers="block", **PHONE)
+    pg = await ctx.new_page()
+    await pg.goto(BASE); await pg.wait_for_function("allData && readLoaded", timeout=30000); await pg.wait_for_timeout(1500)
+    await pg.evaluate("localStorage.setItem('dr_quiet', JSON.stringify({ day: '2020-01-01', levels: {}, stats: {}, base: 0, off: {} }))")
+    await ctx.route(lambda u: "firestore.googleapis.com" in u, lambda r: r.abort())
+    await pg.reload()
+    try: await pg.wait_for_function("allData && readLoaded", timeout=20000)
+    except Exception: pass
+    await pg.wait_for_timeout(1500)
+    st = await pg.evaluate("[readLoaded, quiet.day]")
+    check("Cached read list: ticks show, quiet subs wait for the server's list", st == [True, "2020-01-01"], str(st))
+    await ctx.unroute_all(behavior="ignoreErrors")
+    await pg.reload()
+    try: await pg.wait_for_function("quiet.day === etDate()", timeout=20000)
+    except Exception: pass
+    check("Server read list: quiet subs scored", await pg.evaluate("quiet.day === etDate()"), await pg.evaluate("quiet.day"))
+    await ctx.close()
+
 ONE_LINE = "(s) => { const e = document.querySelector(s); if (!e) return false; return e.getBoundingClientRect().height <= 1.6 * parseFloat(getComputedStyle(e).fontSize) + 1; }"
 
 async def one_line(b):

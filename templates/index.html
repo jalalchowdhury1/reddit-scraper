@@ -438,7 +438,13 @@ function initSync() {
             syncOk();
             render();
         }, syncFailed);
-        col('read_posts').onSnapshot((snap) => {
+        // The first snapshot can be Firestore's on-device copy (persistence): it paints ticks,
+        // but quiet scoring waits for the server's (metadata changes on, so that one arrives
+        // even when nothing changed; a write's ack alone is skipped).
+        col('read_posts').onSnapshot({ includeMetadataChanges: true }, (snap) => {
+            const fromServer = !snap.metadata.fromCache;
+            if (readLoaded && !snap.docChanges().length && (readServer || !fromServer)) return;
+            if (fromServer) readServer = true;
             cloudReadPosts = new Set();
             cloudReadAt = {};
             cloudSkip = new Set();
@@ -865,6 +871,7 @@ const isNew = (item) => firstSeen[String(item.id)] === etDate();
 const KEEP_DAYS = 30, READ_GRACE_DAYS = 2;
 let kept = { monthly: {}, yearly: {} };
 let readLoaded = false;   // true once the cloud read list has arrived
+let readServer = false;   // ...from the server, not the device's cached copy (quiet scoring needs it)
 // Live ids of BOTH tabs: the server moves posts between them ("one of each").
 const liveIds = () => new Set(['monthly', 'yearly'].flatMap((k) => ((allData && allData[k]) || []).map((i) => String(i.id))));
 // False for a post whose sub the server no longer tracks (sub removed).
@@ -1060,7 +1067,7 @@ function noteEngaged(item) {   // opened or favorited
 // Once a day (Eastern), when the synced read list is in: re-score every sub.
 function scoreQuiet(force = false) {
     const today = etDate();
-    if (!readLoaded || !rawData || snapshotOn || (!force && quiet.day === today)) return false;
+    if (!readServer || !rawData || snapshotOn || (!force && quiet.day === today)) return false;
     const perSec = {};
     for (const t of Object.values(cloudReadAt)) if (t) perSec[t.slice(0, 19)] = (perSec[t.slice(0, 19)] || 0) + 1;
     const stats = {};
