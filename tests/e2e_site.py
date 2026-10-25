@@ -184,6 +184,20 @@ async def robustness(b):
         await pg.wait_for_selector("#feed .item", timeout=20000)
     check("Link: Undo goes back to the old key", await pg.inner_text("#sync-key") == old)
     await ctx.close()
+    # Sync failing right after a switch must not wipe the switch's Undo (the footer says offline).
+    ctx = await b.new_context(service_workers="block", **PHONE)
+    pg = await ctx.new_page()
+    await pg.goto(BASE); await pg.wait_for_selector("#feed .item", timeout=20000)
+    pg.on("dialog", lambda d: asyncio.ensure_future(d.accept("qq77zz")))
+    await ctx.route("**/firebasejs/**", lambda r: r.abort())
+    async with pg.expect_navigation(): await pg.click("#btn-link")
+    try: await pg.wait_for_function("syncBroken", timeout=15000)
+    except Exception: pass
+    await pg.wait_for_timeout(300)
+    msg = await pg.inner_text("#toast-msg")
+    check("Link + sync fails: 'Switched from' and its Undo stay", "Switched from" in msg and await pg.is_visible("#toast-undo")
+          and await pg.evaluate("syncBroken"), msg)
+    await ctx.close()
 
     # Quiet subs are scored from the server's read list, never Firestore's on-device copy
     # (persistence): that copy misses ticks made on other devices since the last visit.

@@ -469,7 +469,8 @@ let syncBroken = false;
 function syncFailed(e) {
     console.error('Sync failed:', e);
     document.getElementById('sync-state').innerHTML = '<span class="hide-mobile"> (offline: ticks may not save)</span><span class="show-mobile"> (offline)</span>';
-    if (!syncBroken) toast("Sync isn't working. Read ticks may not save.");
+    const switching = toastKind === 'switched' && document.getElementById('toast').classList.contains('show');
+    if (!syncBroken && !switching) toast("Sync isn't working. Read ticks may not save.");
     syncBroken = true;
 }
 function syncOk() { if (syncBroken) { syncBroken = false; document.getElementById('sync-state').textContent = ''; } }
@@ -2105,6 +2106,7 @@ document.getElementById('btn-link').onclick = () => {
   if (prev) {
       try { localStorage.removeItem('dr_prev_key'); } catch {}
       toast(`Switched from ${prev}`, () => { try { localStorage.setItem('dailyReaderSyncKey', prev); } catch {} location.reload(); }, 'Undo', 10000);
+      toastKind = 'switched';   // syncFailed must not cover this Undo
   } }
 
 // ---------- Keyboard (desktop): j/k move, o open, r read, f favorite, / search, 1-6 tabs ----------
