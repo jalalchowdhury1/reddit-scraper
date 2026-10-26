@@ -305,6 +305,9 @@ ignores untracked subs anyway, but the dead files would sit in every deploy.
   category wins and is stored in `category`: `India–Bangladesh Relations`,
   `Bangladesh Economy`, `Good News`. (`config.py:NEWS_CATEGORIES` is a separate copy used only by
   the legacy `scrape_dailystar.py`.)
+- Each row also stores `source_url` (25 Oct 2026) = the `<source url=…>` of the item: the
+  outlet's own site. `<link>` is always a news.google.com redirect, so this is the only place
+  the real publisher's domain exists. Rows from before have it empty.
 - `save_articles` dedups the appended CSV on `(article_id, category)` with `keep="last"`;
   `server.py` dedups the same key with `keep="first"`. Effectively identical; don't assume they
   match if you change one.
@@ -333,7 +336,14 @@ post and extract articles.
   - The page shows only items dated today (US/Eastern); Sunday also shows Saturday's Weekend
     Reads; otherwise an empty state with an opt-in "Show <day>'s list" button.
 - SatPost (`scrape_trung.py`) keeps ~20 back issues in its CSV; `server.py` serves only the last
-  7 days of them.
+  7 days of them. An issue whose pubDate doesn't parse is skipped (never dated "now").
+- **Exit codes (25 Oct 2026):** a real failure (fetch error, 403, Cloudflare "Just a moment",
+  no AM/Weekend Reads post, no content, no articles, **a post with no publish time**) raises
+  `ScrapeFailed`; `main()` prints one last line `AM READS FAILED: <why>` and exits 1, keeping
+  the old CSV. SatPost: `SATPOST FAILED: <why>`, exit 1. A day with no NEW post (Sunday,
+  before 6:30 ET) is not a failure: the newest post is the one already served, exit 0. Never
+  bring back the `datetime.now()` fallback for `pub_date`: Saturday's Weekend Reads re-read on
+  Monday would show as Monday's list. Tests: `tests/test_scraper_exits.py`.
 
 ### 2f. `core/scrape_github_trending.py` — GitHub tab (added 27 Sep 2026)
 - No official trending API, so it parses `https://github.com/trending` (one
@@ -374,7 +384,9 @@ post and extract articles.
   - **News** = every story from the last `NEWS_DAYS = 7` days, **no count cap** (the tab's number
     is the real volume). One card per headline (`title_key`: lowercase alphanumerics, 70 chars),
     keeping the EARLIEST copy so a story already marked read can't come back as new. Newest
-    first; full `ts` so the page can say "3h ago". `totals.news_days = 7`.
+    first; full `ts` so the page can say "3h ago". `totals.news_days = 7`. `domain` = the
+    outlet's site from `source_url` (25 Oct 2026), never `news.google.com` (that becomes `""`);
+    an `author` Google gives as a URL is shown as its domain.
   - **ritholtz** = `data/ritholtz/articles.csv` (`rth_` ids) + the last 7 days of
     `data/trung/articles.csv` (`trg_` ids), sorted by date, newest first, capped at 50.
   - **github** = `data/github_trending/repos.csv` sorted by `rank`, rows that aren't `owner/name`
@@ -392,8 +404,13 @@ post and extract articles.
     comments (`load_top_comments`/`add_top_comments`).
   - **`reddit_subs`** = the tracked subs (sorted). The page forgets kept unread posts whose sub
     isn't in it, so removing a sub also clears it from every device's kept list.
-  - **`updated`** = `{news, ritholtz, reddit, github}` (UTC ISO): the newest `scraped_at` in each
-    news/GitHub CSV, and the newest Mac save in `data/reddit_browser.json` (tracked subs only).
+  - **`updated`** = `{news, ritholtz, reddit, github, reddit_oldest, ritholtz_checked}` (UTC ISO):
+    the newest `scraped_at` in each news/GitHub CSV, and the newest Mac save in
+    `data/reddit_browser.json` (tracked subs only). `reddit_oldest` (25 Oct 2026) = the OLDEST
+    save (Mac or GitHub) over the lists Monthly/Yearly actually serve (`served_list_stamps`, the
+    same rule as `/api/freshness`); `ritholtz_checked` = `data/ritholtz/source.json`
+    `checked_at`. Both `'YYYY-MM-DDTHH:MM:SSZ'`, `""` when unknown; the page tolerates them
+    missing.
   - Items carry structured fields (`upvotes`, `rank`, `when`, `mins`, `ts`, `date`, `kind`,
     `category`, `source`, `domain`); `meta` is a legacy display string the page doesn't parse.
 - `GET /api/status` → the health page for fleet-health and humans:
@@ -415,7 +432,7 @@ post and extract articles.
   producer's last successful source read, cap 26 h, so a dead producer is red; both come from
   `data/ritholtz/source.json` = `{source_newest_ts, checked_at}`, which `core/scrape_ritholtz.py`
   rewrites on EVERY run that reads the newest post, even when the list is unchanged, so every
-  AM Reads run now commits; the endpoint never fetches ritholtz.com itself), `satpost` (shown, no cap: the feed has had no issue since 26 Jun 2026), `github-trending`
+  AM Reads run now commits; the endpoint never fetches ritholtz.com itself), `satpost` (shown, no cap: issues are irregular and only 7 days are served, so a cap would go red a week after every issue; a dead SatPost scraper fails its run instead), `github-trending`
   (`scraped_at`, cap 18 h). Items carry `pub_ts` on AM Reads/SatPost cards for this (not `ts`,
   which the card would render as "3h ago"). fleet-health's `freshness` probe judges it; the
   app never grades itself. Tests: `tests/test_freshness.py` (producer-written fixtures).
@@ -463,7 +480,7 @@ python3 core/scrape_reddit_browser.py --only LifeProTips --visible   # needs Pla
 ```
 
 ### Tests
-- **`.venv/bin/python -m pytest tests -q`** — 141 tests, under a minute, no network (`tests/test_frames.py`: the pandas stand-in, §3; its 2 pandas-parity fuzz tests skip unless pandas 2.x is installed, e.g. the owner's pandas-3 venv; CI runs them; `tests/test_top_comments.py`: the comment picker, spoilers, hidden scores, cache/prune/backoff rules, the server attaching them):
+- **`.venv/bin/python -m pytest tests -q`** — 179 tests (2 skip), under a minute, no network (`tests/test_frames.py`: the pandas stand-in, §3; its 2 pandas-parity fuzz tests skip unless pandas 2.x is installed, e.g. the owner's pandas-3 venv; CI runs them; `tests/test_top_comments.py`: the comment picker, spoilers, hidden scores, cache/prune/backoff rules, the server attaching them):
   - `tests/test_am_reads.py`: AM Reads cleanup/dedup helpers.
   - `tests/test_feeds.py`: RSS parsing + honest scores, the News retry (503/404), the live API's
     honesty/no-repeats rules on the committed data, the Mac scraper's rows and CSV round trip,
@@ -491,7 +508,7 @@ python3 core/scrape_reddit_browser.py --only LifeProTips --visible   # needs Pla
     deadline and block messages once), the stuck-profile fallback, the
     `METHOD CHECK` line, and GitHub's side (stalest first, own stamps, the RSS check line, only
     a real top list saved, and that `python core/scrape_top.py` really runs `main()`).
-- **`python3 tests/e2e_site.py [base_url]`** — 140 real-browser checks (~200 s; then 11 = quiet subs + Skip, 27 = top comment, Later/snooze incl. a real Firestore round trip on a throwaway sync key, Podcast this + the paywalled paste box, last 23 = paywall flag (+ Backup chip) + From your Favorites, real Firestore round trips on another throwaway key): every tab shows
+- **`python3 tests/e2e_site.py [base_url]`** — 215+ real-browser checks (the 25 Oct batch's are in `robustness()`, `one_line()`, `qol()`; ~200 s; then 11 = quiet subs + Skip, 27 = top comment, Later/snooze incl. a real Firestore round trip on a throwaway sync key, Podcast this + the paywalled paste box, last 23 = paywall flag (+ Backup chip) + From your Favorites, real Firestore round trips on another throwaway key): every tab shows
   all the API's posts with the right label, the GitHub tab (API's top 10 in GitHub's order,
   "top 10 of N", GitHub's star counts, read + Undo, keys 5/6, its 24 h stale notice), real upvotes on cards, opening ≠ reading, the
   "Done with X?" prompt, undo, keys, stale notices (News 36 h, Reddit 48 h), footer stamps,
@@ -551,7 +568,10 @@ python3 core/scrape_reddit_browser.py --only LifeProTips --visible   # needs Pla
   all of `data/` until 26 Sep 2026, but `am_reads.yml` commits every morning and the Mac commits
   twice a day, so the retry never ran when News failed. Checkout uses `fetch-depth: 50` (the guard
   needs history); `concurrency: daily-scrape` (no cancel) serializes a late 03:00 against 09:00.
-- `am_reads.yml`: ritholtz + trung only, commits only on change.
+- `am_reads.yml`: ritholtz + trung only, commits only on change. Since 25 Oct 2026 it runs
+  both with `set +e`, prints `scraper exits: ritholtz=R trung=T`, commits what the other wrote,
+  then `Fail the run if a scraper failed` prints `SCRAPERS FAILED: …` and exits 1 (same shape
+  as `daily_scrape.yml`, which also goes red now when ritholtz/trung exit 1).
 - `github_trending.yml` (every 6 h at :41): §2f. Python 3.10, `concurrency: github-trending`,
   timeout 10 min, commits `data/github_trending/` only on change, same 3-try rebase loop.
 
@@ -677,7 +697,7 @@ python3 core/scrape_reddit_browser.py --only LifeProTips --visible   # needs Pla
   rest). Its tick = mark unread (Undo works). Closed by Done, Escape, any tab, or search;
   its scroll never overwrites the tab's saved scroll. Progress row ("50 of 50 left · top 50 of
   534", "27 of 27 left · last 7 days") + Mark all read (with Undo); swipe left = read, right =
-  favorite; search across tabs; text size + light/dark/auto; keys j/k/o/r/f/u(z), 1-6 = tabs; remembers tab
+  favorite; search across tabs; text size + light/dark/auto; keys j/k/o/r/f/u(z), n = next tab with unread, 1-6 = tabs; remembers tab
   and scroll; re-fetches when resumed after 20 min. **Opening a link must NOT mark it read** (the
   owner peeks without reading; only the tick / left swipe / `r` / Mark all read / the prompt's
   "Mark read" count). Opened-but-unread cards get a hollow dot + "Opened" tag (localStorage
@@ -725,9 +745,10 @@ python3 core/scrape_reddit_browser.py --only LifeProTips --visible   # needs Pla
   bigger posts get read, the rate falls, the level goes. **Tab title / app badge:** "(7) Daily
   Reader" = today's unread AM Reads + unread posts marked New today (`setBadge`; the home-screen
   icon badge only where the browser allows `setAppBadge`). **Warning cards:** News
-  when `updated.news` is 36 h+ old; Monthly/Yearly when `updated.reddit` is 48 h+ old (the Mac
-  stopped; lists may be older and show ranks); GitHub when `updated.github` is 24 h+ old (4
-  missed runs). Footer: when AM Reads, News, Reddit and GitHub last landed. Sync write failures show a toast + "(offline)". Firebase layout:
+  when `updated.news` is 36 h+ old; Monthly/Yearly when the OLDEST served list
+  (`updated.reddit_oldest`, falling back to `updated.reddit`) is 48 h+ old ("Some Reddit lists
+  last refreshed …", or "The Mac mini last refreshed …" when even the newest is); GitHub when `updated.github` is 24 h+ old (4
+  missed runs). Footer: when AM Reads, News, Reddit and GitHub last landed (phones: one "Updated <newest> ⌄", tap for each; see the 25 Oct batch section). Sync write failures show a toast + "(offline)". Firebase layout:
   `sync_groups/{key}/favorites` + `read_posts` + `snoozed` + `podcast_requests`.
   **Top comment** (10 Oct 2026): Reddit cards show `top_comment` under the blurb, ONE faint line
   (minimal pass, 17 Oct 2026: the owner found 2 lines too wordy), tap for all (`expanded` key `c:<id>`).
@@ -759,7 +780,7 @@ python3 core/scrape_reddit_browser.py --only LifeProTips --visible   # needs Pla
   **Paywall flag** (11 Oct 2026, every card, matters on AM Reads): `isPaywalled(url)` checks the
   host against `PAYWALLED` (built from 529 AM Reads links Aug–Oct: wsj, nytimes, washingtonpost,
   theatlantic, ft, bloomberg, barrons, wired, newyorker, …; subdomains count, `notwsj.com` doesn't).
-  Hit = chip "Paywall · Open Option 3" (`ARCHIVE(url)`, same link as the paste box; a tap =
+  Hit = chip "🔒 Option 3" (`ARCHIVE(url)`, same link as the paste box; a tap =
   opened, never read) + a "Backup" chip (`data-act="option3b"`, `ARCHIVE(url, 'archive.ph')`:
   the same archive at another address, for when archive.is won't load; the paste box has it
   too as "try the backup"). Backups tested 11 Oct on 9 paywalled sites in real phone-size
@@ -783,7 +804,9 @@ python3 core/scrape_reddit_browser.py --only LifeProTips --visible   # needs Pla
   with the anonymous ID token, `mask.fieldPaths=id`, µs cut to ms for Safari). If that fails
   (`savedAtFill = 'failed'`) such stars can still come up, labelled "From your Favorites".
 - `manifest.json` + `sw.js` — PWA; network-first service worker (cache `daily-reader-v2`, only
-  the offline fallback; an offline `/api/data` copy carries `X-Offline-Copy: 1`).
+  the fallback; a saved `/api/data` copy carries `X-Offline-Copy: 1`). Since 25 Oct 2026 the
+  saved copy also answers a 5xx and an 8 s stall, and the pinned Firebase + Phosphor files are
+  cache-first in `daily-reader-assets-v1` (see the 25 Oct batch section).
 - `server_assets/icon.png` — app icon.
 - `core/reddit_common.py` — `SUBREDDITS`, tiers, freshness handshake (shared, stdlib only).
 - `core/live_data.py` — on Vercel, serves `data/` from GitHub's newest commit (stdlib only; §4 Deploy).
@@ -878,3 +901,80 @@ script mac/morning-kick.sh installed as ~/.local/bin/daily-reader-kick.sh) runs
 Log: ~/Library/Logs/daily-reader-kick.log ("KICK OK <workflow>"). The GHA cron
 lines stay as backup. GitHub Trending's daily page can list <10 repos (8 on
 28 Sep); the scraper tops up from ?since=weekly with blank stars_today.
+
+## QoL + robustness batch — 2026-10-25
+Branch `qol-2026-10-25`. Everything below is in `templates/index.html` unless named. Phone
+first: every new label, chip, notice and button is ONE line at 390 px (ellipsis, never wrap).
+
+**Robustness (the app must open and be honest when something is down)**
+- **Firebase loads in the background** (`fbReady`): the 3 gstatic scripts are no longer
+  blocking `<head>` tags. Until they arrive `col()` / `batch()` hand back stand-ins
+  (`laterDoc`) whose writes wait on `fbReady`, or fail into `syncFailed`. Never call
+  `db.`/`auth.` directly at top level again: a slow gstatic = blank app.
+- **Offline ticks survive an app kill:** `db.enablePersistence({synchronizeTabs: true})`, right
+  after `firestore()` and before any read/write (moved later it silently does nothing: the catch swallows it).
+- **CDN copies** (`sw.js` `ASSETS`, cache `daily-reader-assets-v1`, cache-first): Firebase 10.8.0
+  + Phosphor 2.1.1 files. The URLs pin a version; bumping one means changing `FB`/`PH` in sw.js
+  AND the tags in index.html, and renaming the cache. The `<link>`s and scripts carry
+  `crossorigin` so the SW gets a readable (cacheable) answer. `daily-reader-v2` (his saved
+  feed) must survive every deploy: `activate` keeps both names.
+- **Saved feed on 5xx / stall** (`sw.js` fetch): a 503 `DEPLOYMENT_PAUSED`, 500 or 504 for `/`
+  or `/api/data` gives the saved copy (still `X-Offline-Copy: 1`); after `SLOW_MS` = 8 s with
+  no answer the saved copy shows and the late answer still refreshes the cache. No saved copy
+  = the real error passes through.
+- **Say so** (`dataNote`, set in `loadData`): a saved copy -> amber one-line notice "Saved copy
+  · Sun 7:39 AM" + Try again atop every feed tab, and the sticky progress label starts "Saved
+  copy · "; a failed refresh with an older list up -> "Couldn't refresh · …". AM Reads' empty
+  state then says "Can't check today's list" (never blames Ritholtz while offline). A 200
+  that isn't a feed (no `monthly`/`news` arrays) counts as a failed load; an empty tab whose
+  `updated` stamp is `""` says "This list couldn't be loaded" + Try again.
+- **Instant open** (`bootFromCopy`): paints `dr_last` (last good `/api/data`, written on every
+  fresh load) with `dr_read_cache` (`cacheRead`) at once; progress label starts "Updating… · ".
+  Trap: nothing is tracked from the copy (`snapshotOn`: no New, kept, quiet or shown log;
+  `lastLoad` stays 0).
+- **Quiet subs score only from the SERVER's read list** (`readServer`; the `read_posts`
+  snapshot listens with `includeMetadataChanges`): the persisted device copy misses ticks
+  made elsewhere and would quiet a sub for the day. The cached copy may paint ticks; `carried()`
+  accepts `readCached` so kept posts don't wait.
+- **Sync key:** "Link another device" accepts only `^[A-Z0-9]{6}$` ("Keys are 6 letters or
+  numbers"), stores `dr_prev_key`, and after the reload shows "Switched from ABC123 · Undo" for
+  10 s (`toastKind = 'switched'`; `syncFailed` must not replace that toast). Storage blocked
+  -> footer "(this browser can't save your key)" (phone: "(can't save key)"); sync down ->
+  "(offline: ticks may not save)" (phone: "(offline)").
+- **Scrapers fail loudly:** §2e (`AM READS FAILED` / `SATPOST FAILED`, exit 1, `am_reads.yml`
+  fails at the end after committing).
+
+**QoL**
+- **Freshness dot** (`#btn-fresh`, `freshness(src)`, `FRESH_H` = reddit 48 / news 36 / amreads
+  26 / github 24 h): green, amber past half, red past the limit, grey with no stamp. Tap ->
+  `#fresh-sheet` (`openFresh`), one row per source, a row opens its tab; closes on outside tap,
+  scroll, Esc, tab switch. Desktop label adds "· updated 2h ago". AM Reads is graded on
+  `updated.ritholtz_checked` (the checker), never his calendar; its empty state adds "Last
+  checked ritholtz.com 8:30 AM".
+- **Reddit stale notice uses the oldest served list** (`redditOldestAt` = min of
+  `reddit_oldest`, `reddit`). Fallback to `reddit` must stay: lane A tolerates the field absent.
+- **"New N" chip** on Monthly/Yearly (`NEW_SUB`, `inSub`): only posts first seen today on this
+  device; Mark all read and the label ("· New only") stay inside it. Hidden when none unread.
+- **Finish state:** "All caught up" offers "Next: Monthly · 50 left" (`nextTab()`: tab-bar order,
+  never Favorites; marks nothing read); when `todayLeft()` (= the badge number) is 0 the head
+  reads "Done for today · 4-day streak". Key `n` = next tab.
+- **News publisher:** cards say "The Daily Star", no news.google.com suffix/icon (`cardHTML`
+  drops that domain even if an old server sends it; server side in §3).
+- **One-line fixes (phone):** toasts (`white-space: nowrap`, ellipsis); progress label ellipsis
+  with Mark all read `flex-shrink: 0` (a long label once pushed the row to 397 px and slid the
+  page sideways); today line short form "12 cleared today › · 🔥 14-day" / "Keep your 14-day
+  streak" (`streakHTML`, `matchMedia`); footer "Updated Sun 5:12 PM ⌄", tap lists each feed
+  (`updOpen`, `[data-upd]`); card footer row `flex-wrap: nowrap` on phones unless it holds the
+  snooze menu or paste box; paywalled cards read "Later · Podcast · 🔒 Option 3 · Backup"
+  ("Podcast this" button is now "Podcast").
+- **"Done with X?" prompt** (`toastKind = 'done'`) hides on a tab switch; Undo toasts stay, so
+  `u` still works.
+
+**Test:** `.venv/bin/python -m pytest tests -q` (new: `tests/test_scraper_exits.py`, the
+`reddit_oldest` / `ritholtz_checked` / news-publisher tests in `test_robustness.py`,
+`test_feeds.py`, `test_freshness.py`). Then `/opt/homebrew/bin/python3 tests/e2e_site.py
+http://127.0.0.1:PORT` against `.venv/bin/uvicorn server:app --port PORT`: the batch's checks
+(Firebase/CDNs blocked, offline tick reload, 503 + stalled feed, Saved copy / Couldn't
+refresh, Link typo + Undo, cached vs server read list, every one-line check at 390 px, fresh
+dot + sheet, Next / Done for today / `n`, instant open) all must pass, plus a look at 390 px
+and 1440 px for any wrapped text.
