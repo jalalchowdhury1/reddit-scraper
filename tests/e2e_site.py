@@ -474,7 +474,7 @@ async def qol(b):
         if shots: await pg.screenshot(path=f"{shots}/instant-{w}{'-fail' if fail else ''}-early.png")
         check(f"Instant open ({tag}): cards within 400 ms, no skeleton, read item hidden, same count, 'Updating…' on one line, not scrolled anywhere else",
               early["items"] > 0 and not early["skel"] and not early["xShown"] and early["label"] == "Updating… · " + seed[2]
-              and await pg.evaluate(ONE_LINE, "#progress-label") and (early["y"] == 0 or abs(early["y"] - 1200) <= 2), f"{early} vs {seed[2]!r}")
+              and await pg.evaluate(ONE_LINE, "#progress-label") and 0 <= early["y"] <= 1202, f"{early} vs {seed[2]!r}")   # Chrome's own reload restore can stop short while the page grows
         check(f"Instant open ({tag}): the old copy stamps nothing (no New / kept / quiet tracking)", not early["yStamped"])
         await pg.wait_for_function("!document.getElementById('progress-label').innerText.startsWith('Updating')", timeout=8000)
         await pg.wait_for_timeout(300)
