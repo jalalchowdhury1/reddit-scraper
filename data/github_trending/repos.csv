@@ -1,11 +1,11 @@
 rank,repo,url,description,language,stars,forks,stars_today,scraped_at
-1,Nutlope/hallmark,https://github.com/Nutlope/hallmark,"Anti-AI-slop design skill for Claude Code, Cursor, and Codex.",CSS,38135,1983,2859,2026-10-27T14:00:54
-2,nightly-labs/openbot,https://github.com/nightly-labs/openbot,"A local-first desktop workspace for persistent AI teammates. Run Codex, Claude, and Grok with dedicated workspaces, task queues, file sharing, browser control, and agent-to-agent collaboration.",TypeScript,1973,221,794,2026-10-27T14:00:54
-3,obra/superpowers,https://github.com/obra/superpowers,An agentic skills framework & software development methodology that works.,Shell,306001,27249,608,2026-10-27T14:00:54
-4,pbakaus/impeccable,https://github.com/pbakaus/impeccable,The design language that makes your AI harness better at design.,Rust,89987,5351,1458,2026-10-27T14:00:54
-5,makecindy/cindy,https://github.com/makecindy/cindy,Consider it done. The open-source AI agent that works out of the box · 想到，就能做到。开源、开箱即用的 AI Agent。,TypeScript,7196,860,1446,2026-10-27T14:00:54
-6,gitroomhq/postiz-app,https://github.com/gitroomhq/postiz-app,📨 The ultimate agentic social media scheduling tool 🤖,TypeScript,38964,7475,953,2026-10-27T14:00:54
-7,affaan-m/ECC,https://github.com/affaan-m/ECC,"The agent harness performance optimization system. Skills, instincts, memory, security, and research-first development for Claude Code, Codex, Opencode, Cursor and beyond.",JavaScript,290441,43027,1183,2026-10-27T14:00:54
-8,HKUDS/DeepTutor,https://github.com/HKUDS/DeepTutor,DeepTutor: Lifelong Personalized Tutoring. https://deeptutor.info/.,Python,45080,5684,1587,2026-10-27T14:00:54
-9,JetBrains/thinkrail,https://github.com/JetBrains/thinkrail,"Vibe code with pi in a lightweight, real IDE that customises itself around the way you work — The Vibe You Need",TypeScript,3616,190,1211,2026-10-27T14:00:54
-10,togg53192-cmd/jailbreaks,https://github.com/togg53192-cmd/jailbreaks,LIST OF ALL MY JAILBREAKS,,4994,785,890,2026-10-27T14:00:54
+1,Nutlope/hallmark,https://github.com/Nutlope/hallmark,"Anti-AI-slop design skill for Claude Code, Cursor, and Codex.",CSS,38563,2012,2859,2026-10-27T18:15:35
+2,nightly-labs/openbot,https://github.com/nightly-labs/openbot,"A local-first desktop workspace for persistent AI teammates. Run Codex, Claude, and Grok with dedicated workspaces, task queues, file sharing, browser control, and agent-to-agent collaboration.",TypeScript,2208,236,794,2026-10-27T18:15:35
+3,obra/superpowers,https://github.com/obra/superpowers,An agentic skills framework & software development methodology that works.,Shell,306217,27266,608,2026-10-27T18:15:35
+4,pbakaus/impeccable,https://github.com/pbakaus/impeccable,The design language that makes your AI harness better at design.,Rust,90260,5367,1458,2026-10-27T18:15:35
+5,makecindy/cindy,https://github.com/makecindy/cindy,Consider it done. The open-source AI agent that works out of the box · 想到，就能做到。开源、开箱即用的 AI Agent。,TypeScript,7330,874,1446,2026-10-27T18:15:35
+6,gitroomhq/postiz-app,https://github.com/gitroomhq/postiz-app,📨 The ultimate agentic social media scheduling tool 🤖,TypeScript,39137,7482,953,2026-10-27T18:15:35
+7,affaan-m/ECC,https://github.com/affaan-m/ECC,"The agent harness performance optimization system. Skills, instincts, memory, security, and research-first development for Claude Code, Codex, Opencode, Cursor and beyond.",JavaScript,290624,43054,1183,2026-10-27T18:15:35
+8,HKUDS/DeepTutor,https://github.com/HKUDS/DeepTutor,DeepTutor: Lifelong Personalized Tutoring. https://deeptutor.info/.,Python,45541,5729,1587,2026-10-27T18:15:35
+9,JetBrains/thinkrail,https://github.com/JetBrains/thinkrail,"Vibe code with pi in a lightweight, real IDE that customises itself around the way you work — The Vibe You Need",TypeScript,3791,200,1211,2026-10-27T18:15:35
+10,togg53192-cmd/jailbreaks,https://github.com/togg53192-cmd/jailbreaks,LIST OF ALL MY JAILBREAKS,,5249,804,890,2026-10-27T18:15:35
