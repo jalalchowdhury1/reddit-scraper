@@ -1,15 +1,15 @@
 rank,repo,url,description,language,stars,forks,stars_today,scraped_at
-1,JetBrains/thinkrail,https://github.com/JetBrains/thinkrail,"Vibe code with pi in a lightweight, real IDE that customises itself around the way you work — The Vibe You Need",TypeScript,4635,242,1075,2026-10-28T14:00:32
-2,elayadesign/ai-design-skills,https://github.com/elayadesign/ai-design-skills,,,10672,759,1395,2026-10-28T14:00:32
-3,obra/superpowers,https://github.com/obra/superpowers,An agentic skills framework & software development methodology that works.,Shell,307030,27323,1096,2026-10-28T14:00:32
-4,HKUDS/DeepTutor,https://github.com/HKUDS/DeepTutor,DeepTutor: Lifelong Personalized Tutoring. https://deeptutor.info/.,Python,47364,5898,2376,2026-10-28T14:00:32
-5,macro-inc/macro,https://github.com/macro-inc/macro,"Macro is a unified workspace for teams: email, chat, docs, tasks, agents, calls, and CRM — @-linked together with shared AI memory.",Rust,5224,508,106,2026-10-28T14:00:32
-6,Nutlope/hallmark,https://github.com/Nutlope/hallmark,"Anti-AI-slop design skill for Claude Code, Cursor, and Codex.",CSS,40116,2089,2109,2026-10-28T14:00:32
-7,pbakaus/impeccable,https://github.com/pbakaus/impeccable,"The design vocabulary for your coding agent. Steer with polish and bolder, review with critique and audit, catch AI slop before it ships.",Rust,91538,5414,1471,2026-10-28T14:00:32
-8,makecindy/cindy,https://github.com/makecindy/cindy,Consider it done. The open-source AI agent that works out of the box · 想到，就能做到。开源、开箱即用的 AI Agent。,TypeScript,7865,925,740,2026-10-28T14:00:32
-9,nightly-labs/openbot,https://github.com/nightly-labs/openbot,"A local-first desktop workspace for persistent AI teammates. Run Codex, Claude, and Grok with dedicated workspaces, task queues, file sharing, browser control, and agent-to-agent collaboration.",TypeScript,2964,292,1053,2026-10-28T14:00:32
-10,togg53192-cmd/jailbreaks,https://github.com/togg53192-cmd/jailbreaks,LIST OF ALL MY JAILBREAKS,,6514,943,1478,2026-10-28T14:00:32
-11,hmjz100/LinkSwift,https://github.com/hmjz100/LinkSwift,一个基于 JavaScript 的网盘文件下载地址获取工具。基于【网盘直链下载助手】修改 ，支持 百度网盘 / 阿里云盘 / 中国移动云盘 / 天翼云盘 / 迅雷云盘 / 夸克网盘 / UC网盘 / 123云盘 八大网盘,JavaScript,33914,2394,3209,2026-10-28T14:00:32
-12,expo/skills,https://github.com/expo/skills,A collection of AI agent skills for working with Expo projects and Expo Application Services,Shell,3393,217,212,2026-10-28T14:00:32
-13,ruvnet/RuView,https://github.com/ruvnet/RuView,"π RuView turns commodity WiFi signals into real-time spatial intelligence, vital sign monitoring, and presence detection — all without a single pixel of video.",Rust,100630,13131,415,2026-10-28T14:00:32
-14,xiaolai/the-craft-of-selfteaching,https://github.com/xiaolai/the-craft-of-selfteaching,One has no future if one couldn't teach themself.,Jupyter Notebook,18331,17870,143,2026-10-28T14:00:32
+1,JetBrains/thinkrail,https://github.com/JetBrains/thinkrail,"Vibe code with pi in a lightweight, real IDE that customises itself around the way you work — The Vibe You Need",TypeScript,4638,242,1075,2026-10-28T14:01:11
+2,elayadesign/ai-design-skills,https://github.com/elayadesign/ai-design-skills,,,10674,759,1395,2026-10-28T14:01:11
+3,obra/superpowers,https://github.com/obra/superpowers,An agentic skills framework & software development methodology that works.,Shell,307031,27323,1096,2026-10-28T14:01:11
+4,HKUDS/DeepTutor,https://github.com/HKUDS/DeepTutor,DeepTutor: Lifelong Personalized Tutoring. https://deeptutor.info/.,Python,47366,5898,2376,2026-10-28T14:01:11
+5,macro-inc/macro,https://github.com/macro-inc/macro,"Macro is a unified workspace for teams: email, chat, docs, tasks, agents, calls, and CRM — @-linked together with shared AI memory.",Rust,5224,508,106,2026-10-28T14:01:11
+6,Nutlope/hallmark,https://github.com/Nutlope/hallmark,"Anti-AI-slop design skill for Claude Code, Cursor, and Codex.",CSS,40117,2089,2109,2026-10-28T14:01:11
+7,pbakaus/impeccable,https://github.com/pbakaus/impeccable,"The design vocabulary for your coding agent. Steer with polish and bolder, review with critique and audit, catch AI slop before it ships.",Rust,91541,5414,1471,2026-10-28T14:01:11
+8,makecindy/cindy,https://github.com/makecindy/cindy,Consider it done. The open-source AI agent that works out of the box · 想到，就能做到。开源、开箱即用的 AI Agent。,TypeScript,7865,925,740,2026-10-28T14:01:11
+9,nightly-labs/openbot,https://github.com/nightly-labs/openbot,"A local-first desktop workspace for persistent AI teammates. Run Codex, Claude, and Grok with dedicated workspaces, task queues, file sharing, browser control, and agent-to-agent collaboration.",TypeScript,2965,292,1053,2026-10-28T14:01:11
+10,togg53192-cmd/jailbreaks,https://github.com/togg53192-cmd/jailbreaks,LIST OF ALL MY JAILBREAKS,,6514,943,1478,2026-10-28T14:01:11
+11,hmjz100/LinkSwift,https://github.com/hmjz100/LinkSwift,一个基于 JavaScript 的网盘文件下载地址获取工具。基于【网盘直链下载助手】修改 ，支持 百度网盘 / 阿里云盘 / 中国移动云盘 / 天翼云盘 / 迅雷云盘 / 夸克网盘 / UC网盘 / 123云盘 八大网盘,JavaScript,33917,2394,3209,2026-10-28T14:01:11
+12,expo/skills,https://github.com/expo/skills,A collection of AI agent skills for working with Expo projects and Expo Application Services,Shell,3393,217,212,2026-10-28T14:01:11
+13,ruvnet/RuView,https://github.com/ruvnet/RuView,"π RuView turns commodity WiFi signals into real-time spatial intelligence, vital sign monitoring, and presence detection — all without a single pixel of video.",Rust,100630,13131,415,2026-10-28T14:01:11
+14,xiaolai/the-craft-of-selfteaching,https://github.com/xiaolai/the-craft-of-selfteaching,One has no future if one couldn't teach themself.,Jupyter Notebook,18332,17870,143,2026-10-28T14:01:11
