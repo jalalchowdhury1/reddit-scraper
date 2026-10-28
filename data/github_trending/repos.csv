@@ -1,12 +1,15 @@
 rank,repo,url,description,language,stars,forks,stars_today,scraped_at
-1,elayadesign/ai-design-skills,https://github.com/elayadesign/ai-design-skills,,,9921,697,1395,2026-10-28T06:14:54
-2,Nutlope/hallmark,https://github.com/Nutlope/hallmark,"Anti-AI-slop design skill for Claude Code, Cursor, and Codex.",CSS,39413,2055,2830,2026-10-28T06:14:54
-3,nightly-labs/openbot,https://github.com/nightly-labs/openbot,"A local-first desktop workspace for persistent AI teammates. Run Codex, Claude, and Grok with dedicated workspaces, task queues, file sharing, browser control, and agent-to-agent collaboration.",TypeScript,2662,272,777,2026-10-28T06:14:54
-4,obra/superpowers,https://github.com/obra/superpowers,An agentic skills framework & software development methodology that works.,Shell,306660,27295,617,2026-10-28T06:14:54
-5,pbakaus/impeccable,https://github.com/pbakaus/impeccable,"The design vocabulary for your coding agent. Steer with polish and bolder, review with critique and audit, catch AI slop before it ships.",Rust,90944,5391,1449,2026-10-28T06:14:54
-6,makecindy/cindy,https://github.com/makecindy/cindy,Consider it done. The open-source AI agent that works out of the box · 想到，就能做到。开源、开箱即用的 AI Agent。,TypeScript,7675,909,1465,2026-10-28T06:14:54
-7,gitroomhq/postiz-app,https://github.com/gitroomhq/postiz-app,📨 The ultimate agentic social media scheduling tool 🤖,TypeScript,39611,7531,951,2026-10-28T06:14:54
-8,affaan-m/ECC,https://github.com/affaan-m/ECC,"The agent harness performance optimization system. Skills, instincts, memory, security, and research-first development for Claude Code, Codex, Opencode, Cursor and beyond.",JavaScript,291091,43094,1165,2026-10-28T06:14:54
-9,HKUDS/DeepTutor,https://github.com/HKUDS/DeepTutor,DeepTutor: Lifelong Personalized Tutoring. https://deeptutor.info/.,Python,46502,5814,1598,2026-10-28T06:14:54
-10,JetBrains/thinkrail,https://github.com/JetBrains/thinkrail,"Vibe code with pi in a lightweight, real IDE that customises itself around the way you work — The Vibe You Need",TypeScript,4306,227,1204,2026-10-28T06:14:54
-11,togg53192-cmd/jailbreaks,https://github.com/togg53192-cmd/jailbreaks,LIST OF ALL MY JAILBREAKS,,5927,869,902,2026-10-28T06:14:54
+1,JetBrains/thinkrail,https://github.com/JetBrains/thinkrail,"Vibe code with pi in a lightweight, real IDE that customises itself around the way you work — The Vibe You Need",TypeScript,4508,236,1204,2026-10-28T11:00:29
+2,elayadesign/ai-design-skills,https://github.com/elayadesign/ai-design-skills,,,10492,747,1395,2026-10-28T11:00:29
+3,obra/superpowers,https://github.com/obra/superpowers,An agentic skills framework & software development methodology that works.,Shell,306890,27314,617,2026-10-28T11:00:29
+4,HKUDS/DeepTutor,https://github.com/HKUDS/DeepTutor,DeepTutor: Lifelong Personalized Tutoring. https://deeptutor.info/.,Python,47065,5861,1598,2026-10-28T11:00:29
+5,macro-inc/macro,https://github.com/macro-inc/macro,"Macro is a unified workspace for teams: email, chat, docs, tasks, agents, calls, and CRM — @-linked together with shared AI memory.",Rust,5160,505,106,2026-10-28T11:00:29
+6,Nutlope/hallmark,https://github.com/Nutlope/hallmark,"Anti-AI-slop design skill for Claude Code, Cursor, and Codex.",CSS,39821,2081,2830,2026-10-28T11:00:29
+7,pbakaus/impeccable,https://github.com/pbakaus/impeccable,"The design vocabulary for your coding agent. Steer with polish and bolder, review with critique and audit, catch AI slop before it ships.",Rust,91240,5399,1449,2026-10-28T11:00:29
+8,makecindy/cindy,https://github.com/makecindy/cindy,Consider it done. The open-source AI agent that works out of the box · 想到，就能做到。开源、开箱即用的 AI Agent。,TypeScript,7803,921,1465,2026-10-28T11:00:29
+9,nightly-labs/openbot,https://github.com/nightly-labs/openbot,"A local-first desktop workspace for persistent AI teammates. Run Codex, Claude, and Grok with dedicated workspaces, task queues, file sharing, browser control, and agent-to-agent collaboration.",TypeScript,2861,285,777,2026-10-28T11:00:29
+10,togg53192-cmd/jailbreaks,https://github.com/togg53192-cmd/jailbreaks,LIST OF ALL MY JAILBREAKS,,6278,904,902,2026-10-28T11:00:29
+11,hmjz100/LinkSwift,https://github.com/hmjz100/LinkSwift,一个基于 JavaScript 的网盘文件下载地址获取工具。基于【网盘直链下载助手】修改 ，支持 百度网盘 / 阿里云盘 / 中国移动云盘 / 天翼云盘 / 迅雷云盘 / 夸克网盘 / UC网盘 / 123云盘 八大网盘,JavaScript,33716,2375,3209,2026-10-28T11:00:29
+12,expo/skills,https://github.com/expo/skills,A collection of AI agent skills for working with Expo projects and Expo Application Services,Shell,3338,215,212,2026-10-28T11:00:29
+13,ruvnet/RuView,https://github.com/ruvnet/RuView,"π RuView turns commodity WiFi signals into real-time spatial intelligence, vital sign monitoring, and presence detection — all without a single pixel of video.",Rust,100500,13119,415,2026-10-28T11:00:29
+14,xiaolai/the-craft-of-selfteaching,https://github.com/xiaolai/the-craft-of-selfteaching,One has no future if one couldn't teach themself.,Jupyter Notebook,18231,17860,143,2026-10-28T11:00:29
