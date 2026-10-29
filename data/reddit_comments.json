@@ -1,12 +1,7 @@
 {
  "note": "Each Reddit post's top comment, read by the Mac mini's browser job (core/top_comments.py). body '' = no usable comment yet.",
- "updated": "2026-10-29T11:43:24Z",
+ "updated": "2026-10-29T23:43:27Z",
  "posts": {
-  "1ojb0vn": {
-   "body": "It's better to both donate cash as well as food that's expiring 'soon' and replenish your pantry for those who like to keep a relatively full cupboard. Donating expired food is a dick move, though.",
-   "ups": 368,
-   "at": "2026-10-13T11:40:50Z"
-  },
   "1okr970": {
    "body": "I'm so cynical that part of me thinks this post was set up. The baby weighed 8.13 pounds? Isn't birth weight normally given in pounds and ounces?",
    "ups": null,
@@ -31,6 +26,11 @@
    "body": "Yeah, the two-day rule is a game changer. It kills the guilt loop and keeps things realistic , one missed day’s fine, just don’t make it two. Simple, doable, and super effective.",
    "ups": null,
    "at": "2026-10-21T11:42:44Z"
+  },
+  "1ol3shx": {
+   "body": "What was going on about 50 years ago that left a hole like that",
+   "ups": null,
+   "at": "2026-10-29T23:43:22Z"
   },
   "1om40wf": {
    "body": "shelter party offbeat compare yam encourage soft squash sand fade",
@@ -121,6 +121,11 @@
    "body": "This is visually appealing. The three pointer rules all now.",
    "ups": null,
    "at": "2026-10-18T23:42:44Z"
+  },
+  "1ow4sjg": {
+   "body": "If anyone missed it when it was previously announced, HSA limits are going to $4400/$8750, an increase of $100/$200 respectively. Edit: Someone asked about Healthcare FSA so I figured I'd add it here. It is going from $3300 to $3400. Also, as /u/Doorstate wrote in a reply, the child dependent care FSA is going from $5000 to $7500 ($3750 for MFS)",
+   "ups": null,
+   "at": "2026-10-29T23:42:32Z"
   },
   "1owwnyc": {
    "body": "congrats, you just saved yourself around $4.",
@@ -242,6 +247,11 @@
    "ups": null,
    "at": "2026-10-18T12:06:01Z"
   },
+  "1pak7d5": {
+   "body": "All these people trying to \"invest in their 401ks\" and \"start their own businesses\" when they could just be writing the next Christmas hit instead",
+   "ups": null,
+   "at": "2026-10-29T23:42:53Z"
+  },
   "1pbs8s4": {
    "body": "The seeing visible progress is the most underrated thing that video games do better than anything else. Most things that are good for you you’ll never see the fruits of labor (sunscreen, diet, journalling, mental health, good sleep) unless you look back, but in the now, in the present it’s invisible all the good it’s doing. For most it would make sense to not care if you don’t feel any…",
    "ups": null,
@@ -336,6 +346,11 @@
    "body": "Yes you should be filing a police report",
    "ups": 6054,
    "at": "2026-10-12T11:40:09Z"
+  },
+  "1pmxnxq": {
+   "body": "This is r/thathappened material. It's just 4chan greentext. I'm no fan of \"AI\" but this is just written to indulge whatever we already wanted to think was happening in boardrooms. It's cathartic to imagine I guess. Edit: I guess the source was more clearly satire. It definitely works for that.",
+   "ups": null,
+   "at": "2026-10-29T23:42:12Z"
   },
   "1pn0y2k": {
    "body": "Love that people are getting behind this hero and supporting him.",
@@ -577,6 +592,11 @@
    "ups": null,
    "at": "2026-10-22T11:43:15Z"
   },
+  "1qeufi3": {
+   "body": "Hello and welcome to r/LifeProTips! Please help us decide if this post is a good fit for the subreddit by upvoting or downvoting this comment. If you think that this is great advice to improve your life, please upvote. If you think this doesn't help you in any way, please downvote. If you don't care, leave it for the others to decide.",
+   "ups": null,
+   "at": "2026-10-29T23:41:54Z"
+  },
   "1qfplum": {
    "body": "Now this is a real pro tip.",
    "ups": 2897,
@@ -752,6 +772,16 @@
    "ups": null,
    "at": "2026-10-22T23:43:09Z"
   },
+  "1qvehv5": {
+   "body": "Report the dentist to the state dental licensure board.",
+   "ups": null,
+   "at": "2026-10-29T23:41:17Z"
+  },
+  "1qwg29k": {
+   "body": "I think you just found out the reason in your post. Essentials have gone through the rood simply because they're essential and people will pay regardless. Non essentials however, have had to deal with a very competitive market and lower demand due to inflation, so they've lowered margins.",
+   "ups": null,
+   "at": "2026-10-29T23:43:15Z"
+  },
   "1qwmcet": {
    "body": "Best cool guide yet.",
    "ups": null,
@@ -876,6 +906,11 @@
    "body": "Lol this is definitely also an r/PhantomBorders candidate",
    "ups": null,
    "at": "2026-10-23T11:42:59Z"
+  },
+  "1rc5q9c": {
+   "body": "Got LinkedIn to finally delete my account after I claimed to be the CEO of LinkedIn and started harrassing the CEO as a fraud. That felt good.",
+   "ups": null,
+   "at": "2026-10-29T23:41:10Z"
   },
   "1rd2zfo": {
    "body": "Being an imperial officer and ordering Vader to behave as if he's a misbehaving child makes him look like the ultimate badass in hindsight.",
@@ -1257,11 +1292,6 @@
    "ups": null,
    "at": "2026-10-28T11:43:24Z"
   },
-  "1sisb8v": {
-   "body": "The real LPT is to read your fucking company policy.",
-   "ups": 5959,
-   "at": "2026-10-11T11:39:51Z"
-  },
   "1sjc316": {
    "body": "Nature really said “annual report,” but made it impossible to fake the numbers.",
    "ups": null,
@@ -1372,10 +1402,20 @@
    "ups": null,
    "at": "2026-10-17T11:41:07Z"
   },
+  "1t4l8p8": {
+   "body": "Hello and welcome to r/LifeProTips! Please help us decide if this post is a good fit for the subreddit by upvoting or downvoting this comment. If you think that this is great advice to improve your life, please upvote. If you think this doesn't help you in any way, please downvote. If you don't care, leave it for the others to decide.",
+   "ups": null,
+   "at": "2026-10-29T23:43:18Z"
+  },
   "1t4qpqr": {
    "body": "“I can’t let you do that, Dave…”",
    "ups": null,
    "at": "2026-10-20T11:41:44Z"
+  },
+  "1t7qcie": {
+   "body": "Get one of those flappy armed guys you see at car dealerships and plug him in out there. Let her try to sort all the notifications when that is going all day. [GIF]",
+   "ups": null,
+   "at": "2026-10-29T23:41:46Z"
   },
   "1t9pjyu": {
    "body": "I refuse to eat sneakers. ETA: Thanks for the awards, fellow redditors!",
@@ -1406,6 +1446,11 @@
    "body": "Hello and welcome to r/LifeProTips! Please help us decide if this post is a good fit for the subreddit by upvoting or downvoting this comment. If you think that this is great advice to improve your life, please upvote. If you think this doesn't help you in any way, please downvote. If you don't care, leave it for the others to decide.",
    "ups": null,
    "at": "2026-10-18T11:40:13Z"
+  },
+  "1th0adg": {
+   "body": "One positive side effect is El Niño tends to suppress hurricane development in the Atlantic Basin. Not that they can’t form and be dangerous, but conditions tend to be less favorable for development.",
+   "ups": null,
+   "at": "2026-10-29T23:42:18Z"
   },
   "1tiodc5": {
    "body": "If you got it in high school, are you sure you aren't just an authorized user on the account instead of the account owner?",
@@ -1447,6 +1492,11 @@
    "ups": null,
    "at": "2026-10-27T23:43:06Z"
   },
+  "1tre8z1": {
+   "body": "Oh my god, my fourth grade teacher's obsession with having us memorize the pH's of foods when she was supposed to be teaching us environmental science has prepared me for this moment. Basically (heh) it boils down to acid tastes good to us and bases taste bad to us. If you look up the pH's of foods example, most of them range from neutral (7) to acidic (below 7), with a few being very slightly…",
+   "ups": null,
+   "at": "2026-10-29T23:42:37Z"
+  },
   "1tt6grr": {
    "body": "I mean fair enough, those six lads are about the size of 15 normal people.",
    "ups": 9004,
@@ -1461,6 +1511,11 @@
    "body": "This shouldn't even be news nor should a law need to be passed for this",
    "ups": null,
    "at": "2026-10-17T11:42:17Z"
+  },
+  "1tvri6e": {
+   "body": "Lol. We just got a directive to use fewer token after months of being told to use as many as possible",
+   "ups": null,
+   "at": "2026-10-29T23:42:59Z"
   },
   "1twu5p7": {
    "body": "So Trump invested in coal mines is what I'm hearing...",
@@ -1992,6 +2047,11 @@
    "ups": null,
    "at": "2026-10-15T23:40:42Z"
   },
+  "1w1gmr0": {
+   "body": "My dad told me about his secret girlfriend and kids this way.",
+   "ups": null,
+   "at": "2026-10-29T23:42:08Z"
+  },
   "1w2ij35": {
    "body": "This is a really concerning development to be honest. And the gap is getting wider and wider and so far we aren't even cosidering doing anything about it. I wonder what problems this will ensue in the coming decades.",
    "ups": null,
@@ -2182,80 +2242,15 @@
    "ups": 2344,
    "at": "2026-10-10T11:58:15Z"
   },
+  "1wrjran": {
+   "body": "The brain is a wonderful machine. We just get used to a lot of things when we're in an environment for while odors, noises.",
+   "ups": null,
+   "at": "2026-10-29T23:43:08Z"
+  },
   "1wt6fa5": {
    "body": "You’re not lacking motivation, you’re lacking energy, and that’s ok. Listening to your body is ok. There’s a lot of toxic messaging around that makes us think we’re supposed to push through and do all the things, but is a home cooked meal or a trip to the gym really all that healthy if you have to push your body past its limits to do it? Trust me, it’s not. My advice is, give less to your job.…",
    "ups": 532,
    "at": "2026-10-13T11:40:04Z"
-  },
-  "1wt7xn3": {
-   "body": "I love how a lot of recent rewilding succes stories boil down to either ''we dropped a few bisons'' or ''we dropped a few beavers'' in this ecologically dead piece of land. Then we just sit back and watch them create a biodiversity boom within years while we struggled to do it ourselves for decades.",
-   "ups": null,
-   "at": "2026-10-27T11:42:01Z"
-  },
-  "1wt8k43": {
-   "body": "It's pretty sad when the list is this long and I can't see my birth year still.... 😞",
-   "ups": null,
-   "at": "2026-10-25T11:41:10Z"
-  },
-  "1wt9yk9": {
-   "body": "Upvote this . Thank you. Now find a way to sift out garbage from the swamp eh? Seriously, nice work, uplifting.",
-   "ups": null,
-   "at": "2026-10-29T11:40:16Z"
-  },
-  "1wta74n": {
-   "body": "26% don’t have access to clean water",
-   "ups": null,
-   "at": "2026-10-28T11:41:53Z"
-  },
-  "1wtb22v": {
-   "body": "High yield savings account or laddered bonds or money market",
-   "ups": null,
-   "at": "2026-10-19T23:42:46Z"
-  },
-  "1wtcmx5": {
-   "body": "I'm happy that programs like this exist and that they have saved lives... But it highlights how deep our country's problems are that children are mentally and emotionally breaking to such a degree. I miss being a kid, but will children growing up now also miss being a kid one day?",
-   "ups": null,
-   "at": "2026-10-27T11:43:15Z"
-  },
-  "1wtd0wu": {
-   "body": "There’s nothing he can do. 529s are fully controlled by the owner. If you contribute to someone else’s 529, you are gifting them money. In the future, tell your dad to open his own 529 account if he wants to ensure it goes to his grandkids.",
-   "ups": null,
-   "at": "2026-10-21T23:43:12Z"
-  },
-  "1wtfy05": {
-   "body": "Oh man I had this problem once. I tried everything. I thought leaving a polite anonymous note in his mailbox would work (you should try this if you haven't), but it didn't. I knew I had a problem when I found myself looking up blueprints for a non-nuclear EMP at 3 am. Instead, I went outside, bought a 1 kg bag of nuts, and started throwing them by the fistful into his open window. I got more than…",
-   "ups": null,
-   "at": "2026-10-22T23:43:02Z"
-  },
-  "1wtgj9m": {
-   "body": "Some things in life we wish to get done with but are actually a forever thing. e.g. laundry, dishes, cooking. You're not catching up, these simply are never meant to be 'finished'. It would help to distinguish such things from others and your feeling of catching up will reduce a lot. Aiming to finish these things is the cause of a lot of misery in our life. Aim should be to remain functional.",
-   "ups": null,
-   "at": "2026-10-22T11:43:27Z"
-  },
-  "1wthf0f": {
-   "body": "Eliminate, automate, delegate. Write down your entire day step by step from waking up to going to sleep. Literally every step. Look at what you can cut, make more efficient, or outsource. Look at time shifting. What can you do when you are sleeping? Crock pot meals over night, over night oats, run laundry, dishwasher, robot vacuums / mops, etc. Schedule emails. Sometimes its best to push…",
-   "ups": null,
-   "at": "2026-10-29T11:42:22Z"
-  },
-  "1wtj18v": {
-   "body": "Imagine a 15-story tall building filled with explosive fuel falling over. It's going to explode. Frankly it's kind of incredible that the one didn't. People forget how big this thing is.",
-   "ups": 28,
-   "at": "2026-10-11T11:40:28Z"
-  },
-  "1wtjgm7": {
-   "body": "Oh wow is that actually true? I def have the dirt gene but assumed they actually taste like dirt.",
-   "ups": null,
-   "at": "2026-10-20T11:43:01Z"
-  },
-  "1wtjxk2": {
-   "body": "Of course it's hard. It's a trivia test. Doesn't matter how smart you are if you never thought to look up random trivia facts Edit: people keep popping up in the replies to be like \"it's not that hard man\", and ironically, I think that this test is showing who the dumb ones actually are. A trivia test is just memorization. \"Trivia\" literally means \"trivial facts\". You can never accurately…",
-   "ups": null,
-   "at": "2026-10-24T23:43:05Z"
-  },
-  "1wtmah1": {
-   "body": "That, for once, is beautiful and clean data.",
-   "ups": null,
-   "at": "2026-10-28T11:41:14Z"
   },
   "1wtr16m": {
    "body": "Situational thinking, both past and future. Being present in the moment has been the biggest factor in the quality of my life.",
@@ -2327,6 +2322,11 @@
    "ups": null,
    "at": "2026-10-26T11:40:34Z"
   },
+  "1wusgk8": {
+   "body": "It's not a lie if you believe it.",
+   "ups": null,
+   "at": "2026-10-29T23:41:21Z"
+  },
   "1wut1q6": {
    "body": "From the article: The American Civil Liberties Union opposed the bill saying that it would remove “the critical benefits and legal protections that marriage can provide to minors.” Planned Parenthood did not take an official stance on the bill. Can someone knowledgable put that into perspective?",
    "ups": null,
@@ -2367,6 +2367,11 @@
    "ups": null,
    "at": "2026-10-18T11:40:04Z"
   },
+  "1wvhezh": {
+   "body": "That’s a way to save your job I guess.",
+   "ups": null,
+   "at": "2026-10-29T23:42:27Z"
+  },
   "1wvn40f": {
    "body": "Interesting strategy, but I'm not going to reverse image search the guests -- can you just tell us what you found?",
    "ups": 24,
@@ -2391,11 +2396,6 @@
    "body": "Next time you see her just go into a long story about how your friend just found out her husband has been gambling massive sums of money. Include all of the massive red flags of problem gamblers in your story - \"he would get so upset when he watched sports, and he'd be on his phone half the time.\" \"She didn't realize the money was missing because he had a separate bank account he used for…",
    "ups": 264,
    "at": "2026-10-13T12:46:31Z"
-  },
-  "1wvx9il": {
-   "body": "Lower the selling price on your old house.",
-   "ups": null,
-   "at": "2026-10-27T11:40:04Z"
   },
   "1ww118z": {
    "body": "Tech companies (and all most companies really) increasingly believe that having one experienced/good employee is more productive than having several entry level employees so this checks out. The problem is that experienced employees didn't start off that way. What happens when the pipeline dries up because there are no more entry level people gaming experience? I guess we'll find out.",
@@ -2511,6 +2511,11 @@
    "body": "I hate how much cruelty is baked into the American judicial system.",
    "ups": null,
    "at": "2026-10-22T23:40:46Z"
+  },
+  "1wxpju7": {
+   "body": "No. The Social Security earnings limits, while expressed as an annual limit, are actually applied as a monthly limit of $24,600 divided by 12. SSA will send you a paper form to fill out asking you to estimate your 2027 earnings month by month. There's a good chance you will get yours in mid 2027, in which case you complete it honestly accounting for the 4 or 5 months you received a paycheck in…",
+   "ups": null,
+   "at": "2026-10-29T23:42:48Z"
   },
   "1wxsjgv": {
    "body": "Had no idea you needed a law for that. I would have just bought one and slapped it out there. Good to know.",
@@ -2677,11 +2682,6 @@
    "ups": null,
    "at": "2026-10-24T23:41:10Z"
   },
-  "1wza0ci": {
-   "body": "Yeah! Fax ain't dead! It was here before the internet, it will still be here even after AI takes over the internet!",
-   "ups": null,
-   "at": "2026-10-21T23:41:42Z"
-  },
   "1wzikak": {
    "body": "Trump unintentionally has become the biggest catalyst in EV and hybrid sales.",
    "ups": null,
@@ -2707,6 +2707,11 @@
    "ups": 22,
    "at": "2026-10-13T12:46:02Z"
   },
+  "1wzvktx": {
+   "body": "That sounds way more fun to watch but the problem is it's impossible to define and enforce. Ski instructors were banned because they technically practiced the sport professionally.",
+   "ups": null,
+   "at": "2026-10-29T23:40:08Z"
+  },
   "1wzw5z2": {
    "body": "I’m already engaged on how this story is gonna go. So this can’t be the worst possible.",
    "ups": 6352,
@@ -2731,16 +2736,6 @@
    "body": "Not unethical, but call the police and tell them that you saw them switch plates. In fact, make it your business to take photos to show the police that the plates move from car to car, and that they are expired.",
    "ups": null,
    "at": "2026-10-20T23:42:38Z"
-  },
-  "1x00llz": {
-   "body": "Genuinely fascinating bit of unique culture",
-   "ups": 52,
-   "at": "2026-10-13T11:39:37Z"
-  },
-  "1x00ouq": {
-   "body": "1902 would make this Edwardian, not Victorian. Fairly different style.",
-   "ups": null,
-   "at": "2026-10-25T23:42:20Z"
   },
   "1x01sa9": {
    "body": "Hello and welcome to r/LifeProTips! Please help us decide if this post is a good fit for the subreddit by upvoting or downvoting this comment. If you think that this is great advice to improve your life, please upvote. If you think this doesn't help you in any way, please downvote. If you don't care, leave it for the others to decide.",
@@ -3297,11 +3292,6 @@
    "ups": null,
    "at": "2026-10-25T11:43:07Z"
   },
-  "1x51gxq": {
-   "body": "People used to get bored in their houses which eventually encouraged them to go do something. Now they are entertained but lonely. It's odd that loneliness isn't as great of a motivator.",
-   "ups": null,
-   "at": "2026-10-29T11:40:12Z"
-  },
   "1x51qjc": {
    "body": "So just opening and slamming the drawer over and over is not the way?",
    "ups": null,
@@ -3341,6 +3331,11 @@
    "body": "I live in New York part-time, and have seen these horses “working”. I once saw a horse looking out of a window in what appeared to be an abandoned building in Hell’s Kitchen. The horses looked worn out and exhausted, with their tongues hanging out. It’s heartbreaking to see animals treated this way for a tourist attraction. I’m glad NYC is finally moving toward banning horse-drawn carriages. I…",
    "ups": null,
    "at": "2026-10-23T23:41:04Z"
+  },
+  "1x5c3un": {
+   "body": "Hello and welcome to r/LifeProTips! Please help us decide if this post is a good fit for the subreddit by upvoting or downvoting this comment. If you think that this is great advice to improve your life, please upvote. If you think this doesn't help you in any way, please downvote. If you don't care, leave it for the others to decide.",
+   "ups": null,
+   "at": "2026-10-29T23:43:04Z"
   },
   "1x5dl3b": {
    "body": "I’m guessing you’re not talking about USD, but if you’re saying you managed to go from 18,000 to 200,000 in a few years, then you’re doing way better than over half the people in the US. Keep doing what you’re doing. Continue integrating into Poland if you’re happy there, work to make it a permanent place for yourself so you’ve got a place to be in case you can’t go back home for a very long…",
@@ -3407,11 +3402,6 @@
    "ups": null,
    "at": "2026-10-28T11:40:49Z"
   },
-  "1x5ufkw": {
-   "body": "Dear God, all this time I've been spraying myself with fire extinguisher foam I've actually been killing myself",
-   "ups": null,
-   "at": "2026-10-21T23:40:35Z"
-  },
   "1x5v23v": {
    "body": "Most people wait until they are tired to take a break. I just break regularly throughout the day. So simple yet it made a huge difference in my afternoon energy.",
    "ups": null,
@@ -3442,11 +3432,6 @@
    "ups": null,
    "at": "2026-10-29T11:40:02Z"
   },
-  "1x6182h": {
-   "body": "Hire a lawyer. Sue the city for the right to set the playlist. Play only baby shark. Go on vacation.",
-   "ups": null,
-   "at": "2026-10-28T23:40:16Z"
-  },
   "1x651na": {
    "body": "Beanbag chairs made today are really secure. The pull/handle of the zipper is removed, and the remaining part of the zipper is clamped to the fabric with a big industrial-size staple. Getting that zipper open requires a lot of work. Aside from removing the giant staple, the remaining zipper part that can move has an automatic lock, which requires inserting a paperclip or other small object. How…",
    "ups": null,
@@ -3476,11 +3461,6 @@
    "body": "Pure elemental iron is silverish. Iron oxide, of a specific form, is red. You may be familiar with rust. That’s iron oxide. Our blood uses the iron in a molecule called hemoglobin to carry and transport oxygen around. Hence the red color.",
    "ups": null,
    "at": "2026-10-17T11:39:44Z"
-  },
-  "1x6fbu3": {
-   "body": "No fruit for France",
-   "ups": null,
-   "at": "2026-10-25T23:42:14Z"
   },
   "1x6fkkh": {
    "body": "TIL brazil has/had a six day work week",
@@ -3782,10 +3762,20 @@
    "ups": null,
    "at": "2026-10-28T11:40:40Z"
   },
+  "1x9wqge": {
+   "body": "If you need $150k a year and you only have $1.1M even with a pension, and growth for five years. I don’t think it’s realistic to retire at that age with that small of a nest egg. If you needed $50k a year I could see it, but $150k? You’re sledding uphill.",
+   "ups": null,
+   "at": "2026-10-29T23:41:06Z"
+  },
   "1x9x6gu": {
    "body": "Apparently doctors normally take it in 2 minute shifts doing chest compressions because of how tiring it is. Good work to the kid",
    "ups": null,
    "at": "2026-10-26T23:42:32Z"
+  },
+  "1x9z4li": {
+   "body": "Audiobooks have become a huge tool to increase my productivity as well. It’s so accessible and makes every task more enjoyable. I alternate between fiction and non-fiction / self help. For every “fun” book, the next is more educational. It’s been a great way to expand my philosophy and to add some joy to the mundane habits. I look forward to doing tasks and habits now that I previously dreaded…",
+   "ups": null,
+   "at": "2026-10-29T23:42:42Z"
   },
   "1x9zq49": {
    "body": "Ai slop ad",
@@ -3811,6 +3801,11 @@
    "body": "First and foremost, I think it’s important to acknowledge that you are balancing a lot on your plate between your own business, lack of connection, and supporting your family. From your post, my initial thought is that your family responsibilities are taking up a lot of your mental capacity, leaving you feeling “stuck” in your career and personal life. My suggestion is to start by focusing on…",
    "ups": null,
    "at": "2026-10-21T11:40:32Z"
+  },
+  "1xa7gjp": {
+   "body": "acquire birth control pills and add them to his protein smoothies. within days he will be an emotional wreck. he will start loosing muscle mass in weeks.",
+   "ups": null,
+   "at": "2026-10-29T23:41:36Z"
   },
   "1xa8cb7": {
    "body": "Is intense, uninterrupted focus more valuable than simply putting in more hours? I mean, yeah. Of course it is. If you're interested in this topic, read the book Deep Work by Cal Newport. He goes into it extensively. The best performers work smarter by going deeper, not necessarily by working harder or longer.",
@@ -3932,11 +3927,6 @@
    "ups": null,
    "at": "2026-10-23T11:41:46Z"
   },
-  "1xc8tch": {
-   "body": "First off you'd need specialized equipment, like low-voltage electrical stimulation devices and strict cold-chain or freeze-drying (lyophilization) protocols. Then youd have a hard time selling it. Reputable pharmaceutical companies, biotech firms, and toxinologists do not buy unverified venom from casual hobbyists or wild-caught sources. They require strict batch documentation, traceability…",
-   "ups": null,
-   "at": "2026-10-22T23:42:12Z"
-  },
   "1xccr32": {
    "body": "[image] These are filled with wet sand and weigh 50, 25, and 50 pounds, respectively. The bigger ones hold about 3 gallons. I use them for farmer's carry, suitcase carry, squats, and Romanian deadlifts.",
    "ups": null,
@@ -4047,6 +4037,11 @@
    "ups": null,
    "at": "2026-10-24T11:41:01Z"
   },
+  "1xdfnu9": {
+   "body": "Of course it's not \"wise\" financially. It's a major hamper on your own finances. That doesn't necessarily mean you shouldn't do it, but at least recognize that (1) it's not going to help them long term to the point where they won't need your support and (2) it's going to be a detriment to your own finances.",
+   "ups": null,
+   "at": "2026-10-29T23:42:01Z"
+  },
   "1xdg15s": {
    "body": "Is it really gonna matter much though? Feel like most people buy games online anyway and i doubt many parents won't allow a football game because of this",
    "ups": null,
@@ -4072,6 +4067,11 @@
    "ups": null,
    "at": "2026-10-23T23:40:37Z"
   },
+  "1xdkvu1": {
+   "body": "I'll say one thing about Stalin. Bad friend.",
+   "ups": null,
+   "at": "2026-10-29T23:41:30Z"
+  },
   "1xdnz86": {
    "body": "This does not make sense. Collection Agencies only collect after they own the debt. But the original company still had the debt. You are being lied to/scammed somewhere.",
    "ups": null,
@@ -4081,6 +4081,11 @@
    "body": "Motivation just gets you to the starting line. That’s it. You need determination and discipline to keep going. That’s why a lot of people quit, they mainly rely on getting motivated.",
    "ups": null,
    "at": "2026-10-24T11:39:57Z"
+  },
+  "1xdqer7": {
+   "body": "[GIF]",
+   "ups": null,
+   "at": "2026-10-29T23:41:50Z"
   },
   "1xdxqnu": {
    "body": "Colonel Sanders didn’t start KFC until he was 62",
@@ -4131,6 +4136,11 @@
    "body": "Gravity does not bend light; it bends the SPACE light is travelling through. It's like if gravity was curving a drag strip while dragsters are racing along it.",
    "ups": null,
    "at": "2026-10-25T23:43:17Z"
+  },
+  "1xenfd9": {
+   "body": "Rim the glass with brandy, and dip the drinking end of the straw in it as well. First sip will taste strong but have essentially no volume to absorb. The rim will give off the odour for a while so the drink will smell boozy.",
+   "ups": null,
+   "at": "2026-10-29T23:41:40Z"
   },
   "1xer1qb": {
    "body": "Fish don't have completely waterfilled bodies, they have a little balloon inside them called a \"swim bladder\".",
@@ -4202,6 +4212,11 @@
    "ups": null,
    "at": "2026-10-27T23:41:22Z"
   },
+  "1xg5c3i": {
+   "body": "Donated my kidney to my dad; not a single regret about doing it. I wouldn't care if it had only made his life better for a few months. The change in his health was noticeable and immediate and the most gratifying thing I could ever experience. 5 years later, still going strong :)",
+   "ups": null,
+   "at": "2026-10-29T23:41:01Z"
+  },
   "1xg6n34": {
    "body": "Oh That's worse, actually.",
    "ups": null,
@@ -4262,6 +4277,11 @@
    "ups": null,
    "at": "2026-10-28T23:41:21Z"
   },
+  "1xgw5nv": {
+   "body": "My wife and I merged everything after we bought a house while we were engaged. It just made more sense instead of doing the Venmo thing. What some people don't realize is that if you get divorced, you're splitting assets and money, regardless of whether it was \"your savings account\" or his. Marriage is about making two people one unit. I can see why people say wait until after you're married…",
+   "ups": null,
+   "at": "2026-10-29T23:42:22Z"
+  },
   "1xgwqiq": {
    "body": "The amount of genes and the variablility of those genes is different and they do still have birth defects but because of the sheer number of them and nature covers up for the mutations we don't see",
    "ups": null,
@@ -4271,11 +4291,6 @@
    "body": "Don't quit. Life is hard it's pain and struggle, you must keep fighting hard and get up ready for a fight. Great people aren't great because they had easy lives and an easy way forward they continue in spite of the adversity and get up after getting knocked down. Life is a perpetual state of embarrassment. Have the courage to live, stop at nothing and show people you're better than the average…",
    "ups": null,
    "at": "2026-10-28T23:42:51Z"
-  },
-  "1xh334w": {
-   "body": "Call EBSA at the DOL. this is the sort of thing they handle.",
-   "ups": null,
-   "at": "2026-10-28T23:40:22Z"
   },
   "1xh7237": {
    "body": "Sheriffs are a county police department. Often municipalities will have their own police departments but that leaves pockets outside their jurisdiction. For those mostly rural pockets the sheriff is the main law enforcement.",
@@ -4312,15 +4327,65 @@
    "ups": null,
    "at": "2026-10-29T11:40:52Z"
   },
-  "1xhpyxi": {
-   "body": "Of that 67% of republicans that approve of ICE, 98% believe Jesus Christ had the same coloring as Owen Wilson.",
-   "ups": null,
-   "at": "2026-10-29T11:42:40Z"
-  },
   "1xhsfgb": {
    "body": "I read this on a random reddit thread like this one: \"Anything worth doing is worth doing poorly\". This has become my motto in life now. I was, and still am a perfectionist, and I usually get really disappointed in myself when I know I won't be able to do something perfectly. But then I do it anyway coz it's worth it. So I cook. I exercise. I work. I still grieve when I do a bad job, but I am…",
    "ups": null,
    "at": "2026-10-28T23:43:09Z"
+  },
+  "1xhuqgg": {
+   "body": "Hello and welcome to r/LifeProTips! Please help us decide if this post is a good fit for the subreddit by upvoting or downvoting this comment. If you think that this is great advice to improve your life, please upvote. If you think this doesn't help you in any way, please downvote. If you don't care, leave it for the others to decide.",
+   "ups": null,
+   "at": "2026-10-29T23:41:25Z"
+  },
+  "1xhvd1a": {
+   "body": "Wow, that could be a game changer.",
+   "ups": null,
+   "at": "2026-10-29T23:40:56Z"
+  },
+  "1xhygmg": {
+   "body": "Imagine if every American city had a Mamdani. And every state. And every county. Americans would be so much happier and healthier. But somehow we’ve learned to accept suffering and insecurity as foundational to our existence.",
+   "ups": null,
+   "at": "2026-10-29T23:40:44Z"
+  },
+  "1xi0tqh": {
+   "body": "Hello and welcome to r/LifeProTips! Please help us decide if this post is a good fit for the subreddit by upvoting or downvoting this comment. If you think that this is great advice to improve your life, please upvote. If you think this doesn't help you in any way, please downvote. If you don't care, leave it for the others to decide.",
+   "ups": null,
+   "at": "2026-10-29T23:40:51Z"
+  },
+  "1xi1gbe": {
+   "body": "Is this a guide for somebody born seven years from now to collect their own shit for a medical test? I have never heard of this practice before.",
+   "ups": null,
+   "at": "2026-10-29T23:40:32Z"
+  },
+  "1xi5b38": {
+   "body": "This is closer to a punchline than a cool guide",
+   "ups": null,
+   "at": "2026-10-29T23:40:37Z"
+  },
+  "1xicwai": {
+   "body": "Hello and welcome to r/LifeProTips! Please help us decide if this post is a good fit for the subreddit by upvoting or downvoting this comment. If you think that this is great advice to improve your life, please upvote. If you think this doesn't help you in any way, please downvote. If you don't care, leave it for the others to decide.",
+   "ups": null,
+   "at": "2026-10-29T23:40:27Z"
+  },
+  "1xifd44": {
+   "body": "What kind of damage do they do to the ecosystem? Just eat all the food or what?",
+   "ups": null,
+   "at": "2026-10-29T23:40:18Z"
+  },
+  "1xiib8j": {
+   "body": "The world we could live in is so fucking awesome. Science for the motherfucking win.",
+   "ups": null,
+   "at": "2026-10-29T23:40:41Z"
+  },
+  "1xiic8q": {
+   "body": "Maybe I am just too cynical but I am honestly surprised that the percentage isn't higher.",
+   "ups": null,
+   "at": "2026-10-29T23:40:13Z"
+  },
+  "1xilr27": {
+   "body": "At first glance I thought the 1976 logo said White People instead of We The People",
+   "ups": null,
+   "at": "2026-10-29T23:40:23Z"
   }
  }
 }
