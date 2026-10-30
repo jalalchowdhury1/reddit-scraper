@@ -803,6 +803,13 @@ python3 core/scrape_reddit_browser.py --only LifeProTips --visible   # needs Pla
   11 Oct had no `savedAt`: `fillSavedAt()` copies Firestore's own `createTime` once (REST list
   with the anonymous ID token, `mask.fieldPaths=id`, µs cut to ms for Safari). If that fails
   (`savedAtFill = 'failed'`) such stars can still come up, labelled "From your Favorites".
+  **Love order** (30 Oct 2026, the owner's "the ones I'd love the most right on top"): the
+  Favorites tab sorts by the doc's `love` (0-100), high first; a star with no `love` yet sits on
+  top, ties newest `savedAt` (before this the order was reverse doc id, i.e. by URL). `love` is
+  written by the Mac, not this repo: `~/concierge/reader/love.py` (private, launchd
+  `com.jalal.reader-love` at :00/:30) has Claude Sonnet score every unread favorite against
+  `~/concierge/reader/taste.md` + his kept / "Podcast this" stars whenever a new star appears.
+  `love.py --all` rescores everything after a taste edit. Main sync key (`QG40SF`) only.
 - `manifest.json` + `sw.js` — PWA; network-first service worker (cache `daily-reader-v2`, only
   the fallback; a saved `/api/data` copy carries `X-Offline-Copy: 1`). Since 25 Oct 2026 the
   saved copy also answers a 5xx and an 8 s stall, and the pinned Firebase + Phosphor files are

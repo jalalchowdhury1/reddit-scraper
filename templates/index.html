@@ -1279,7 +1279,8 @@ function sourceOf(item) {
 // Items for a tab AFTER filters (mute, AM date), BEFORE read-hiding.
 function itemsFor(tab) {
     if (!allData && tab !== 'favorites') return [];
-    if (tab === 'favorites') return [...cloudFavorites].reverse();
+    // Love score first (concierge reader/love.py, Claude vs his taste); a new star (no score yet) on top, ties newest saved.
+    if (tab === 'favorites') return [...cloudFavorites].sort((a, b) => (b.love ?? 101) - (a.love ?? 101) || String(b.savedAt || '').localeCompare(String(a.savedAt || '')));
     let items = allData[tab] || [];
     if (tab === 'monthly') items = items.filter((i) => !(i.meta || '').toLowerCase().includes('r/askhistorians'));
     if (tab === 'ritholtz') items = items.filter(amIsCurrent);
