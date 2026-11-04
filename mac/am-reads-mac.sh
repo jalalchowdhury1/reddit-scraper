@@ -5,7 +5,7 @@
 # 10:00 BEFORE it starts am_reads.yml, so the GitHub run (now the backup) finds the
 # list already current. Own clone + venv in ~/.local/share/am-reads, never the
 # PyCharm copy. Install: cp mac/am-reads-mac.sh ~/.local/bin/am-reads-mac.sh
-# Last line: "AM READS MAC PUSHED <sha>", "AM READS MAC NO CHANGE" or
+# Last line: "AM READS MAC PUSHED <sha> (Extracted N articles)", "... NO CHANGE (Extracted N articles)" or
 # "AM READS MAC FAILED: <why>" (exit 1). AM_READS_* variables are for tests only.
 export PATH=/opt/homebrew/bin:/usr/bin:/bin
 BASE="${AM_READS_BASE:-$HOME/.local/share/am-reads}"
@@ -27,15 +27,20 @@ git rebase --abort >/dev/null 2>&1
   { /opt/homebrew/bin/python3 -m venv "$V" && "$V/bin/pip" install -q requests beautifulsoup4 lxml pandas; } ||
   fail "venv install"
 
-timeout 120 "$V/bin/python" core/scrape_ritholtz.py || fail "scraper exit $? (its own FAILED line is above)"
+out=$(timeout 120 "$V/bin/python" core/scrape_ritholtz.py 2>&1); rc=$?
+echo "$out"
+[ "$rc" = 0 ] || fail "scraper exit $rc (its own FAILED line is above)"
+# The fleet row greps the last line for a real parse IN THIS RUN: "(Extracted N articles)".
+n=$(echo "$out" | grep -oE 'Extracted [0-9]+ articles' | tail -1)
+[ -n "$n" ] || fail "scraper exit 0 but no 'Extracted N articles' line"
 
 git add -f data/ritholtz/
-git diff --cached --quiet && { say "NO CHANGE"; exit 0; }
+git diff --cached --quiet && { say "NO CHANGE ($n)"; exit 0; }
 git -c user.name="am-reads-mac" -c user.email="am-reads-mac@users.noreply.github.com" \
   commit -q -m "Morning AM Reads update (Mac)" || fail "git commit"
 for i in 1 2 3; do
   timeout 120 git pull -q --rebase -X theirs origin main && timeout 120 git push -q origin HEAD:main &&
-    { say "PUSHED $(git rev-parse --short HEAD)"; exit 0; }
+    { say "PUSHED $(git rev-parse --short HEAD) ($n)"; exit 0; }
   git rebase --abort >/dev/null 2>&1
   sleep 10
 done
