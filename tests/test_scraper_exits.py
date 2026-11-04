@@ -28,6 +28,9 @@ class Resp:
         self.content = body.encode()
         self.status_code = code
 
+    def json(self):
+        return json.loads(self.content)
+
     def raise_for_status(self):
         if self.status_code >= 400:
             raise requests.HTTPError(f"{self.status_code} Client Error")
@@ -98,6 +101,35 @@ def test_new_post_whose_links_all_ran_before_exits_0(monkeypatch, tmp_path, caps
 def test_real_failure_exits_1_with_one_fixed_line(monkeypatch, tmp_path, capsys, pages, why):
     code, last = run_rt(monkeypatch, tmp_path, capsys, pages)
     assert code == 1 and last.startswith("AM READS FAILED: ") and why in last, last
+    assert not (tmp_path / "data/ritholtz/articles.csv").exists()
+
+
+def api_posts(*links):
+    items = "".join(f'<li><a href="https://ex.com/{i}">WSJ</a> Title {i} : blurb {i}</li>' for i in range(3))
+    return json.dumps([{"link": l, "date_gmt": "2026-11-04T11:30:31",
+                        "content": {"rendered": f"<ul>{items}</ul>"}} for l in links])
+
+
+def test_walled_pages_fall_back_to_the_wordpress_api(monkeypatch, tmp_path, capsys):
+    """4 Nov 2026: Cloudflare walled every ritholtz.com page (403 'Just a moment') but
+    its WordPress API still answered. The list comes from the API, the run says so."""
+    post = "https://ritholtz.com/2026/11/10-wednesday-am-reads-396/"
+    pages = {rt.CATEGORY_URL: Resp(CHALLENGE, 403),
+             rt.API_URL: api_posts("https://ritholtz.com/2026/11/why-polls-fails/", post)}
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(rt.requests, "Session", lambda: Session(pages))
+    monkeypatch.setattr(rt.time, "sleep", lambda s: None)
+    assert rt.main() == 0
+    out = capsys.readouterr().out
+    assert "via WordPress API fallback" in out and "Cloudflare challenge" in out
+    csv = (tmp_path / "data/ritholtz/articles.csv").read_text()
+    assert post in csv and "2026-11-04T06:30:31-05:00" in csv
+
+
+def test_walled_pages_and_dead_api_still_exit_1_naming_both(monkeypatch, tmp_path, capsys):
+    code, last = run_rt(monkeypatch, tmp_path, capsys,
+                        {rt.CATEGORY_URL: Resp(CHALLENGE, 403), rt.API_URL: Resp("nope", 403)})
+    assert code == 1 and "Cloudflare challenge" in last and "API fallback" in last, last
     assert not (tmp_path / "data/ritholtz/articles.csv").exists()
 
 

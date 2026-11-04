@@ -316,6 +316,10 @@ ignores untracked subs anyway, but the dead files would sit in every deploy.
 Two steps: fetch `https://ritholtz.com/category/links/` → find today's `am-reads` /
 `weekend-reads` post URL (must start with `http` and contain `ritholtz.com/202`) → fetch that
 post and extract articles.
+- **WordPress API fallback (4 Nov 2026):** Cloudflare walls the HTML pages for GitHub runner IPs
+  (403 "Just a moment"). Any page failure → `api_reads_post()` reads the same post from
+  `/wp-json/wp/v2/posts` and feeds the same parser; the run logs `::warning::AM Reads via WordPress API
+  fallback`. Both dead → exit 1 naming both. Keep this path; tests in `tests/test_scraper_exits.py`.
 - Only the **first `<a>` in each `<li>`** (ignores "see also" links); skip any href containing
   `ritholtz.com`; strip leading bullets/whitespace and zero-width characters from titles;
   **hard cap of 12 items**; falls back to a link-based pass if the `<li>` pass finds nothing.

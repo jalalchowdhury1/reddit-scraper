@@ -48,6 +48,7 @@ from typing import List, Dict, Optional
 # ============================================================================
 CATEGORY_URL = "https://ritholtz.com/category/links/"
 BASE_URL = "https://ritholtz.com"
+API_URL = BASE_URL + "/wp-json/wp/v2/posts?per_page=10&_fields=link,date_gmt,content"
 SCRAPER_TIMEOUT = 30
 SCRAPER_DELAY = 1.5
 SCRAPER_USER_AGENT = "RitholtzAMReadsScraper/1.0"
@@ -276,12 +277,31 @@ def find_am_reads_url(session: requests.Session) -> str:
     raise ScrapeFailed(f"no AM/Weekend Reads post on {CATEGORY_URL}")
 
 
+def api_reads_post(session: requests.Session):
+    """Second way in (4 Nov 2026): Cloudflare walled ritholtz.com's HTML pages (403
+    "Just a moment", even from a home IP) while its WordPress API still answered.
+    Returns (post_url, html) for the newest AM/Weekend Reads post, shaped like the
+    real page (publish-time meta + entry-content div) so extract_articles parses it."""
+    print(f"  Fetching {API_URL}...")
+    try:
+        posts = fetch(session, API_URL).json()
+    except ValueError as e:
+        raise ScrapeFailed(f"{API_URL}: not JSON ({e})")
+    for p in posts:
+        link = p.get("link", "")
+        if any(k in link for k in ("am-reads", "weekend-reads")) and "ritholtz.com/202" in link:
+            print(f"    Found reading list post (API): {link}")
+            return link, (f'<meta property="article:published_time" content="{p["date_gmt"]}+00:00">'
+                          f'<div class="entry-content">{p["content"]["rendered"]}</div>')
+    raise ScrapeFailed(f"no AM/Weekend Reads post in {API_URL}")
+
+
 # ============================================================================
 # EXTRACT ARTICLES FROM AM READS POST
 # ============================================================================
 
 
-def extract_articles(post_url: str, session: requests.Session, seen_post: Dict = None) -> List[Dict]:
+def extract_articles(post_url: str, session: requests.Session, seen_post: Dict = None, html: str = None) -> List[Dict]:
     """
     Extract articles from an AM Reads post.
     
@@ -297,10 +317,11 @@ def extract_articles(post_url: str, session: requests.Session, seen_post: Dict =
             - article_id, title, url, description, pub_date, author,
             - source_post, scraped_at
     """
-    print(f"  Fetching AM Reads post: {post_url}...")
-    resp = fetch(session, post_url)
-    
-    soup = BeautifulSoup(resp.content, "html.parser")
+    if html is None:
+        print(f"  Fetching AM Reads post: {post_url}...")
+        html = fetch(session, post_url).content
+
+    soup = BeautifulSoup(html, "html.parser")
     articles = []
     seen_titles = set()
     post_date = get_post_date(soup)
@@ -572,14 +593,20 @@ def scrape_am_reads() -> List[Dict]:
     session = requests.Session()
     session.headers.update({"User-Agent": SCRAPER_USER_AGENT})
     
-    # Step 1: Find today's AM Reads post
-    post_url = find_am_reads_url(session)
-    
-    time.sleep(SCRAPER_DELAY)
-    
-    # Step 2: Extract articles from the post
+    # Step 1: Find today's AM Reads post, Step 2: extract its articles.
+    # Pages blocked or broken → same post from the WordPress API, labelled in the log.
     seen_post = {}
-    articles = extract_articles(post_url, session, seen_post)
+    try:
+        post_url = find_am_reads_url(session)
+        time.sleep(SCRAPER_DELAY)
+        articles = extract_articles(post_url, session, seen_post)
+    except ScrapeFailed as e:
+        print(f"::warning::AM Reads via WordPress API fallback (pages failed: {e})")
+        try:
+            post_url, html = api_reads_post(session)
+            articles = extract_articles(post_url, session, seen_post, html=html)
+        except ScrapeFailed as e2:
+            raise ScrapeFailed(f"{e}; API fallback: {e2}")
     meta = write_source_meta(seen_post["post_date"])
     print(f"    Source check: newest post {meta['source_newest_ts']} (checked {meta['checked_at']})")
     if not articles:
