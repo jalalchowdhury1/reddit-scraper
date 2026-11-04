@@ -320,6 +320,12 @@ post and extract articles.
   (403 "Just a moment"). Any page failure → `api_reads_post()` reads the same post from
   `/wp-json/wp/v2/posts` and feeds the same parser; the run logs `::warning::AM Reads via WordPress API
   fallback`. Both dead → exit 1 naming both. Keep this path; tests in `tests/test_scraper_exits.py`.
+- **The Mac is PRIMARY since 4 Nov 2026** (Jalal's yes): GitHub's runners are walled on the whole
+  domain. `mac/am-reads-mac.sh` (installed `~/.local/bin/am-reads-mac.sh`, own clone + venv in
+  `~/.local/share/am-reads`) scrapes + pushes, run by the morning kick before it starts am_reads.yml.
+  GitHub runs set `AM_READS_BACKUP=1`: a failure there exits 0 (`AM READS BACKUP NOT NEEDED`) only
+  while source.json `checked_at` < `MAC_FRESH_H` = 22 h (Mac's longest gap 10:00 → 07:00 = 21 h);
+  older = red. Never set AM_READS_BACKUP on the Mac, never widen 22 h without a new Mac schedule.
 - Only the **first `<a>` in each `<li>`** (ignores "see also" links); skip any href containing
   `ritholtz.com`; strip leading bullets/whitespace and zero-width characters from titles;
   **hard cap of 12 items**; falls back to a link-based pass if the `<li>` pass finds nothing.
@@ -909,6 +915,8 @@ GitHub's cron started am_reads.yml 2-4 h late (the 11:45 UTC slot ran at 15:48).
 launchd `com.jalal.daily-reader-kick` (mac/com.jalal.daily-reader-kick.plist,
 script mac/morning-kick.sh installed as ~/.local/bin/daily-reader-kick.sh) runs
 `gh workflow run` for am_reads.yml + github_trending.yml at 07:00, 08:30, 10:00 ET.
+Since 4 Nov 2026 it first runs `~/.local/bin/am-reads-mac.sh` under `lockf` (AM Reads from the
+Mac; log lines `AM READS MAC PUSHED|NO CHANGE|FAILED: <why>`). Reinstall both scripts after editing.
 Log: ~/Library/Logs/daily-reader-kick.log ("KICK OK <workflow>"). The GHA cron
 lines stay as backup. GitHub Trending's daily page can list <10 repos (8 on
 28 Sep); the scraper tops up from ?since=weekly with blank stars_today.

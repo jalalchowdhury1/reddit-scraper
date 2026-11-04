@@ -205,3 +205,35 @@ def test_am_reads_workflow_commits_then_fails_on_a_scraper_error():
     assert "set +e" in run and "ritholtz=$R" in run and "trung=$T" in run and '"$GITHUB_OUTPUT"' in run
     assert wf.index("- name: Commit if the list changed") < wf.index("- name: Fail the run if a scraper failed")
     assert "steps.scrape.outputs.failed != ''" in wf
+
+
+def mac_read(tmp_path, hours_ago):
+    from datetime import datetime, timedelta, timezone
+    at = (datetime.now(timezone.utc) - timedelta(hours=hours_ago)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    (tmp_path / "data/ritholtz").mkdir(parents=True)
+    (tmp_path / "data/ritholtz/source.json").write_text(json.dumps({"checked_at": at}))
+
+
+WALLED = {rt.CATEGORY_URL: Resp(CHALLENGE, 403), rt.API_URL: Resp(CHALLENGE, 403)}
+
+
+def test_github_backup_walled_but_mac_read_today_exits_0(monkeypatch, tmp_path, capsys):
+    """4 Nov 2026: the Mac is primary; a walled GitHub run is fine while the Mac's read is current."""
+    mac_read(tmp_path, 21)
+    monkeypatch.setenv("AM_READS_BACKUP", "1")
+    code, last = run_rt(monkeypatch, tmp_path, capsys, WALLED)
+    assert code == 0 and last.startswith("AM READS BACKUP NOT NEEDED") and "Cloudflare" in last, last
+
+
+def test_github_backup_walled_and_mac_silent_exits_1(monkeypatch, tmp_path, capsys):
+    mac_read(tmp_path, 23)
+    monkeypatch.setenv("AM_READS_BACKUP", "1")
+    code, last = run_rt(monkeypatch, tmp_path, capsys, WALLED)
+    assert code == 1 and last.startswith("AM READS FAILED: "), last
+
+
+def test_mac_run_never_excuses_itself(monkeypatch, tmp_path, capsys):
+    mac_read(tmp_path, 1)
+    monkeypatch.delenv("AM_READS_BACKUP", raising=False)
+    code, last = run_rt(monkeypatch, tmp_path, capsys, WALLED)
+    assert code == 1 and last.startswith("AM READS FAILED: "), last

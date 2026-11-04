@@ -44,7 +44,7 @@ jobs:
         timeout-minutes: 3
         run: |
           set +e
-          python core/scrape_ritholtz.py; R=$?
+          AM_READS_BACKUP=1 python core/scrape_ritholtz.py; R=$?  # Mac = primary (4 Nov)
           python core/scrape_trung.py; T=$?
           echo "scraper exits: ritholtz=$R trung=$T"
           BAD=""

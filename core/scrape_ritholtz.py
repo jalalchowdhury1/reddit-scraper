@@ -628,6 +628,24 @@ def scrape_am_reads() -> List[Dict]:
 # ============================================================================
 
 
+# GitHub runs are the BACKUP since 4 Nov 2026 (mac/am-reads-mac.sh is primary: Cloudflare
+# walls GitHub's runners). They set AM_READS_BACKUP=1. Their failure is fine only while
+# the Mac's own read is current: it checks at 07:00/08:30/10:00 ET, longest gap 21 h.
+MAC_FRESH_H = 22
+
+
+def recent_check(path: str = SOURCE_FILE, now: datetime = None) -> Optional[str]:
+    """source.json's checked_at if it is under MAC_FRESH_H old, else None."""
+    try:
+        with open(path) as f:
+            raw = json.load(f)["checked_at"]
+        at = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+    except Exception:
+        return None
+    age = (now or datetime.now(ZoneInfo("UTC"))) - at
+    return raw if age < timedelta(hours=MAC_FRESH_H) else None
+
+
 def main() -> int:
     """
     Run the complete scraper pipeline. 1 = a real failure (last line
@@ -636,6 +654,10 @@ def main() -> int:
     try:
         articles = scrape_am_reads()
     except ScrapeFailed as e:
+        checked = recent_check() if os.environ.get("AM_READS_BACKUP") else None
+        if checked:
+            print(f"AM READS BACKUP NOT NEEDED: the Mac read ritholtz.com at {checked} ({e})")
+            return 0
         print(f"AM READS FAILED: {e}")
         return 1
     save_articles(articles)

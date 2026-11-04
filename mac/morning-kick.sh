@@ -5,6 +5,9 @@
 # Log line per job: "KICK OK <workflow>" or "KICK FAILED <workflow>".
 export PATH=/opt/homebrew/bin:/usr/bin:/bin
 REPO=jalalchowdhury1/reddit-scraper
+# AM Reads itself first, from the Mac (4 Nov 2026: Cloudflare walls GitHub's runners).
+# lockf: a manual run and a scheduled one never share the clone; the lock dies with the process.
+lockf -t 0 "$HOME/.local/share/am-reads.lock" /bin/bash "$HOME/.local/bin/am-reads-mac.sh" 2>&1 | tail -3
 for wf in am_reads.yml github_trending.yml; do
   ok=0
   for i in 1 2 3; do
