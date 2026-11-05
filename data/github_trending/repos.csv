@@ -1,16 +1,16 @@
 rank,repo,url,description,language,stars,forks,stars_today,scraped_at
-1,NVIDIA/auto-ontology,https://github.com/NVIDIA/auto-ontology,"Auto Ontology is a Python framework for building semantic, graph-based reasoning layers over data. It enables deterministic query generation, better context retrieval, and more explainable AI for LLM and agent workflows.",Python,6642,521,2707,2026-11-05T15:01:27
-2,mattpocock/skills,https://github.com/mattpocock/skills,Skills for Real Engineers. Straight from my .agents directory.,Shell,314487,26347,2053,2026-11-05T15:01:27
-3,garrytan/gstack,https://github.com/garrytan/gstack,"Use Garry Tan's exact Claude Code setup: 23 opinionated tools that serve as CEO, Designer, Eng Manager, Release Manager, Doc Engineer, and QA",TypeScript,139717,20670,608,2026-11-05T15:01:27
-4,Usagi-org/ai-goofish-monitor,https://github.com/Usagi-org/ai-goofish-monitor,基于 Playwright 和AI实现的闲鱼多任务实时/定时监控与智能分析系统，配备了功能完善的后台管理UI。帮助用户从闲鱼海量商品中，找到心仪产品。,Python,17397,2932,242,2026-11-05T15:01:27
-5,D4Vinci/Scrapling,https://github.com/D4Vinci/Scrapling,"🕷️ The BEST Web Scraping framework that handles everything from a single request to a full-scale crawl! Don't be shy, join here: https://discord.gg/EMgGbDceNQ and follow here for daily tips and tricks: https://x.com/Scrapling_dev",Python,97532,10222,1661,2026-11-05T15:01:27
-6,vercel-labs/agent-desktop,https://github.com/vercel-labs/agent-desktop,Computer use CLI for AI agents,Rust,16327,1143,2173,2026-11-05T15:01:27
-7,max-sixty/worktrunk,https://github.com/max-sixty/worktrunk,"Worktrunk is a CLI for Git worktree management, designed for parallel AI agent workflows",Rust,11354,427,546,2026-11-05T15:01:27
-8,lz4/lz4,https://github.com/lz4/lz4,Extremely Fast Compression algorithm,C,12264,1631,16,2026-11-05T15:01:27
-9,google/skills,https://github.com/google/skills,Agent Skills for Google products and technologies,Python,22168,1883,199,2026-11-05T15:01:27
-10,vercel-labs/agent-browser,https://github.com/vercel-labs/agent-browser,Browser automation CLI for AI agents,Rust,45679,3138,181,2026-11-05T15:01:27
-11,scenario-labs/skills,https://github.com/scenario-labs/skills,"Get production-ready images, video, audio, and 3D from any AI agent: skills that pick the right model, price before spending, and keep characters and brands consistent through the Scenario MCP, plus expert teams that drive Blender, Maya, ZBrush, Unreal, and Unity.",Python,2824,259,674,2026-11-05T15:01:27
-12,ConardLi/garden-skills,https://github.com/ConardLi/garden-skills,"ConardLi's open-source Skills collection, featuring web design, knowledge retrieval, image generation, and more.",JavaScript,14001,1639,181,2026-11-05T15:01:27
-13,microsoft/VibeVoice,https://github.com/microsoft/VibeVoice,Open-Source Frontier Voice AI,Python,55491,6249,214,2026-11-05T15:01:27
-14,floci-io/floci,https://github.com/floci-io/floci,"Light, fluffy, and always free - The AWS Local Emulator alternative",Java,30101,3313,784,2026-11-05T15:01:27
-15,JiaFeiMiao-K-Cat/DiscImageStudio,https://github.com/JiaFeiMiao-K-Cat/DiscImageStudio,,C#,7075,251,977,2026-11-05T15:01:27
+1,NVIDIA/auto-ontology,https://github.com/NVIDIA/auto-ontology,"Auto Ontology is a Python framework for building semantic, graph-based reasoning layers over data. It enables deterministic query generation, better context retrieval, and more explainable AI for LLM and agent workflows.",Python,7058,558,2707,2026-11-05T20:14:50
+2,mattpocock/skills,https://github.com/mattpocock/skills,Skills for Real Engineers. Straight from my .agents directory.,Shell,314952,26377,2053,2026-11-05T20:14:50
+3,garrytan/gstack,https://github.com/garrytan/gstack,"Use Garry Tan's exact Claude Code setup: 23 opinionated tools that serve as CEO, Designer, Eng Manager, Release Manager, Doc Engineer, and QA",TypeScript,139849,20686,608,2026-11-05T20:14:50
+4,Usagi-org/ai-goofish-monitor,https://github.com/Usagi-org/ai-goofish-monitor,基于 Playwright 和AI实现的闲鱼多任务实时/定时监控与智能分析系统，配备了功能完善的后台管理UI。帮助用户从闲鱼海量商品中，找到心仪产品。,Python,17474,2938,242,2026-11-05T20:14:50
+5,D4Vinci/Scrapling,https://github.com/D4Vinci/Scrapling,"🕷️ The BEST Web Scraping framework that handles everything from a single request to a full-scale crawl! Don't be shy, join here: https://discord.gg/EMgGbDceNQ and follow here for daily tips and tricks: https://x.com/Scrapling_dev",Python,97801,10248,1661,2026-11-05T20:14:50
+6,vercel-labs/agent-desktop,https://github.com/vercel-labs/agent-desktop,Computer use CLI for AI agents,Rust,16643,1164,2173,2026-11-05T20:14:50
+7,max-sixty/worktrunk,https://github.com/max-sixty/worktrunk,"Worktrunk is a CLI for Git worktree management, designed for parallel AI agent workflows",Rust,11442,432,546,2026-11-05T20:14:50
+8,lz4/lz4,https://github.com/lz4/lz4,Extremely Fast Compression algorithm,C,12333,1632,16,2026-11-05T20:14:50
+9,google/skills,https://github.com/google/skills,Agent Skills for Google products and technologies,Python,22288,1887,199,2026-11-05T20:14:50
+10,vercel-labs/agent-browser,https://github.com/vercel-labs/agent-browser,Browser automation CLI for AI agents,Rust,45791,3142,181,2026-11-05T20:14:50
+11,scenario-labs/skills,https://github.com/scenario-labs/skills,"Get production-ready images, video, audio, and 3D from any AI agent: skills that pick the right model, price before spending, and keep characters and brands consistent through the Scenario MCP, plus expert teams that drive Blender, Maya, ZBrush, Unreal, and Unity.",Python,2955,264,674,2026-11-05T20:14:50
+12,ConardLi/garden-skills,https://github.com/ConardLi/garden-skills,"ConardLi's open-source Skills collection, featuring web design, knowledge retrieval, image generation, and more.",JavaScript,14070,1643,241,2026-11-05T20:14:50
+13,microsoft/VibeVoice,https://github.com/microsoft/VibeVoice,Open-Source Frontier Voice AI,Python,55739,6271,214,2026-11-05T20:14:50
+14,floci-io/floci,https://github.com/floci-io/floci,"Light, fluffy, and always free - The AWS Local Emulator alternative",Java,30295,3325,784,2026-11-05T20:14:50
+15,JiaFeiMiao-K-Cat/DiscImageStudio,https://github.com/JiaFeiMiao-K-Cat/DiscImageStudio,,C#,7189,258,977,2026-11-05T20:14:50
