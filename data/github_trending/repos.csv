@@ -1,16 +1,19 @@
 rank,repo,url,description,language,stars,forks,stars_today,scraped_at
-1,NVIDIA/auto-ontology,https://github.com/NVIDIA/auto-ontology,"Auto Ontology is a Python framework for building semantic, graph-based reasoning layers over data. It enables deterministic query generation, better context retrieval, and more explainable AI for LLM and agent workflows.",Python,7906,637,2679,2026-11-06T07:21:49
-2,mattpocock/skills,https://github.com/mattpocock/skills,Skills for Real Engineers. Straight from my .agents directory.,Shell,315751,26428,2071,2026-11-06T07:21:49
-3,garrytan/gstack,https://github.com/garrytan/gstack,"Use Garry Tan's exact Claude Code setup: 23 opinionated tools that serve as CEO, Designer, Eng Manager, Release Manager, Doc Engineer, and QA",TypeScript,140163,20707,612,2026-11-06T07:21:49
-4,Usagi-org/ai-goofish-monitor,https://github.com/Usagi-org/ai-goofish-monitor,基于 Playwright 和AI实现的闲鱼多任务实时/定时监控与智能分析系统，配备了功能完善的后台管理UI。帮助用户从闲鱼海量商品中，找到心仪产品。,Python,17943,2973,240,2026-11-06T07:21:49
-5,D4Vinci/Scrapling,https://github.com/D4Vinci/Scrapling,"🕷️ The BEST Web Scraping framework that handles everything from a single request to a full-scale crawl! Don't be shy, join here: https://discord.gg/EMgGbDceNQ and follow here for daily tips and tricks: https://x.com/Scrapling_dev",Python,98349,10301,1655,2026-11-06T07:21:49
-6,vercel-labs/agent-desktop,https://github.com/vercel-labs/agent-desktop,Computer use CLI for AI agents,Rust,17350,1234,2173,2026-11-06T07:21:49
-7,max-sixty/worktrunk,https://github.com/max-sixty/worktrunk,"Worktrunk is a CLI for Git worktree management, designed for parallel AI agent workflows",Rust,11653,446,546,2026-11-06T07:21:49
-8,lz4/lz4,https://github.com/lz4/lz4,Extremely Fast Compression algorithm,C,12471,1640,23,2026-11-06T07:21:49
-9,google/skills,https://github.com/google/skills,Agent Skills for Google products and technologies,Python,22524,1897,211,2026-11-06T07:21:49
-10,vercel-labs/agent-browser,https://github.com/vercel-labs/agent-browser,Browser automation CLI for AI agents,Rust,46101,3155,150,2026-11-06T07:21:49
-11,scenario-labs/skills,https://github.com/scenario-labs/skills,"Get production-ready images, video, audio, and 3D from any AI agent: skills that pick the right model, price before spending, and keep characters and brands consistent through the Scenario MCP, plus expert teams that drive Blender, Maya, ZBrush, Unreal, and Unity.",Python,3247,282,667,2026-11-06T07:21:49
-12,ConardLi/garden-skills,https://github.com/ConardLi/garden-skills,"ConardLi's open-source Skills collection, featuring web design, knowledge retrieval, image generation, and more.",JavaScript,14334,1658,175,2026-11-06T07:21:49
-13,microsoft/VibeVoice,https://github.com/microsoft/VibeVoice,Open-Source Frontier Voice AI,Python,56238,6334,223,2026-11-06T07:21:49
-14,floci-io/floci,https://github.com/floci-io/floci,"Light, fluffy, and always free - The AWS Local Emulator alternative",Java,30614,3339,779,2026-11-06T07:21:49
-15,JiaFeiMiao-K-Cat/DiscImageStudio,https://github.com/JiaFeiMiao-K-Cat/DiscImageStudio,,C#,7473,267,984,2026-11-06T07:21:49
+1,zed-industries/zed,https://github.com/zed-industries/zed,"Code at the speed of thought – Zed is a high-performance, multiplayer code editor from the creators of Atom and Tree-sitter.",Rust,92995,11456,292,2026-11-06T12:00:39
+2,NVIDIA/auto-ontology,https://github.com/NVIDIA/auto-ontology,"Auto Ontology is a Python framework for building semantic, graph-based reasoning layers over data. It enables deterministic query generation, better context retrieval, and more explainable AI for LLM and agent workflows.",Python,8291,665,2005,2026-11-06T12:00:39
+3,rails/rails,https://github.com/rails/rails,Ruby on Rails,Ruby,58891,23823,44,2026-11-06T12:00:39
+4,mpv-player/mpv,https://github.com/mpv-player/mpv,🎥 Command line media player,C,37756,3628,36,2026-11-06T12:00:39
+5,rust-lang/rust,https://github.com/rust-lang/rust,Empowering everyone to build reliable and efficient software.,Rust,121161,17357,186,2026-11-06T12:00:39
+6,react/react,https://github.com/react/react,The library for web and native user interfaces.,JavaScript,252035,51778,244,2026-11-06T12:00:39
+7,angular/angular,https://github.com/angular/angular,Deliver web apps with confidence 🚀,TypeScript,101142,28905,128,2026-11-06T12:00:39
+8,symfony/symfony,https://github.com/symfony/symfony,The Symfony PHP framework,PHP,31247,9938,89,2026-11-06T12:00:39
+9,prometheus/prometheus,https://github.com/prometheus/prometheus,The Prometheus monitoring system and time series database.,Go,66989,10980,140,2026-11-06T12:00:39
+10,google/skills,https://github.com/google/skills,Agent Skills for Google products and technologies,Python,22621,1904,532,2026-11-06T12:00:39
+11,microsoft/vscode,https://github.com/microsoft/vscode,Visual Studio Code,TypeScript,194781,44404,295,2026-11-06T12:00:39
+12,lz4/lz4,https://github.com/lz4/lz4,Extremely Fast Compression algorithm,C,12529,1640,313,2026-11-06T12:00:39
+13,nushell/nushell,https://github.com/nushell/nushell,A new type of shell,Rust,40799,2331,88,2026-11-06T12:00:39
+14,etcd-io/etcd,https://github.com/etcd-io/etcd,Distributed reliable key-value store for the most critical data of a distributed system,Go,52484,10573,123,2026-11-06T12:00:39
+15,openssl/openssl,https://github.com/openssl/openssl,General purpose TLS and crypto library,C,31200,11579,24,2026-11-06T12:00:39
+16,mattpocock/skills,https://github.com/mattpocock/skills,Skills for Real Engineers. Straight from my .agents directory.,Shell,316108,26447,2058,2026-11-06T12:00:39
+17,cloudflare/security-audit-skill,https://github.com/cloudflare/security-audit-skill,"A coding-agent skill for multi-phase security audits with independently verified, machine-readable findings",JavaScript,62735,4068,2524,2026-11-06T12:00:39
+18,astral-sh/ruff,https://github.com/astral-sh/ruff,"An extremely fast Python linter and code formatter, written in Rust.",Rust,50484,2597,107,2026-11-06T12:00:39
