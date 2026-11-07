@@ -1,19 +1,19 @@
 rank,repo,url,description,language,stars,forks,stars_today,scraped_at
-1,zed-industries/zed,https://github.com/zed-industries/zed,"Code at the speed of thought – Zed is a high-performance, multiplayer code editor from the creators of Atom and Tree-sitter.",Rust,93409,11483,292,2026-11-06T19:40:19
-2,NVIDIA/auto-ontology,https://github.com/NVIDIA/auto-ontology,"Auto Ontology is a Python framework for building semantic, graph-based reasoning layers over data. It enables deterministic query generation, better context retrieval, and more explainable AI for LLM and agent workflows.",Python,8776,706,2005,2026-11-06T19:40:19
-3,rails/rails,https://github.com/rails/rails,Ruby on Rails,Ruby,58958,23826,152,2026-11-06T19:40:19
-4,mpv-player/mpv,https://github.com/mpv-player/mpv,🎥 Command line media player,C,37832,3630,36,2026-11-06T19:40:19
-5,rust-lang/rust,https://github.com/rust-lang/rust,Empowering everyone to build reliable and efficient software.,Rust,121328,17359,186,2026-11-06T19:40:19
-6,react/react,https://github.com/react/react,The library for web and native user interfaces.,JavaScript,252169,51802,244,2026-11-06T19:40:19
-7,angular/angular,https://github.com/angular/angular,Deliver web apps with confidence 🚀,TypeScript,101246,28908,128,2026-11-06T19:40:19
-8,symfony/symfony,https://github.com/symfony/symfony,The Symfony PHP framework,PHP,31343,9943,89,2026-11-06T19:40:19
-9,prometheus/prometheus,https://github.com/prometheus/prometheus,The Prometheus monitoring system and time series database.,Go,67091,10980,140,2026-11-06T19:40:19
-10,google/skills,https://github.com/google/skills,Agent Skills for Google products and technologies,Python,22763,1916,532,2026-11-06T19:40:19
-11,microsoft/vscode,https://github.com/microsoft/vscode,Visual Studio Code,TypeScript,194926,44412,295,2026-11-06T19:40:19
-12,lz4/lz4,https://github.com/lz4/lz4,Extremely Fast Compression algorithm,C,12615,1643,313,2026-11-06T19:40:19
-13,nushell/nushell,https://github.com/nushell/nushell,A new type of shell,Rust,40886,2338,88,2026-11-06T19:40:19
-14,etcd-io/etcd,https://github.com/etcd-io/etcd,Distributed reliable key-value store for the most critical data of a distributed system,Go,52556,10585,123,2026-11-06T19:40:19
-15,openssl/openssl,https://github.com/openssl/openssl,General purpose TLS and crypto library,C,31250,11581,24,2026-11-06T19:40:19
-16,mattpocock/skills,https://github.com/mattpocock/skills,Skills for Real Engineers. Straight from my .agents directory.,Shell,316510,26476,2058,2026-11-06T19:40:19
-17,cloudflare/security-audit-skill,https://github.com/cloudflare/security-audit-skill,"A coding-agent skill for multi-phase security audits with independently verified, machine-readable findings",JavaScript,63584,4123,2524,2026-11-06T19:40:19
-18,astral-sh/ruff,https://github.com/astral-sh/ruff,"An extremely fast Python linter and code formatter, written in Rust.",Rust,50585,2601,107,2026-11-06T19:40:19
+1,zed-industries/zed,https://github.com/zed-industries/zed,"Code at the speed of thought – Zed is a high-performance, multiplayer code editor from the creators of Atom and Tree-sitter.",Rust,93825,11512,306,2026-11-07T06:33:45
+2,NVIDIA/auto-ontology,https://github.com/NVIDIA/auto-ontology,"Auto Ontology is a Python framework for building semantic, graph-based reasoning layers over data. It enables deterministic query generation, better context retrieval, and more explainable AI for LLM and agent workflows.",Python,9325,739,2015,2026-11-07T06:33:45
+3,rails/rails,https://github.com/rails/rails,Ruby on Rails,Ruby,59058,23833,142,2026-11-07T06:33:45
+4,mpv-player/mpv,https://github.com/mpv-player/mpv,🎥 Command line media player,C,37932,3635,37,2026-11-07T06:33:45
+5,rust-lang/rust,https://github.com/rust-lang/rust,Empowering everyone to build reliable and efficient software.,Rust,121518,17369,192,2026-11-07T06:33:45
+6,react/react,https://github.com/react/react,The library for web and native user interfaces.,JavaScript,252307,51830,248,2026-11-07T06:33:45
+7,angular/angular,https://github.com/angular/angular,Deliver web apps with confidence 🚀,TypeScript,101420,28914,135,2026-11-07T06:33:45
+8,symfony/symfony,https://github.com/symfony/symfony,The Symfony PHP framework,PHP,31478,9950,128,2026-11-07T06:33:45
+9,prometheus/prometheus,https://github.com/prometheus/prometheus,The Prometheus monitoring system and time series database.,Go,67239,10990,148,2026-11-07T06:33:45
+10,google/skills,https://github.com/google/skills,Agent Skills for Google products and technologies,Python,22950,1929,534,2026-11-07T06:33:45
+11,microsoft/vscode,https://github.com/microsoft/vscode,Visual Studio Code,TypeScript,195079,44433,301,2026-11-07T06:33:45
+12,lz4/lz4,https://github.com/lz4/lz4,Extremely Fast Compression algorithm,C,12647,1643,315,2026-11-07T06:33:45
+13,nushell/nushell,https://github.com/nushell/nushell,A new type of shell,Rust,41022,2344,131,2026-11-07T06:33:45
+14,etcd-io/etcd,https://github.com/etcd-io/etcd,Distributed reliable key-value store for the most critical data of a distributed system,Go,52642,10590,128,2026-11-07T06:33:45
+15,openssl/openssl,https://github.com/openssl/openssl,General purpose TLS and crypto library,C,31333,11583,26,2026-11-07T06:33:45
+16,mattpocock/skills,https://github.com/mattpocock/skills,Skills for Real Engineers. Straight from my .agents directory.,Shell,316928,26523,2070,2026-11-07T06:33:45
+17,cloudflare/security-audit-skill,https://github.com/cloudflare/security-audit-skill,"A coding-agent skill for multi-phase security audits with independently verified, machine-readable findings",JavaScript,64434,4176,2548,2026-11-07T06:33:45
+18,astral-sh/ruff,https://github.com/astral-sh/ruff,"An extremely fast Python linter and code formatter, written in Rust.",Rust,50755,2616,169,2026-11-07T06:33:45
