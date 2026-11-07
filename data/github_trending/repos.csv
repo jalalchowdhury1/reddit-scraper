@@ -1,16 +1,16 @@
 rank,repo,url,description,language,stars,forks,stars_today,scraped_at
-1,vercel-labs/agent-browser,https://github.com/vercel-labs/agent-browser,Browser automation CLI for AI agents,Rust,46450,3184,180,2026-11-07T13:30:31
-2,cloudflare/security-audit-skill,https://github.com/cloudflare/security-audit-skill,"A coding-agent skill for multi-phase security audits with independently verified, machine-readable findings",JavaScript,64912,4212,2088,2026-11-07T13:30:31
-3,google/skills,https://github.com/google/skills,Agent Skills for Google products and technologies,Python,23089,1939,449,2026-11-07T13:30:31
-4,mattpocock/skills,https://github.com/mattpocock/skills,Skills for Real Engineers. Straight from my .agents directory.,Shell,317233,26546,1111,2026-11-07T13:30:31
-5,anthropics/skills,https://github.com/anthropics/skills,Public repository for Agent Skills,Python,188387,22218,386,2026-11-07T13:30:31
-6,meta/astryx,https://github.com/meta/astryx,An open source design system that's fully customizable and agent ready,TypeScript,14164,1171,198,2026-11-07T13:30:31
-7,prometheus/prometheus,https://github.com/prometheus/prometheus,The Prometheus monitoring system and time series database.,Go,67308,10994,325,2026-11-07T13:30:31
-8,sherlock-project/sherlock,https://github.com/sherlock-project/sherlock,Hunt down social media accounts by username across social networks,Python,99550,11793,1761,2026-11-07T13:30:31
-9,milind-soni/OpenMausBot,https://github.com/milind-soni/OpenMausBot,Open-source Grok Bot alternative with a virtual machine that bots can use,TypeScript,16318,2313,1986,2026-11-07T13:30:31
-10,astral-sh/ruff,https://github.com/astral-sh/ruff,"An extremely fast Python linter and code formatter, written in Rust.",Rust,50830,2624,350,2026-11-07T13:30:31
-11,tailwindlabs/tailwindcss,https://github.com/tailwindlabs/tailwindcss,A utility-first CSS framework for rapid UI development.,TypeScript,98238,7091,152,2026-11-07T13:30:31
-12,mbillow/localthings,https://github.com/mbillow/localthings,"Control your Samsung appliances from Home Assistant over your home network, with no cloud account.",Python,952,102,184,2026-11-07T13:30:31
-13,zed-industries/zed,https://github.com/zed-industries/zed,"Code at the speed of thought – Zed is a high-performance, multiplayer code editor from the creators of Atom and Tree-sitter.",Rust,94069,11535,1119,2026-11-07T13:30:31
-14,ranxianglei/billion-context,https://github.com/ranxianglei/billion-context,"A context-compression plugin for month-long single sessions (billions of tokens) ,small context windows (a 100K context is enough) and token savings (5x fewer tokens) .上下文压缩插件，月级长会话会话， 兼顾小窗口(100k上下文足矣)省token(省5倍token) . billion-context is all you need",TypeScript,4431,359,185,2026-11-07T13:30:31
-15,dsx-ai-factory/nvke,https://github.com/dsx-ai-factory/nvke,NVIDIA Kubernetes Engine (NVKE). A management plane for GPU Kubernetes on bare metal.,Go,370,78,125,2026-11-07T13:30:31
+1,vercel-labs/agent-browser,https://github.com/vercel-labs/agent-browser,Browser automation CLI for AI agents,Rust,46451,3184,180,2026-11-07T13:30:59
+2,cloudflare/security-audit-skill,https://github.com/cloudflare/security-audit-skill,"A coding-agent skill for multi-phase security audits with independently verified, machine-readable findings",JavaScript,64912,4212,2088,2026-11-07T13:30:59
+3,google/skills,https://github.com/google/skills,Agent Skills for Google products and technologies,Python,23089,1939,449,2026-11-07T13:30:59
+4,mattpocock/skills,https://github.com/mattpocock/skills,Skills for Real Engineers. Straight from my .agents directory.,Shell,317234,26546,1111,2026-11-07T13:30:59
+5,anthropics/skills,https://github.com/anthropics/skills,Public repository for Agent Skills,Python,188387,22218,386,2026-11-07T13:30:59
+6,meta/astryx,https://github.com/meta/astryx,An open source design system that's fully customizable and agent ready,TypeScript,14165,1171,198,2026-11-07T13:30:59
+7,prometheus/prometheus,https://github.com/prometheus/prometheus,The Prometheus monitoring system and time series database.,Go,67308,10994,325,2026-11-07T13:30:59
+8,sherlock-project/sherlock,https://github.com/sherlock-project/sherlock,Hunt down social media accounts by username across social networks,Python,99552,11793,1761,2026-11-07T13:30:59
+9,milind-soni/OpenMausBot,https://github.com/milind-soni/OpenMausBot,Open-source Grok Bot alternative with a virtual machine that bots can use,TypeScript,16318,2313,1986,2026-11-07T13:30:59
+10,astral-sh/ruff,https://github.com/astral-sh/ruff,"An extremely fast Python linter and code formatter, written in Rust.",Rust,50830,2624,350,2026-11-07T13:30:59
+11,tailwindlabs/tailwindcss,https://github.com/tailwindlabs/tailwindcss,A utility-first CSS framework for rapid UI development.,TypeScript,98239,7091,152,2026-11-07T13:30:59
+12,mbillow/localthings,https://github.com/mbillow/localthings,"Control your Samsung appliances from Home Assistant over your home network, with no cloud account.",Python,952,102,184,2026-11-07T13:30:59
+13,zed-industries/zed,https://github.com/zed-industries/zed,"Code at the speed of thought – Zed is a high-performance, multiplayer code editor from the creators of Atom and Tree-sitter.",Rust,94069,11535,1119,2026-11-07T13:30:59
+14,ranxianglei/billion-context,https://github.com/ranxianglei/billion-context,"A context-compression plugin for month-long single sessions (billions of tokens) ,small context windows (a 100K context is enough) and token savings (5x fewer tokens) .上下文压缩插件，月级长会话会话， 兼顾小窗口(100k上下文足矣)省token(省5倍token) . billion-context is all you need",TypeScript,4431,359,185,2026-11-07T13:30:59
+15,dsx-ai-factory/nvke,https://github.com/dsx-ai-factory/nvke,NVIDIA Kubernetes Engine (NVKE). A management plane for GPU Kubernetes on bare metal.,Go,371,78,125,2026-11-07T13:30:59
