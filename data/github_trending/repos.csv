@@ -1,11 +1,12 @@
 rank,repo,url,description,language,stars,forks,stars_today,scraped_at
-1,sherlock-project/sherlock,https://github.com/sherlock-project/sherlock,Hunt down social media accounts by username across social networks,Python,104839,12218,2373.0,2026-11-09T07:08:27
-2,dsx-ai-factory/nvke,https://github.com/dsx-ai-factory/nvke,NVIDIA Kubernetes Engine (NVKE). A management plane for GPU Kubernetes on bare metal.,Go,947,113,345.0,2026-11-09T07:08:27
-3,milind-soni/OpenMausBot,https://github.com/milind-soni/OpenMausBot,Open-source Grok Bot alternative with a virtual machine that bots can use,TypeScript,18791,2588,1439.0,2026-11-09T07:08:27
-4,anthropics/claude-quickstarts,https://github.com/anthropics/claude-quickstarts,A collection of projects designed to help developers quickly get started with building deployable applications using the Claude API,Python,19605,3287,32.0,2026-11-09T07:08:27
-5,vercel-labs/agent-browser,https://github.com/vercel-labs/agent-browser,Browser automation CLI for AI agents,Rust,47905,3272,815.0,2026-11-09T07:08:27
-6,meta/astryx,https://github.com/meta/astryx,An open source design system that's fully customizable and agent ready,TypeScript,17703,1386,875.0,2026-11-09T07:08:27
-7,anthropics/skills,https://github.com/anthropics/skills,Public repository for Agent Skills,Python,189937,22377,792.0,2026-11-09T07:08:27
-8,google-deepmind/mujoco,https://github.com/google-deepmind/mujoco,Multi-Joint dynamics with Contact. A general purpose physics simulator.,C++,16584,1960,41.0,2026-11-09T07:08:27
-9,ranxianglei/billion-context,https://github.com/ranxianglei/billion-context,"A context-compression plugin for month-long single sessions (billions of tokens) ,small context windows (a 100K context is enough) and token savings (5x fewer tokens) .上下文压缩插件，月级长会话会话， 兼顾小窗口(100k上下文足矣)省token(省5倍token) . billion-context is all you need",TypeScript,5404,418,460.0,2026-11-09T07:08:27
-10,NVIDIA/auto-ontology,https://github.com/NVIDIA/auto-ontology,"Auto Ontology is a Python framework for building semantic, graph-based reasoning layers over data. It enables deterministic query generation, better context retrieval, and more explainable AI for LLM and agent workflows.",Python,10612,868,,2026-11-09T07:08:27
+1,anthropics/skills,https://github.com/anthropics/skills,Public repository for Agent Skills,Python,190143,22388,1052,2026-11-09T12:00:40
+2,meta/astryx,https://github.com/meta/astryx,An open source design system that's fully customizable and agent ready,TypeScript,18315,1422,3324,2026-11-09T12:00:40
+3,sherlock-project/sherlock,https://github.com/sherlock-project/sherlock,Hunt down social media accounts by username across social networks,Python,105890,12294,4294,2026-11-09T12:00:40
+4,google-deepmind/mujoco,https://github.com/google-deepmind/mujoco,Multi-Joint dynamics with Contact. A general purpose physics simulator.,C++,16710,1970,579,2026-11-09T12:00:40
+5,anthropics/claude-quickstarts,https://github.com/anthropics/claude-quickstarts,A collection of projects designed to help developers quickly get started with building deployable applications using the Claude API,Python,19725,3293,560,2026-11-09T12:00:40
+6,garrytan/gbrain,https://github.com/garrytan/gbrain,Garry's Opinionated OpenClaw/Hermes Agent Brain,TypeScript,31854,4743,215,2026-11-09T12:00:40
+7,vercel-labs/agent-browser,https://github.com/vercel-labs/agent-browser,Browser automation CLI for AI agents,Rust,48110,3286,914,2026-11-09T12:00:40
+8,ruvnet/RuView,https://github.com/ruvnet/RuView,"π RuView turns commodity WiFi signals into real-time spatial intelligence, vital sign monitoring, and presence detection — all without a single pixel of video.",Rust,103142,13388,203,2026-11-09T12:00:40
+9,ZhuLinsen/daily_stock_analysis,https://github.com/ZhuLinsen/daily_stock_analysis,"LLM 驱动的多市场股票智能分析系统：多源行情、实时新闻、决策看板与自动推送，支持零成本定时运行。 LLM-powered multi-market stock analysis system with multi-source market data, real-time news, decision dashboard, automated notifications, and cost-free scheduled runs.",Python,68447,56303,505,2026-11-09T12:00:40
+10,homeassistant-ai/ha-mcp,https://github.com/homeassistant-ai/ha-mcp,"Configure and automate Home Assistant with Claude, ChatGPT, and other AI assistants.",Python,5547,272,31,2026-11-09T12:00:40
+11,milind-soni/OpenMausBot,https://github.com/milind-soni/OpenMausBot,Open-source Grok Bot alternative with a virtual machine that bots can use,TypeScript,19166,2640,1589,2026-11-09T12:00:40
