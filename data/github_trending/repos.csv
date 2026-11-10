@@ -1,12 +1,12 @@
 rank,repo,url,description,language,stars,forks,stars_today,scraped_at
-1,anthropics/skills,https://github.com/anthropics/skills,Public repository for Agent Skills,Python,190864,22435,1052,2026-11-09T22:40:42
-2,meta/astryx,https://github.com/meta/astryx,An open source design system that's fully customizable and agent ready,TypeScript,19819,1507,3324,2026-11-09T22:40:42
-3,sherlock-project/sherlock,https://github.com/sherlock-project/sherlock,Hunt down social media accounts by username across social networks,Python,106896,12375,4294,2026-11-09T22:40:42
-4,google-deepmind/mujoco,https://github.com/google-deepmind/mujoco,Multi-Joint dynamics with Contact. A general purpose physics simulator.,C++,16876,1990,579,2026-11-09T22:40:42
-5,anthropics/claude-quickstarts,https://github.com/anthropics/claude-quickstarts,A collection of projects designed to help developers quickly get started with building deployable applications using the Claude API,Python,19983,3308,560,2026-11-09T22:40:42
-6,garrytan/gbrain,https://github.com/garrytan/gbrain,Garry's Opinionated OpenClaw/Hermes Agent Brain,TypeScript,32100,4761,215,2026-11-09T22:40:42
-7,vercel-labs/agent-browser,https://github.com/vercel-labs/agent-browser,Browser automation CLI for AI agents,Rust,48412,3299,914,2026-11-09T22:40:42
-8,ruvnet/RuView,https://github.com/ruvnet/RuView,"π RuView turns commodity WiFi signals into real-time spatial intelligence, vital sign monitoring, and presence detection — all without a single pixel of video.",Rust,103401,13399,245,2026-11-09T22:40:42
-9,ZhuLinsen/daily_stock_analysis,https://github.com/ZhuLinsen/daily_stock_analysis,"LLM 驱动的多市场股票智能分析系统：多源行情、实时新闻、决策看板与自动推送，支持零成本定时运行。 LLM-powered multi-market stock analysis system with multi-source market data, real-time news, decision dashboard, automated notifications, and cost-free scheduled runs.",Python,68785,56375,505,2026-11-09T22:40:42
-10,homeassistant-ai/ha-mcp,https://github.com/homeassistant-ai/ha-mcp,"Configure and automate Home Assistant with Claude, ChatGPT, and other AI assistants.",Python,5906,292,31,2026-11-09T22:40:42
-11,milind-soni/OpenMausBot,https://github.com/milind-soni/OpenMausBot,Open-source Grok Bot alternative with a virtual machine that bots can use,TypeScript,19600,2685,1589,2026-11-09T22:40:42
+1,anthropics/skills,https://github.com/anthropics/skills,Public repository for Agent Skills,Python,191456,22473,1038,2026-11-10T07:42:46
+2,meta/astryx,https://github.com/meta/astryx,An open source design system that's fully customizable and agent ready,TypeScript,20938,1584,3278,2026-11-10T07:42:46
+3,sherlock-project/sherlock,https://github.com/sherlock-project/sherlock,Hunt down social media accounts by username across social networks,Python,107816,12465,4267,2026-11-10T07:42:46
+4,google-deepmind/mujoco,https://github.com/google-deepmind/mujoco,Multi-Joint dynamics with Contact. A general purpose physics simulator.,C++,17076,2012,574,2026-11-10T07:42:46
+5,anthropics/claude-quickstarts,https://github.com/anthropics/claude-quickstarts,A collection of projects designed to help developers quickly get started with building deployable applications using the Claude API,Python,20171,3328,551,2026-11-10T07:42:46
+6,garrytan/gbrain,https://github.com/garrytan/gbrain,Garry's Opinionated OpenClaw/Hermes Agent Brain,TypeScript,32322,4781,216,2026-11-10T07:42:46
+7,vercel-labs/agent-browser,https://github.com/vercel-labs/agent-browser,Browser automation CLI for AI agents,Rust,48736,3320,916,2026-11-10T07:42:46
+8,ruvnet/RuView,https://github.com/ruvnet/RuView,"π RuView turns commodity WiFi signals into real-time spatial intelligence, vital sign monitoring, and presence detection — all without a single pixel of video.",Rust,103693,13431,172,2026-11-10T07:42:46
+9,ZhuLinsen/daily_stock_analysis,https://github.com/ZhuLinsen/daily_stock_analysis,"LLM 驱动的多市场股票智能分析系统：多源行情、实时新闻、决策看板与自动推送，支持零成本定时运行。 LLM-powered multi-market stock analysis system with multi-source market data, real-time news, decision dashboard, automated notifications, and cost-free scheduled runs.",Python,69271,56488,506,2026-11-10T07:42:46
+10,homeassistant-ai/ha-mcp,https://github.com/homeassistant-ai/ha-mcp,"Configure and automate Home Assistant with Claude, ChatGPT, and other AI assistants.",Python,6197,302,31,2026-11-10T07:42:46
+11,milind-soni/OpenMausBot,https://github.com/milind-soni/OpenMausBot,Open-source Grok Bot alternative with a virtual machine that bots can use,TypeScript,20132,2752,1587,2026-11-10T07:42:46
