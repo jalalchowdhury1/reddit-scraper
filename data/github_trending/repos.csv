@@ -1,12 +1,13 @@
 rank,repo,url,description,language,stars,forks,stars_today,scraped_at
-1,anthropics/skills,https://github.com/anthropics/skills,Public repository for Agent Skills,Python,191456,22473,1038,2026-11-10T07:42:46
-2,meta/astryx,https://github.com/meta/astryx,An open source design system that's fully customizable and agent ready,TypeScript,20938,1584,3278,2026-11-10T07:42:46
-3,sherlock-project/sherlock,https://github.com/sherlock-project/sherlock,Hunt down social media accounts by username across social networks,Python,107816,12465,4267,2026-11-10T07:42:46
-4,google-deepmind/mujoco,https://github.com/google-deepmind/mujoco,Multi-Joint dynamics with Contact. A general purpose physics simulator.,C++,17076,2012,574,2026-11-10T07:42:46
-5,anthropics/claude-quickstarts,https://github.com/anthropics/claude-quickstarts,A collection of projects designed to help developers quickly get started with building deployable applications using the Claude API,Python,20171,3328,551,2026-11-10T07:42:46
-6,garrytan/gbrain,https://github.com/garrytan/gbrain,Garry's Opinionated OpenClaw/Hermes Agent Brain,TypeScript,32322,4781,216,2026-11-10T07:42:46
-7,vercel-labs/agent-browser,https://github.com/vercel-labs/agent-browser,Browser automation CLI for AI agents,Rust,48736,3320,916,2026-11-10T07:42:46
-8,ruvnet/RuView,https://github.com/ruvnet/RuView,"π RuView turns commodity WiFi signals into real-time spatial intelligence, vital sign monitoring, and presence detection — all without a single pixel of video.",Rust,103693,13431,172,2026-11-10T07:42:46
-9,ZhuLinsen/daily_stock_analysis,https://github.com/ZhuLinsen/daily_stock_analysis,"LLM 驱动的多市场股票智能分析系统：多源行情、实时新闻、决策看板与自动推送，支持零成本定时运行。 LLM-powered multi-market stock analysis system with multi-source market data, real-time news, decision dashboard, automated notifications, and cost-free scheduled runs.",Python,69271,56488,506,2026-11-10T07:42:46
-10,homeassistant-ai/ha-mcp,https://github.com/homeassistant-ai/ha-mcp,"Configure and automate Home Assistant with Claude, ChatGPT, and other AI assistants.",Python,6197,302,31,2026-11-10T07:42:46
-11,milind-soni/OpenMausBot,https://github.com/milind-soni/OpenMausBot,Open-source Grok Bot alternative with a virtual machine that bots can use,TypeScript,20132,2752,1587,2026-11-10T07:42:46
+1,meta/astryx,https://github.com/meta/astryx,An open source design system that's fully customizable and agent ready,TypeScript,21408,1660,3111,2026-11-10T12:00:32
+2,anthropics/skills,https://github.com/anthropics/skills,Public repository for Agent Skills,Python,191754,22531,1676,2026-11-10T12:00:32
+3,addyosmani/agent-skills,https://github.com/addyosmani/agent-skills,Production-grade engineering skills for AI coding agents.,JavaScript,114785,11997,465,2026-11-10T12:00:32
+4,anthropics/claude-quickstarts,https://github.com/anthropics/claude-quickstarts,A collection of projects designed to help developers quickly get started with building deployable applications using the Claude API,Python,20251,3386,530,2026-11-10T12:00:32
+5,google-deepmind/mujoco,https://github.com/google-deepmind/mujoco,Multi-Joint dynamics with Contact. A general purpose physics simulator.,C++,17158,2068,453,2026-11-10T12:00:32
+6,we-promise/sure,https://github.com/we-promise/sure,The personal finance app for everyone (by everyone),Ruby,11411,798,184,2026-11-10T12:00:32
+7,homeassistant-ai/ha-mcp,https://github.com/homeassistant-ai/ha-mcp,"Configure and automate Home Assistant with Claude, ChatGPT, and other AI assistants.",Python,6328,348,792,2026-11-10T12:00:32
+8,vercel-labs/agent-browser,https://github.com/vercel-labs/agent-browser,Browser automation CLI for AI agents,Rust,48881,3386,775,2026-11-10T12:00:32
+9,sherlock-project/sherlock,https://github.com/sherlock-project/sherlock,Hunt down social media accounts by username across social networks,Python,108200,12539,2387,2026-11-10T12:00:32
+10,tokio-rs/topcoat,https://github.com/tokio-rs/topcoat,A batteries-included framework for building web apps,Rust,6589,236,192,2026-11-10T12:00:32
+11,ranxianglei/billion-context,https://github.com/ranxianglei/billion-context,"A context-compression plugin for month-long single sessions (billions of tokens) ,small context windows (a 100K context is enough) and token savings (5x fewer tokens) .上下文压缩插件，月级长会话会话， 兼顾小窗口(100k上下文足矣)省token(省5倍token) . billion-context is all you need",TypeScript,5950,449,374,2026-11-10T12:00:32
+12,mattpocock/skills,https://github.com/mattpocock/skills,Skills for Real Engineers. Straight from my .agents directory.,Shell,320310,26822,1223,2026-11-10T12:00:32
