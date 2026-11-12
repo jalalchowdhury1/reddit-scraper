@@ -1,11 +1,14 @@
 rank,repo,url,description,language,stars,forks,stars_today,scraped_at
-1,meta/astryx,https://github.com/meta/astryx,An open source design system that's fully customizable and agent ready,TypeScript,25589,1991,2776,2026-11-12T07:41:30
-2,ZhuLinsen/daily_stock_analysis,https://github.com/ZhuLinsen/daily_stock_analysis,"LLM 驱动的多市场股票智能分析系统：多源行情、实时新闻、决策看板与自动推送，支持零成本定时运行。 LLM-powered multi-market stock analysis system with multi-source market data, real-time news, decision dashboard, automated notifications, and cost-free scheduled runs.",Python,70746,57006,278,2026-11-12T07:41:30
-3,GoogleChrome/modern-web-guidance-src,https://github.com/GoogleChrome/modern-web-guidance-src,,TypeScript,2028,151,159,2026-11-12T07:41:30
-4,shadcn/improve,https://github.com/shadcn/improve,Use your most capable model to audit your codebase and write plans for cheaper models to execute.,,11190,454,361,2026-11-12T07:41:30
-5,addyosmani/agent-skills,https://github.com/addyosmani/agent-skills,Production-grade engineering skills for AI coding agents.,JavaScript,116176,12174,787,2026-11-12T07:41:30
-6,vercel-labs/agent-browser,https://github.com/vercel-labs/agent-browser,Browser automation CLI for AI agents,Rust,50061,3493,708,2026-11-12T07:41:30
-7,we-promise/sure,https://github.com/we-promise/sure,The personal finance app for everyone (by everyone),Ruby,13233,977,1078,2026-11-12T07:41:30
-8,homeassistant-ai/ha-mcp,https://github.com/homeassistant-ai/ha-mcp,"Configure and automate Home Assistant with Claude, ChatGPT, and other AI assistants.",Python,7554,459,645,2026-11-12T07:41:30
-9,openai/codex-security,https://github.com/openai/codex-security,"OpenAI's Codex Security CLI and TypeScript SDK for finding, validating, and fixing security vulnerabilities. npm: https://www.npmjs.com/package/@openai/codex-security",TypeScript,11948,952,52,2026-11-12T07:41:30
-10,TheAlgorithms/Java,https://github.com/TheAlgorithms/Java,All Algorithms implemented in Java,Java,67153,21519,51,2026-11-12T07:41:30
+1,GoogleChrome/modern-web-guidance-src,https://github.com/GoogleChrome/modern-web-guidance-src,,TypeScript,2206,159,159,2026-11-12T12:00:36
+2,openai/codex-security,https://github.com/openai/codex-security,"OpenAI's Codex Security CLI and TypeScript SDK for finding, validating, and fixing security vulnerabilities. npm: https://www.npmjs.com/package/@openai/codex-security",TypeScript,12057,955,52,2026-11-12T12:00:36
+3,nvm-sh/nvm,https://github.com/nvm-sh/nvm,Node Version Manager - POSIX-compliant bash script to manage multiple active node.js versions.,Shell,95921,10754,79,2026-11-12T12:00:36
+4,pookjw/HermesEnabler,https://github.com/pookjw/HermesEnabler,Enable Hermès Watch Faces on any Apple Watch devices,Objective-C,1333,127,390,2026-11-12T12:00:36
+5,we-promise/sure,https://github.com/we-promise/sure,The personal finance app for everyone (by everyone),Ruby,13448,991,1078,2026-11-12T12:00:36
+6,QwenLM/qwen-code,https://github.com/QwenLM/qwen-code,An open-source AI coding agent that lives in your terminal.,TypeScript,29543,3381,151,2026-11-12T12:00:36
+7,ashhart/TensorFold,https://github.com/ashhart/TensorFold,"LLM Inference Engine for Metal, CUDA and Vulkan.",Zig,1820,386,58,2026-11-12T12:00:36
+8,nodejs/node,https://github.com/nodejs/node,Node.js JavaScript runtime ✨🐢🚀✨,JavaScript,123493,38051,133,2026-11-12T12:00:36
+9,addyosmani/agent-skills,https://github.com/addyosmani/agent-skills,Production-grade engineering skills for AI coding agents.,JavaScript,116327,12186,787,2026-11-12T12:00:36
+10,meta/astryx,https://github.com/meta/astryx,An open source design system that's fully customizable and agent ready,TypeScript,25905,2011,2776,2026-11-12T12:00:36
+11,CopilotKit/OpenBot,https://github.com/CopilotKit/OpenBot,"Open-source AI coworkers that each get a computer of their own: a browser, files and tools, with every action decided before it happens and recorded after. Bring any AG-UI agent.",TypeScript,11210,1390,291,2026-11-12T12:00:36
+12,Alishahryar1/free-claude-code,https://github.com/Alishahryar1/free-claude-code,"Use Claude Code, Codex, Antigravity, VSCode, Pi, and OpenCode (and 6 other harnesses) for free (1.3B+ free tokens) from your terminal, app, IDE, or phone, and now from the browser with native browser sessions (multi-harness + multi-model) like OpenClaw (voice supported + ToS friendly)",Python,68852,10720,636,2026-11-12T12:00:36
+13,ggml-org/llama.cpp,https://github.com/ggml-org/llama.cpp,LLM inference in C/C++,C++,134236,25470,162,2026-11-12T12:00:36
