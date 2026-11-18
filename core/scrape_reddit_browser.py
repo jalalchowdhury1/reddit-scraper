@@ -11,7 +11,8 @@ Backups, per list, when the page fails (each one checked for real on 26 Sep 2026
   1. page  the new-Reddit page's <shreddit-post> elements (real upvotes + text)
   2. json  Reddit's own top.json, fetched with the same browser's cookies once its
            bot check is passed (real upvotes + text; without them it is 403)
-  3. rss   the top-list RSS feed through the same browser (text, no upvotes)
+  3. rss   the top-list RSS feed through the same browser (text, no upvotes).
+           OFF since 17 Nov 2026 (Reddit ended RSS): only --probe / --method rss try it
 Whatever comes back must pass list_problem() (right sub, right time window, upvotes
 present, enough posts) or it isn't saved. A profile that won't open, or that
 Reddit blocks 4 lists in a row, is swapped for a fresh throwaway one once.
@@ -64,7 +65,10 @@ COMMENTS_END_S = 17 * 60
 # A top-of-the-month list holds posts from the last ~30 days, a yearly one the last
 # ~365. Posts older than this (with slack) mean Reddit served some other list.
 MAX_AGE_DAYS = {"month": 40, "year": 400}
-METHODS = ("page", "json", "rss")
+# The run's ladder. rss left it 17 Nov 2026: Reddit ended RSS (every .rss url 404s, from
+# this Mac, a fresh profile and GitHub). via_rss stays in READERS so --probe and
+# --method rss still show whether it ever comes back.
+METHODS = ("page", "json")
 SHORT = "too short: "    # list_problem() prefix for a real list with few posts
 DEFAULT_PROFILE = Path.home() / ".local/share/reddit-browser/profile"
 UA = ("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
@@ -199,8 +203,8 @@ def list_problem(raw: list, sub: str, t: str, url: str = "", upvotes: bool = Tru
 
 def method_check_line(page_saved: int, tried: int, backups: dict) -> str:
     """Last line of a run. fleet-health's reddit-browser backups row greps
-    "METHOD CHECK: page ok · json (?:ok|FAILED) · rss ok": the page method saved at
-    least half the lists AND the rss backup just fetched a real list. json is shown
+    "METHOD CHECK: page ok · json (?:ok|FAILED)": the page method saved at least half
+    the lists (rss was graded too until Reddit ended RSS, 17 Nov 2026). json is shown
     honestly but not graded (14 Oct 2026: Reddit 403s every .json url from this Mac).
     Anything else names what broke."""
     page = "ok" if tried and page_saved * 2 >= tried else "FAILING"
@@ -558,7 +562,7 @@ async def run(profile, subs: list, visible: bool, methods=METHODS, with_comments
             # fleet board before the day it's needed.
             check_sub = subs[0]
             backups = {}
-            for m in ("json", "rss"):
+            for m in ("json",):
                 if stop == "blocked" or time.monotonic() > deadline + 120:  # stay inside the wrapper's 20 min
                     backups[m] = "not checked (Reddit blocked this run)" if stop == "blocked" else "not checked (out of time)"
                     continue
@@ -581,7 +585,7 @@ async def run(profile, subs: list, visible: bool, methods=METHODS, with_comments
 
 async def comments_step(page, subs: list, budget_s: float, max_posts: int = top_comments.MAX_PER_RUN):
     try:
-        stats = await top_comments.fetch_top_comments(page, fetch, subs=set(subs), budget_s=budget_s,
+        stats = await top_comments.fetch_top_comments(page, subs=set(subs), budget_s=budget_s,
                                                       max_posts=max_posts)
         print(top_comments.comments_line(stats))
     except Exception as e:  # never costs the lists, which are already saved
@@ -612,7 +616,7 @@ async def probe(profile, subs: list, visible: bool) -> bool:
         try:
             for sub in subs:
                 for t in ("month", "year"):
-                    for m in METHODS:
+                    for m in READERS:
                         got, problem = await try_method(page, m, sub, t)
                         raw = got["raw"] if got else []
                         ups = sum(as_int(x.get("score")) is not None for x in raw)
@@ -633,7 +637,7 @@ def main():
                     help="browser profile just for this job (keeps Reddit's cookie)")
     ap.add_argument("--fresh-profile", action="store_true", help="use a throwaway profile instead")
     ap.add_argument("--only", default="", help="comma list of subreddits (default: all)")
-    ap.add_argument("--method", choices=METHODS, help="use only this method (to test a backup)")
+    ap.add_argument("--method", choices=list(READERS), help="use only this method (to test a backup)")
     ap.add_argument("--probe", action="store_true", help="try every method, write nothing")
     ap.add_argument("--visible", action="store_true", help="show the browser window")
     ap.add_argument("--no-comments", action="store_true", help="skip the top-comment step")
@@ -643,7 +647,7 @@ def main():
     profile = None if a.fresh_profile else a.profile
     if a.probe:
         subs = [s for s in a.only.split(",") if s] or ["LifeProTips"]
-        print(f"🔎 Reddit method probe: {', '.join(subs)} x month/year x {', '.join(METHODS)}  ({utc_now_iso()})")
+        print(f"🔎 Reddit method probe: {', '.join(subs)} x month/year x {', '.join(READERS)}  ({utc_now_iso()})")
         sys.exit(0 if asyncio.run(probe(profile, subs, a.visible)) else 1)
     subs = [s for s in a.only.split(",") if s] or SUBREDDITS
     if a.comments_only:

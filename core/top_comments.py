@@ -3,13 +3,14 @@
 On TIL / ELI5 / LPT the best part is often the top comment, so the card shows it
 and you don't have to open the post. The Mac mini's browser job reads them AFTER
 it has saved the lists (core/scrape_reddit_browser.py), through the same browser
-and cookies, one post at a time at a person's pace:
+and cookies, one post at a time at a person's pace, from the post's own page:
 
-  GET https://www.reddit.com/comments/<id>/.rss?sort=top&limit=10&depth=1
+  https://www.reddit.com/comments/<id>/?sort=top   (each <shreddit-comment>)
 
-(14 Oct 2026: was the post's .json, but from 12 Oct Reddit 403s every .json url from
-this Mac, fresh profile and cache-buster included. The comments RSS still answers.
-RSS has no upvotes, so `ups` is stored as None: it was never served anyway.)
+(14 Oct 2026: was the post's .json until Reddit 403'd every .json url from this Mac;
+then the comments RSS. 17 Nov 2026 19:35: Reddit ended RSS (every .rss url 404s, from
+the Mac, a fresh profile AND GitHub), so all 33 reads failed. The page is what people
+see, so it lasts as long as the site does. `ups` stays None: never served.)
 
 Cached in data/reddit_comments.json, so each post costs ONE request, ever: a run
 only asks about posts it hasn't seen (best tier score first = the ones the site
@@ -25,7 +26,6 @@ import json
 import random
 import re
 import time
-import xml.etree.ElementTree as ET
 from datetime import datetime, timedelta, timezone
 from html.parser import HTMLParser
 from pathlib import Path
@@ -57,7 +57,7 @@ def clean_body(text: str, limit: int = MAX_CHARS) -> str:
 
 def pick_top(listing) -> dict:
     """(The .json reader, unused since 14 Oct: Reddit 403s .json from the Mac. Kept as
-    the reference for the skip rules pick_top_rss copies.)
+    the reference for the skip rules pick_top_page copies.)
     [post listing, comment listing] -> {"body", "ups"} of the first real comment
     (Reddit's top order), skipping stickied/mod/AutoModerator and deleted ones. {} if none."""
     try:
@@ -80,17 +80,16 @@ def pick_top(listing) -> dict:
     return {}
 
 
-# RSS has no stickied/distinguished flags, so a mod or bot notice (r/dataisbeautiful's
-# "Thank you for your Original Content" sticky, posted by a human mod's account) is told
-# apart by its text: links into the sub's wiki or modmail, or the usual bot footers.
+# A mod or bot notice (r/dataisbeautiful's "Thank you for your Original Content" sticky,
+# posted by a human mod's account) is told apart by the page's is-mod-distinguished
+# flag and, as a second net, by its text: links into the sub's wiki or modmail, or the usual bot footers.
 BOT_NAME = re.compile(r"bot$", re.I)   # AutoModerator is in SKIP_AUTHORS; this is the *bot accounts
 NOTICE = re.compile(r"reddit\.com/r/\w+/wiki/|href=\"/r/\w+/wiki/|/message/compose/?\?to=(/r/|%2Fr%2F)"
                     r"|i am a bot|i&#39;m a bot|i'm a bot|performed automatically", re.I)
-ATOM = {"a": "http://www.w3.org/2005/Atom"}
 
 
 class _CommentText(HTMLParser):
-    """An RSS comment's <div class="md"> HTML -> markdown-ish text clean_body() expects:
+    """A comment's body HTML -> markdown-ish text clean_body() expects:
     paragraphs/list items/line breaks become new lines, spoilers stay hidden, a bare
     image or GIF link becomes [image]/[GIF]."""
 
@@ -141,39 +140,55 @@ def html_text(html: str) -> str:
     return "".join(p.parts)
 
 
-def pick_top_rss(content: bytes) -> dict:
-    """A post's comments Atom feed (sort=top) -> {"body", "ups": None} of the first real
-    comment. Entry 0 is the post itself (t3_); after it come the comments (t1_) in
-    Reddit's top order, a stickied one first. Skips AutoModerator/*bot accounts, mod or
-    bot notices (NOTICE) and deleted/removed ones, like pick_top. {} if none.
-    Not an Atom feed at all (a challenge page) -> RuntimeError, i.e. Reddit pushing back."""
-    try:
-        root = ET.fromstring(content)
-    except ET.ParseError as e:
-        raise RuntimeError(f"not a feed ({e})")
-    if root.tag != "{%s}feed" % ATOM["a"]:
-        raise RuntimeError(f"not a feed (<{root.tag[:30]}>)")
-    for entry in root.findall("a:entry", ATOM):
-        if not entry.findtext("a:id", "", ATOM).startswith("t1_"):
-            continue                                   # the post itself
-        author = entry.findtext("a:author/a:name", "", ATOM).strip()
-        author = re.sub(r"^/?u/", "", author).lower()
+def pick_top_page(comments: list) -> dict:
+    """The post page's comments (COMMENTS_JS, Reddit's top order) -> {"body", "ups": None}
+    of the first real top-level one. Skips replies, mod-distinguished stickies,
+    AutoModerator/*bot accounts, mod or bot notices (NOTICE) and deleted/removed ones,
+    like pick_top. {} if none."""
+    for cm in comments:
+        if str(cm.get("depth", "0")) != "0" or cm.get("mod"):
+            continue
+        author = str(cm.get("author") or "").lower()
         if author in SKIP_AUTHORS or BOT_NAME.search(author):
             continue
-        html = entry.findtext("a:content", "", ATOM)
+        html = str(cm.get("html") or "")
         if NOTICE.search(html):
             continue
         body = clean_body(html_text(html))
         if not body or GONE.match(body):
             continue
-        return {"body": body, "ups": None}             # RSS has no upvotes
+        return {"body": body, "ups": None}
     return {}
 
 
-def rss_url(pid: str) -> str:
-    """The comments feed, top first. depth=1 = top-level comments only (a reply to the
-    sticky must never pass as the top comment). fetch() adds the _=<ms> cache-buster."""
-    return f"https://www.reddit.com/comments/{pid}/.rss?sort=top&limit=10&depth=1"
+def post_url(pid: str) -> str:
+    return f"https://www.reddit.com/comments/{pid}/?sort=top"
+
+
+COMMENTS_JS = """() => ({
+  post: !!document.querySelector('shreddit-post'),
+  comments: [...document.querySelectorAll('shreddit-comment')].slice(0, 30).map(c => {
+    const b = c.querySelector('[slot="comment"]');
+    return {author: c.getAttribute('author') || '', depth: c.getAttribute('depth') || '0',
+            mod: c.hasAttribute('is-mod-distinguished'), html: b ? b.innerHTML : ''};
+  })})"""
+
+
+async def read_post_page(page, pid: str) -> list:
+    """Open the post (sort=top) in the scraper's browser -> its comments for pick_top_page.
+    Not 200 -> RuntimeError("HTTP <n>"); no post on the page (a login wall or a challenge)
+    -> RuntimeError: Reddit pushing back, never cached as "no comment"."""
+    r = await page.goto(post_url(pid), wait_until="domcontentloaded", timeout=30000)
+    if r is None or r.status != 200:
+        raise RuntimeError(f"HTTP {r.status if r else 'no response'}")
+    try:
+        await page.wait_for_selector("shreddit-comment", timeout=8000)
+    except Exception:
+        pass   # no comments yet is fine; a page with no post at all is not (below)
+    got = await page.evaluate(COMMENTS_JS)
+    if not got.get("post"):
+        raise RuntimeError("not a post page (no shreddit-post)")
+    return got.get("comments") or []
 
 
 def load_cache(path: Path = COMMENTS_FILE) -> dict:
@@ -241,11 +256,11 @@ def comments_line(stats: dict) -> str:
     return line + (f" STOPPED: {stats['stopped']}" if stats.get("stopped") else "")
 
 
-async def fetch_top_comments(page, fetch, root: Path = Path("data"), subs=None,
+async def fetch_top_comments(page, read=read_post_page, root: Path = Path("data"), subs=None,
                              max_posts: int = MAX_PER_RUN, budget_s: float = BUDGET_S,
                              pace=(3000, 7000)) -> dict:
-    """Ask Reddit for the top comment of up to max_posts uncached posts. `fetch` =
-    the scraper's fetch(page, url) (browser cookies, one 429 wait). Writes the cache
+    """Ask Reddit for the top comment of up to max_posts uncached posts. `read` =
+    read_post_page (tests pass a fake). Writes the cache
     after every post, so a run killed midway keeps what it got."""
     path = root / COMMENTS_FILE.name
     cache = load_cache(path)
@@ -267,8 +282,7 @@ async def fetch_top_comments(page, fetch, root: Path = Path("data"), subs=None,
             break
         asked += 1
         try:
-            r = await fetch(page, rss_url(pid))
-            top = pick_top_rss(await r.body())
+            top = pick_top_page(await read(page, pid))
         except Exception as e:
             stats["failed"] += 1
             # A gone post (404) or a page that isn't a comment listing is THAT post's problem:

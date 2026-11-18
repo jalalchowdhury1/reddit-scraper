@@ -25,7 +25,8 @@ NOW = datetime(2026, 9, 26, 20, 0, tzinfo=timezone.utc).timestamp()
 DAY = 86400
 # The exact regex fleet-health's "reddit-browser backups" row greps for (github-notion-sync
 # fleet_health.py). 14 Oct 2026: json is a dead backup (403 from the Mac), so it isn't graded.
-FLEET_METHODS_RE = r"METHOD CHECK: page ok · json (?:ok|FAILED) · rss ok"
+FLEET_METHODS_RE = r"METHOD CHECK: page ok · json (?:ok|FAILED)  \("   # rss left 17 Nov 2026 (Reddit ended RSS)
+WITH_RSS = ("page", "json", "rss")   # --method rss / --probe still reach it
 
 
 def post(i, sub="LifeProTips", score="100", age_days=3, **kw):
@@ -191,7 +192,7 @@ def test_blocked_page_falls_back_to_json_with_real_upvotes(monkeypatch):
 def test_layout_change_falls_back_past_json_to_rss(monkeypatch):
     calls = ladder(monkeypatch, page=(fresh(50, score=""), True, False), json=RuntimeError("HTTP 403"),
                    rss=(fresh(50, score=""), False, False))
-    r, _ = run_one()
+    r, _ = run_one(WITH_RSS)
     assert r["method"] == "rss" and r["rows"][0]["upvotes"] == ""         # the site shows the rank instead
     assert calls == ["page", "page", "json", "rss"]
     assert "show upvotes" in r["tries"][0] and r["tries"][1] == "json: RuntimeError: HTTP 403"
@@ -206,7 +207,7 @@ def test_short_real_list_is_saved_via_json_without_retrying_the_page(monkeypatch
 
 def test_everything_fails_keeps_the_old_file_and_says_why(monkeypatch):
     ladder(monkeypatch, page=([], True, False), json=RuntimeError("HTTP 403"), rss=RuntimeError("HTTP 429"))
-    r, _ = run_one()
+    r, _ = run_one(WITH_RSS)
     assert r["method"] is None and r["rows"] == [] and not r["reached"] and r["page_blocked"]
     assert r["tries"] == ["page: no posts", "json: RuntimeError: HTTP 403", "rss: RuntimeError: HTTP 429"]
 
@@ -228,13 +229,13 @@ def test_a_short_rss_list_alone_is_not_trusted(monkeypatch):
     # 3 entries could be a broken feed; saving it would wipe a 50-post file and
     # stamp the list fresh, so GitHub's backup would leave it alone for 36 h.
     ladder(monkeypatch, page=([], True, False), json=RuntimeError("HTTP 403"), rss=(fresh(3, score=""), False, True))
-    r, _ = run_one()
+    r, _ = run_one(WITH_RSS)
     assert r["method"] is None and r["tries"][-1] == "rss: too short: 3 posts"
 
 
 def test_a_short_rss_list_is_trusted_once_the_page_saw_it_short(monkeypatch):
     ladder(monkeypatch, page=(fresh(3), True, False), json=RuntimeError("HTTP 403"), rss=(fresh(3, score=""), False, True))
-    r, _ = run_one()
+    r, _ = run_one(WITH_RSS)
     assert r["method"] == "rss" and len(r["rows"]) == 3
 
 
@@ -334,7 +335,7 @@ def test_a_page_layout_change_still_leaves_time_for_json_on_every_list(monkeypat
     out, calls, sessions = fake_run(monkeypatch, lambda sub, t, n: outcome("json", True), list("abcdef"))
     assert sessions == [Path("profile"), None]                          # one fresh-profile switch
     assert [c[2] for c in calls[:4]] == [True, True, False, False]      # page retry dropped after 2 misses
-    assert calls[7][1] == rb.METHODS and calls[8][1] == ("json", "rss")  # page skipped once fresh failed too
+    assert calls[7][1] == rb.METHODS and calls[8][1] == ("json",)  # page skipped once fresh failed too
     assert len(calls) == 12 and set(out["via"].values()) == {"json"} and out["failed"] == []
 
 
@@ -356,22 +357,22 @@ def test_the_deadline_is_announced_once(monkeypatch, capsys):
 
 # ---------- the canary line fleet-health reads ----------
 
-def test_method_check_line_is_green_only_when_every_method_works():
-    assert re.search(FLEET_METHODS_RE, method_check_line(26, 26, {"json": "", "rss": ""}))
-    assert re.search(FLEET_METHODS_RE, method_check_line(13, 26, {"json": "", "rss": ""}))
-    line = method_check_line(12, 26, {"json": "", "rss": ""})
+def test_method_check_line_is_green_only_when_the_page_works():
+    assert re.search(FLEET_METHODS_RE, method_check_line(26, 26, {"json": ""}))
+    assert re.search(FLEET_METHODS_RE, method_check_line(13, 26, {"json": ""}))
+    line = method_check_line(12, 26, {"json": ""})
     assert not re.search(FLEET_METHODS_RE, line) and "page FAILING" in line
     # json is retired: its 403 stays green on the fleet row but is still printed honestly.
-    line = method_check_line(26, 26, {"json": "RuntimeError: HTTP 403", "rss": ""})
+    line = method_check_line(26, 26, {"json": "RuntimeError: HTTP 403"})
     assert re.search(FLEET_METHODS_RE, line) and "json FAILED" in line and "HTTP 403" in line
-    line = method_check_line(26, 26, {"json": "not checked (out of time)", "rss": ""})
+    line = method_check_line(26, 26, {"json": "not checked (out of time)"})
     assert re.search(FLEET_METHODS_RE, line) and "json FAILED" in line
-    # rss is the live backup: it failing is red, whatever json does.
-    for js in ("", "RuntimeError: HTTP 403"):
-        line = method_check_line(26, 26, {"json": js, "rss": "RuntimeError: HTTP 403"})
-        assert not re.search(FLEET_METHODS_RE, line) and "rss FAILED" in line
-    assert not re.search(FLEET_METHODS_RE, method_check_line(12, 26, {"json": "x", "rss": ""}))
-    assert not re.search(FLEET_METHODS_RE, method_check_line(0, 0, {"json": "", "rss": ""}))
+    assert not re.search(FLEET_METHODS_RE, method_check_line(12, 26, {"json": "x"}))
+    assert not re.search(FLEET_METHODS_RE, method_check_line(0, 0, {"json": ""}))
+    # 17 Nov 2026 replay: Reddit ended RSS. The run no longer checks it, so the line has no rss part.
+    assert method_check_line(24, 24, {"json": "RuntimeError: HTTP 403"}) == \
+        "METHOD CHECK: page ok · json FAILED  (page saved 24 of 24 lists; json: RuntimeError: HTTP 403)"
+    assert "rss" not in rb.METHODS
 
 
 # ---------- GitHub's backup: small batches, stalest first, then move on ----------

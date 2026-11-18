@@ -100,6 +100,8 @@ owner. Don't suggest it again.**
 | 4 | a fresh throwaway profile | Mac | retries 1-3 | a profile that won't open, or one Reddit blocks (4 page misses in a row) |
 | 5 | GitHub RSS (`reddit_backup.yml`) | GitHub | text, no upvotes | the Mac down, or its IP blocked, for 36 h+ |
 
+**17 Nov 2026: Reddit ended RSS** (every `.rss` url 404s: this Mac, a fresh profile AND GitHub). Jalal OK'd dropping it: rungs 3 and 5 are OFF (`METHODS = ("page", "json")`; `reddit_backup.yml` disabled, its fleet row retired), so the ladder is page → json → fresh profile. `--probe` / `--method rss` still try rss, to see if it ever comes back. Top comments read each post's page (`top_comments.read_post_page`), not RSS. Never point anything at a `.rss` url again without a probe showing it answers.
+
 Rungs 1-3 share the Mac's IP: they fix page/layout trouble, not an IP block (a burst of test runs
 on 26 Sep got JSON 403 and RSS 429 for a while). Rung 5 is on another IP for that case.
 `old.reddit.com` is no longer a rung: it sends logged-out visitors to a login page (and 403s

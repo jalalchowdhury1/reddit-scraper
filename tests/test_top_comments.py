@@ -25,27 +25,24 @@ def listing(*comments):
             {"kind": "Listing", "data": {"children": list(comments)}}]
 
 
-FIXTURE = Path(__file__).resolve().parent / "fixtures" / "comments_1x41kxe.rss"
+FIXTURE = Path(__file__).resolve().parent / "fixtures" / "comments_page_1x9aonz.json"
 
 
-def feed(*comments, post=True):
-    """A post's comments Atom feed the way Reddit serves it: entry 0 = the post (t3_),
-    then each comment (t1_) as escaped HTML in <div class="md">. comments = body html
-    strings or (author, html) pairs."""
-    from xml.sax.saxutils import escape
-    entries = []
-    if post:
-        entries.append('<entry><author><name>/u/op</name></author><content type="html">'
-                       + escape('<table><tr><td>the post</td></tr></table>') + '</content><id>t3_p</id></entry>')
-    for i, cm in enumerate(comments):
+def items(*comments):
+    """A post page's comments the way COMMENTS_JS returns them, top order. comments =
+    body html strings, (author, html) pairs, or dicts of extra fields (depth, mod)."""
+    from html import escape
+    out = []
+    for cm in comments:
+        extra = {}
+        if isinstance(cm, dict):
+            extra, cm = cm, cm.pop("html")
         author, html = cm if isinstance(cm, tuple) else ("someone", cm)
         if not html.startswith("<"):
-            html = f"<p>{escape(html)}</p>"
-        entries.append(f'<entry><author><name>/u/{author}</name></author><content type="html">'
-                       + escape(f'<!-- SC_OFF --><div class="md">{html}</div><!-- SC_ON -->')
-                       + f'</content><id>t1_c{i}</id></entry>')
-    return ('<?xml version="1.0" encoding="UTF-8"?><feed xmlns="http://www.w3.org/2005/Atom">'
-            + "".join(entries) + "</feed>").encode()
+            html = f"<p>{escape(html, quote=False)}</p>"
+        out.append({"author": author, "depth": "0", "mod": False,
+                    "html": f'<div id="t1_x-post-rtjson-content">{html}</div>', **extra})
+    return out
 
 
 def c(body, ups=10, **extra):
@@ -108,17 +105,6 @@ class FakePage:
         pass
 
 
-class Resp:
-    def __init__(self, data):
-        self.data = data
-
-    async def json(self):
-        return self.data
-
-    async def body(self):
-        return self.data
-
-
 def run(coro):
     return asyncio.run(coro)
 
@@ -128,15 +114,15 @@ def test_fetch_loop_caches_limits_prunes_and_stops_on_failures(tmp_path):
     tc.save_cache({"gone": {"body": "left every list", "at": "2026-10-01T00:00:00Z"}}, tmp_path / "reddit_comments.json")
     asked = []
 
-    async def fetch(page, url):
-        asked.append(url)
-        return Resp(feed(f"comment for {url.split('/comments/')[1][:2]}"))
+    async def fetch(page, pid):
+        asked.append(pid)
+        return items(f"comment for {pid}")
 
     stats = run(tc.fetch_top_comments(FakePage(), fetch, root=tmp_path, max_posts=3, pace=(0, 0)))
     cache = tc.load_cache(tmp_path / "reddit_comments.json")
     assert stats["new"] == 3 and stats["left"] == 2 and len(asked) == 3
-    assert "gone" not in cache and cache["p0"]["body"] == "comment for p0" and cache["p0"]["ups"] is None   # RSS: no upvotes
-    assert asked[0] == "https://www.reddit.com/comments/p0/.rss?sort=top&limit=10&depth=1"   # fetch() adds _=<ms>
+    assert "gone" not in cache and cache["p0"]["body"] == "comment for p0" and cache["p0"]["ups"] is None   # never served
+    assert asked[0] == "p0" and tc.post_url("p0") == "https://www.reddit.com/comments/p0/?sort=top"
     # Next run asks only the two it hasn't seen.
     asked.clear()
     run(tc.fetch_top_comments(FakePage(), fetch, root=tmp_path, pace=(0, 0)))
@@ -146,8 +132,8 @@ def test_fetch_loop_caches_limits_prunes_and_stops_on_failures(tmp_path):
     write_list(posts("LifeProTips", "q", 6), "r_LifeProTips_yearly", root=tmp_path)
     calls = []
 
-    async def blocked(page, url):
-        calls.append(url)
+    async def blocked(page, pid):
+        calls.append(pid)
         raise RuntimeError("HTTP 403")
 
     stats = run(tc.fetch_top_comments(FakePage(), blocked, root=tmp_path, pace=(0, 0)))
@@ -159,8 +145,8 @@ def test_fetch_loop_caches_limits_prunes_and_stops_on_failures(tmp_path):
 def test_fetch_loop_time_budget(tmp_path):
     write_list(posts("LifeProTips", "t", 4), "r_LifeProTips", root=tmp_path)
 
-    async def fetch(page, url):
-        return Resp(feed("x"))
+    async def fetch(page, pid):
+        return items("x")
 
     stats = run(tc.fetch_top_comments(FakePage(), fetch, root=tmp_path, budget_s=-1, pace=(0, 0)))
     assert stats["new"] == 0 and stats["stopped"] == "time budget"
@@ -169,8 +155,8 @@ def test_fetch_loop_time_budget(tmp_path):
 def test_no_comment_is_cached_empty(tmp_path):
     write_list(posts("LifeProTips", "e", 1), "r_LifeProTips", root=tmp_path)
 
-    async def fetch(page, url):
-        return Resp(feed("[deleted]"))
+    async def fetch(page, pid):
+        return items("[deleted]")
 
     stats = run(tc.fetch_top_comments(FakePage(), fetch, root=tmp_path, pace=(0, 0)))
     assert stats["empty"] == 1 and tc.load_cache(tmp_path / "reddit_comments.json")["e0"]["body"] == ""
@@ -218,8 +204,8 @@ def test_an_only_run_keeps_other_subs_comments(tmp_path):
     write_list(posts("todayilearned", "z", 2), "r_todayilearned", root=tmp_path)
     tc.save_cache({"z0": {"body": "keep me", "at": "2026-10-01T00:00:00Z"}}, tmp_path / "reddit_comments.json")
 
-    async def fetch(page, url):
-        return Resp(feed("x"))
+    async def fetch(page, pid):
+        return items("x")
 
     run(tc.fetch_top_comments(FakePage(), fetch, root=tmp_path, subs={"lifeprotips"}, pace=(0, 0)))   # typo: no such folder
     run(tc.fetch_top_comments(FakePage(), fetch, root=tmp_path, subs={"LifeProTips"}, pace=(0, 0)))
@@ -231,14 +217,14 @@ def test_pushback_is_never_cached(tmp_path):
     write_list(posts("LifeProTips", "h", 6), "r_LifeProTips", root=tmp_path)
     asked = []
 
-    async def slow_down(page, url):
+    async def slow_down(page, pid):
         raise RuntimeError("HTTP 429")
 
     stats = run(tc.fetch_top_comments(FakePage(), slow_down, root=tmp_path, pace=(0, 0)))
     assert stats["failed"] == 3 and stats["stopped"] and tc.load_cache(tmp_path / "reddit_comments.json") == {}
 
-    async def fine(page, url):
-        asked.append(url.split("/comments/")[1][:2]); return Resp(feed("ok"))
+    async def fine(page, pid):
+        asked.append(pid); return items("ok")
 
     run(tc.fetch_top_comments(FakePage(), fine, root=tmp_path, pace=(0, 0)))
     assert asked[:3] == ["h0", "h1", "h2"]
@@ -254,11 +240,11 @@ def test_failures_are_cached_and_404s_dont_stop_the_step(tmp_path):
     write_list(posts("LifeProTips", "g", 5), "r_LifeProTips", root=tmp_path)
     asked = []
 
-    async def fetch(page, url):
-        asked.append(url)
+    async def fetch(page, pid):
+        asked.append(pid)
         if len(asked) <= 3:
             raise RuntimeError("HTTP 404")
-        return Resp(feed("fine"))
+        return items("fine")
 
     stats = run(tc.fetch_top_comments(FakePage(), fetch, root=tmp_path, pace=(0, 0)))
     assert stats["failed"] == 3 and stats["new"] == 2 and not stats["stopped"]
@@ -269,21 +255,23 @@ def test_failures_are_cached_and_404s_dont_stop_the_step(tmp_path):
     assert asked == []   # misses wait EMPTY_RETRY_DAYS like empties
 
 
-# ---------- comments RSS (14 Oct 2026: Reddit 403s every .json url from the Mac) ----------
+# ---------- the post page (17 Nov 2026: Reddit ended RSS, every .rss url 404s) ----------
 
-def test_rss_real_feed_skips_post_and_mod_sticky():
-    """Real reply saved 14 Oct: [0] the post, [1] r/dataisbeautiful's rule-3 sticky from a
-    mod's own account (no sticky flag in RSS), [2] the real top comment = the cached body."""
-    got = tc.pick_top_rss(FIXTURE.read_bytes())
-    assert got == {"body": "So it’s like 90% sports, holidays, deceased people and wars", "ups": None}
+def test_page_real_reply_skips_mod_sticky_and_replies():
+    """Real COMMENTS_JS reply saved 17 Nov (trimmed): [0] r/dataisbeautiful's OC sticky from
+    a mod's account (is-mod-distinguished), [1] the real top comment, [2] a reply to it."""
+    got = tc.pick_top_page(json.loads(FIXTURE.read_text())["comments"])
+    assert got["ups"] is None and got["body"].startswith("I doubt it's possible to do that fairly")
 
 
-def test_rss_skips_bots_notices_and_deleted():
-    got = tc.pick_top_rss(feed(
+def test_page_skips_bots_notices_replies_and_deleted():
+    got = tc.pick_top_page(items(
+        {"html": "pinned rules", "mod": True},
         ("AutoModerator", "Please read the rules"),
         ("SomeHelperBot", "beep"),
         ("a_mod", '<p>Your post broke <a href="/r/LifeProTips/wiki/rules">rule 2</a></p>'),
         ("a_mod", "<p>I am a bot, and this action was performed automatically.</p>"),
+        {"html": "a reply, not top-level", "depth": "1"},
         ("[deleted]", "[deleted]"),
         "[removed]",
         "[ Removed by Reddit ]",
@@ -292,30 +280,49 @@ def test_rss_skips_bots_notices_and_deleted():
     assert got == {"body": "The real answer, see this.", "ups": None}
 
 
-def test_rss_html_spoilers_media_quotes_and_cut():
+def test_page_html_spoilers_media_quotes_and_cut():
     html = ('<blockquote><p>quoted</p></blockquote><p>a <span class="md-spoiler-text">Snape <em>kills</em> '
             'him</span> b</p><ul><li>one</li><li>two &amp; three</li></ul>'
             '<p><a href="https://preview.redd.it/x.gif?w=1">https://preview.redd.it/x.gif?w=1</a> '
             '<a href="https://i.redd.it/y.png">https://i.redd.it/y.png</a></p>')
-    assert tc.pick_top_rss(feed(html))["body"] == "quoted a [spoiler] b one two & three [GIF] [image]"
-    long = tc.pick_top_rss(feed("word " * 200))["body"]
+    assert tc.pick_top_page(items(html))["body"] == "quoted a [spoiler] b one two & three [GIF] [image]"
+    long = tc.pick_top_page(items("word " * 200))["body"]
     assert len(long) <= tc.MAX_CHARS + 1 and long.endswith("…")
+    assert tc.pick_top_page([]) == {} and tc.pick_top_page(items("[deleted]")) == {}
 
 
-def test_rss_empty_and_not_a_feed():
-    assert tc.pick_top_rss(feed()) == {}                      # post, no comments yet
-    assert tc.pick_top_rss(feed("[deleted]")) == {}
-    for junk in (b"<html><body>blocked</body></html>", b"{not xml", b""):
-        with pytest.raises(RuntimeError):                     # a challenge page = pushback, never cached
-            tc.pick_top_rss(junk)
+class NavPage(FakePage):
+    """A browser page for read_post_page: goto() answers `status`, the page holds `got`."""
+    def __init__(self, status, got):
+        self.status, self.got, self.urls = status, got, []
+
+    async def goto(self, url, **kw):
+        self.urls.append(url)
+        return type("R", (), {"status": self.status})()
+
+    async def wait_for_selector(self, sel, **kw):
+        if not self.got.get("comments"):
+            raise TimeoutError("no comments")
+
+    async def evaluate(self, js):
+        return self.got
 
 
-def test_rss_challenge_page_is_pushback_not_a_cached_miss(tmp_path):
+def test_read_post_page_statuses_and_challenge():
+    page = NavPage(200, {"post": True, "comments": items("hi")})
+    assert run(tc.read_post_page(page, "ab")) == items("hi") and page.urls == ["https://www.reddit.com/comments/ab/?sort=top"]
+    assert run(tc.read_post_page(NavPage(200, {"post": True, "comments": []}), "ab")) == []   # no comments yet
+    for status, got, why in ((404, {}, "HTTP 404"), (403, {}, "HTTP 403"),
+                             (200, {"post": False, "comments": []}, "not a post page")):
+        with pytest.raises(RuntimeError, match=why):
+            run(tc.read_post_page(NavPage(status, got), "ab"))
+
+
+def test_challenge_page_is_pushback_not_a_cached_miss(tmp_path):
+    """The 17 Nov failure mode, replayed: every read fails the same way -> 3 in a row stop the
+    step and nothing is cached as "no comment"."""
     write_list(posts("LifeProTips", "k", 5), "r_LifeProTips", root=tmp_path)
-
-    async def challenge(page, url):
-        return Resp(b"<!DOCTYPE html><html><body>prove you're human</body></html>")
-
-    stats = run(tc.fetch_top_comments(FakePage(), challenge, root=tmp_path, pace=(0, 0)))
-    assert stats["failed"] == 3 and "3 failures" in stats["stopped"]
+    page = NavPage(200, {"post": False, "comments": []})
+    stats = run(tc.fetch_top_comments(page, root=tmp_path, pace=(0, 0)))
+    assert stats["failed"] == 3 and "3 failures" in stats["stopped"] and "not a post page" in stats["stopped"]
     assert tc.load_cache(tmp_path / "reddit_comments.json") == {}
