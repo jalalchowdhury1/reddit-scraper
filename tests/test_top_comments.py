@@ -294,11 +294,13 @@ def test_page_html_spoilers_media_quotes_and_cut():
 class NavPage(FakePage):
     """A browser page for read_post_page: goto() answers `status`, the page holds `got`."""
     def __init__(self, status, got):
-        self.status, self.got, self.urls = status, got, []
+        self.statuses = list(status) if isinstance(status, tuple) else [status]
+        self.got, self.urls = got, []
 
     async def goto(self, url, **kw):
         self.urls.append(url)
-        return type("R", (), {"status": self.status})()
+        status = self.statuses.pop(0) if len(self.statuses) > 1 else self.statuses[0]
+        return type("R", (), {"status": status, "headers": {"retry-after": "1"}})()
 
     async def wait_for_selector(self, sel, **kw):
         if not self.got.get("comments"):
@@ -312,7 +314,9 @@ def test_read_post_page_statuses_and_challenge():
     page = NavPage(200, {"post": True, "comments": items("hi")})
     assert run(tc.read_post_page(page, "ab")) == items("hi") and page.urls == ["https://www.reddit.com/comments/ab/?sort=top"]
     assert run(tc.read_post_page(NavPage(200, {"post": True, "comments": []}), "ab")) == []   # no comments yet
-    for status, got, why in ((404, {}, "HTTP 404"), (403, {}, "HTTP 403"),
+    page = NavPage((429, 200), {"post": True, "comments": items("hi")})        # one 429: wait, ask again
+    assert run(tc.read_post_page(page, "ab")) == items("hi") and len(page.urls) == 2
+    for status, got, why in ((404, {}, "HTTP 404"), (403, {}, "HTTP 403"), ((429, 429), {}, "HTTP 429"),
                              (200, {"post": False, "comments": []}, "not a post page")):
         with pytest.raises(RuntimeError, match=why):
             run(tc.read_post_page(NavPage(status, got), "ab"))

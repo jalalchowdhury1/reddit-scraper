@@ -179,6 +179,13 @@ async def read_post_page(page, pid: str) -> list:
     Not 200 -> RuntimeError("HTTP <n>"); no post on the page (a login wall or a challenge)
     -> RuntimeError: Reddit pushing back, never cached as "no comment"."""
     r = await page.goto(post_url(pid), wait_until="domcontentloaded", timeout=30000)
+    if r is not None and r.status == 429:   # "slow down": wait what Reddit asks (3-20 s), once, like fetch()
+        try:
+            wait = min(20, max(3, int(float(r.headers.get("retry-after", 10)))))
+        except (TypeError, ValueError):
+            wait = 10
+        await page.wait_for_timeout(wait * 1000)
+        r = await page.goto(post_url(pid), wait_until="domcontentloaded", timeout=30000)
     if r is None or r.status != 200:
         raise RuntimeError(f"HTTP {r.status if r else 'no response'}")
     try:
